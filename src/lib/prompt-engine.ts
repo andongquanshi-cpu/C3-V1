@@ -24,10 +24,21 @@ function replaceTemplate(template: string, variables: AnyRecord) {
   });
 }
 
+function buildSystemPrompt(knowledge: AnyRecord) {
+  const template = readPromptTemplate("system.md");
+  const line = normalizeText(knowledge.businessLine || "weisec");
+  const brandName = line === "licaitong" ? "腾讯理财通" : "腾讯微证券";
+  return replaceTemplate(template, { brandName });
+}
+
+function normalizeText(value: unknown) {
+  return String(value || "").trim().toLowerCase();
+}
+
 function buildPrompt(templateName: string, input: AnyRecord, taskName: string, variablesBuilder: (input: AnyRecord, knowledge: AnyRecord) => AnyRecord) {
-  const systemPrompt = readPromptTemplate("system.md");
-  const taskTemplate = readPromptTemplate(templateName);
   const knowledge = retrieveKnowledge({ ...input, promptTask: taskName }, input.knowledgeOptions || {});
+  const systemPrompt = buildSystemPrompt(knowledge);
+  const taskTemplate = readPromptTemplate(templateName);
   const variables = variablesBuilder(input, knowledge);
   const taskPrompt = replaceTemplate(taskTemplate, {
     ...variables,
@@ -124,7 +135,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
     input.personaVariant,
   );
 
-  const globalSystem = readPromptTemplate("system.md");
+  const globalSystem = buildSystemPrompt(knowledge);
   return {
     ...personaPrompt,
     system: `${globalSystem}\n\n${personaPrompt.system}`,

@@ -20,9 +20,17 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn, parseLLMJson, safeJsonParse } from "@/lib/utils";
+import {
+  applyBusinessLineToBrief,
+  BUSINESS_LINE_PRESETS,
+  featureMatchesBusinessLine,
+  getBusinessLinePreset,
+  normalizeBusinessLine,
+} from "@/lib/business-line";
 import type {
   ApiConfig,
   BriefInput,
+  BusinessLine,
   ComplianceReport,
   ContentType,
   CreativeAngle,
@@ -59,6 +67,7 @@ const DEFAULT_API_CONFIG: ApiConfig = {
 };
 
 const DEFAULT_BRIEF: BriefInput = {
+  businessLine: "weisec",
   contentType: "brand-seed",
   topic: "腾讯微证券小程序如何帮助投资小白做日常盯盘",
   targetUser: "投资小白",
@@ -83,7 +92,7 @@ const CONTENT_TYPES: Array<{ value: ContentType; label: string; description: str
 ];
 
 const STEP_ITEMS = [
-  { id: 1, label: "API 配置", icon: KeyRound },
+  { id: 1, label: "环境与 API", icon: KeyRound },
   { id: 2, label: "类型/素材", icon: Layers3 },
   { id: 3, label: "创意角度", icon: Sparkles },
   { id: 4, label: "内容生成", icon: FileText },
@@ -104,100 +113,165 @@ function hasTextApi(apiConfig: ApiConfig) {
 }
 
 function buildDemoAngles(brief: BriefInput): CreativeAngle[] {
+  const preset = getBusinessLinePreset(brief.businessLine);
   const type = CONTENT_TYPES.find((item) => item.value === brief.contentType)?.label || "财经内容";
-  const demoAngles: CreativeAngle[] = [
-    {
-      angleId: "demo_angle_001",
-      angleName: "把盯盘变成日常小习惯",
-      angleType: "场景种草",
-      coreIdea: `围绕“${brief.topic || type}”，用上班通勤、午休、收盘后复盘三个场景，说明用户如何降低信息遗漏焦虑。`,
-      targetUser: brief.targetUser,
-      emotionalHook: ["省心", "低门槛", "可复制"],
-      userPainPoint: "想看市场变化，但没有整块时间打开复杂工具。",
-      contentStructure: "痛点提问 -> 场景拆解 -> 工具动作 -> 风险提醒",
-      recommendedTemplateId: "scenario-seeding",
-      recommendedFeatureIds: brief.selectedFeatureIds,
-      productBridge: {
-        painPoint: "碎片化时间无法持续盯盘",
-        contentScene: "微信里快速查看行情和提醒",
-        productAction: "打开腾讯微证券小程序查看自选和消息提醒",
-        softSentence: "我会把它当成日常信息看板，而不是交易指令。",
-        complianceNote: "不承诺收益，不输出买卖建议。",
-      },
-      titleDirections: ["普通人盯盘不用太复杂", "我把行情查看做轻了", "投资小白的日常看盘法"],
-      coverDirection: "简洁清单式封面，突出 3 个使用场景",
-      riskLevel: "low",
-      riskNotes: ["需要避免把工具使用结果表达成收益改善。"],
-    },
-    {
-      angleId: "demo_angle_002",
-      angleName: "从信息焦虑到决策前检查表",
-      angleType: "干货教程",
-      coreIdea: `把“${brief.topic || type}”拆成一个发布前可审核的财经内容检查表，强调信息整理、风险意识和工具辅助。`,
-      targetUser: brief.targetUser,
-      emotionalHook: ["避坑", "清单", "理性"],
-      userPainPoint: "看到热点容易跟风，缺少一套先看信息再判断的流程。",
-      contentStructure: "错误做法 -> 检查清单 -> 产品功能辅助 -> 保守结论",
-      recommendedTemplateId: "beginner-guide",
-      recommendedFeatureIds: brief.selectedFeatureIds,
-      productBridge: {
-        painPoint: "热点信息多，容易只看标题",
-        contentScene: "先查行情、再看提醒、最后做记录",
-        productAction: "用腾讯微证券做公开信息整理",
-        softSentence: "它更适合作为信息整理入口，不是替你做投资决定。",
-        complianceNote: "加入市场风险提示。",
-      },
-      titleDirections: ["看到热点先别急", "投资小白的检查表", "别把热点当答案"],
-      coverDirection: "表格式封面，呈现三步检查",
-      riskLevel: "low",
-      riskNotes: ["热点内容需避免个股推荐和确定性判断。"],
-    },
-  ];
+  const isLicaitong = brief.businessLine === "licaitong";
+  const demoAngles: CreativeAngle[] = isLicaitong
+    ? [
+        {
+          angleId: "demo_angle_001",
+          angleName: "发工资后的三步理财检查",
+          angleType: "生活场景",
+          coreIdea: `围绕“${brief.topic || type}”，用工资到账、周末复盘、月底回顾三个节点，说明新手如何先做风险判断再看产品信息。`,
+          targetUser: brief.targetUser,
+          emotionalHook: ["可执行", "低压力", "生活化"],
+          userPainPoint: "想开始理财，但不知道先看风险等级还是先看收益。",
+          contentStructure: "生活场景 -> 判断框架 -> 平台操作 -> 风险提醒",
+          recommendedTemplateId: "scenario-seeding",
+          recommendedFeatureIds: brief.selectedFeatureIds,
+          productBridge: {
+            painPoint: "产品多、术语多，容易只看收益",
+            contentScene: "微信里比较风险等级和期限",
+            productAction: `打开${preset.brandName}浏览产品详情和风险揭示`,
+            softSentence: "我更把它当成信息整理入口，不是替你做购买决定。",
+            complianceNote: "不承诺收益，不输出买卖建议。",
+          },
+          titleDirections: ["发工资后我会先看这 3 项", "新手选基金先别急着看收益", "微信里怎么比较理财产品"],
+          coverDirection: "暖色生活场景封面，突出检查清单",
+          riskLevel: "low",
+          riskNotes: ["需要避免把产品浏览表达成收益改善。"],
+        },
+        {
+          angleId: "demo_angle_002",
+          angleName: "定投前先搞懂的三个问题",
+          angleType: "干货教程",
+          coreIdea: `把“${brief.topic || type}”拆成三个入门问题：这笔钱多久不用、能接受多大波动、是否看过法律文件。`,
+          targetUser: brief.targetUser,
+          emotionalHook: ["避坑", "框架", "克制"],
+          userPainPoint: "看到别人推荐就想跟，缺少自己的判断框架。",
+          contentStructure: "常见误区 -> 三个问题 -> 平台辅助 -> 保守结论",
+          recommendedTemplateId: "beginner-guide",
+          recommendedFeatureIds: brief.selectedFeatureIds,
+          productBridge: {
+            painPoint: "信息碎片化，容易只看标题",
+            contentScene: "先查产品类型，再看风险等级和规则",
+            productAction: `用${preset.brandName}做公开信息整理`,
+            softSentence: "工具适合帮你把信息摆清楚，不适合替你做决定。",
+            complianceNote: "加入标准风险提示。",
+          },
+          titleDirections: ["定投前我会先问自己", "理财新手别跳过这 3 步", "先搞懂风险再看产品"],
+          coverDirection: "清单式封面，呈现三个问题",
+          riskLevel: "low",
+          riskNotes: ["避免具体产品推荐和确定性判断。"],
+        },
+      ]
+    : [
+        {
+          angleId: "demo_angle_001",
+          angleName: "把盯盘变成日常小习惯",
+          angleType: "场景种草",
+          coreIdea: `围绕“${brief.topic || type}”，用上班通勤、午休、收盘后复盘三个场景，说明用户如何降低信息遗漏焦虑。`,
+          targetUser: brief.targetUser,
+          emotionalHook: ["省心", "低门槛", "可复制"],
+          userPainPoint: "想看市场变化，但没有整块时间打开复杂工具。",
+          contentStructure: "痛点提问 -> 场景拆解 -> 工具动作 -> 风险提醒",
+          recommendedTemplateId: "scenario-seeding",
+          recommendedFeatureIds: brief.selectedFeatureIds,
+          productBridge: {
+            painPoint: "碎片化时间无法持续盯盘",
+            contentScene: "微信里快速查看行情和提醒",
+            productAction: `打开${preset.brandName}小程序查看自选和消息提醒`,
+            softSentence: "我会把它当成日常信息看板，而不是交易指令。",
+            complianceNote: "不承诺收益，不输出买卖建议。",
+          },
+          titleDirections: ["普通人盯盘不用太复杂", "我把行情查看做轻了", "投资小白的日常看盘法"],
+          coverDirection: "简洁清单式封面，突出 3 个使用场景",
+          riskLevel: "low",
+          riskNotes: ["需要避免把工具使用结果表达成收益改善。"],
+        },
+        {
+          angleId: "demo_angle_002",
+          angleName: "从信息焦虑到决策前检查表",
+          angleType: "干货教程",
+          coreIdea: `把“${brief.topic || type}”拆成一个发布前可审核的财经内容检查表，强调信息整理、风险意识和工具辅助。`,
+          targetUser: brief.targetUser,
+          emotionalHook: ["避坑", "清单", "理性"],
+          userPainPoint: "看到热点容易跟风，缺少一套先看信息再判断的流程。",
+          contentStructure: "错误做法 -> 检查清单 -> 产品功能辅助 -> 保守结论",
+          recommendedTemplateId: "beginner-guide",
+          recommendedFeatureIds: brief.selectedFeatureIds,
+          productBridge: {
+            painPoint: "热点信息多，容易只看标题",
+            contentScene: "先查行情、再看提醒、最后做记录",
+            productAction: `用${preset.brandName}做公开信息整理`,
+            softSentence: "它更适合作为信息整理入口，不是替你做投资决定。",
+            complianceNote: "加入市场风险提示。",
+          },
+          titleDirections: ["看到热点先别急", "投资小白的检查表", "别把热点当答案"],
+          coverDirection: "表格式封面，呈现三步检查",
+          riskLevel: "low",
+          riskNotes: ["热点内容需避免个股推荐和确定性判断。"],
+        },
+      ];
   return demoAngles.slice(0, Math.max(1, brief.generateCount));
 }
 
 function buildDemoContent(brief: BriefInput, angle: CreativeAngle): GeneratedContent {
+  const preset = getBusinessLinePreset(brief.businessLine);
   const title = angle.titleDirections[0] || angle.angleName;
-  const featureName = brief.selectedFeatureNames[0] || "行情查询";
+  const featureName = brief.selectedFeatureNames[0] || (brief.businessLine === "licaitong" ? "产品浏览与筛选" : "行情查询");
+  const isLicaitong = brief.businessLine === "licaitong";
   return {
     id: uid("content"),
     angleId: angle.angleId,
     angleName: angle.angleName,
     titleCandidates: [
       { text: title, type: "干货式", riskLevel: "low" },
-      { text: "投资小白先看这 3 点", type: "数字式", riskLevel: "low" },
-      { text: "盯盘不用一直盯着屏幕", type: "反差式", riskLevel: "low" },
+      { text: isLicaitong ? "理财新手先看这 3 点" : "投资小白先看这 3 点", type: "数字式", riskLevel: "low" },
+      { text: isLicaitong ? "选产品不用一次看懂全部" : "盯盘不用一直盯着屏幕", type: "反差式", riskLevel: "low" },
     ],
     selectedTitle: title,
     coverTextCandidates: [
-      { text: "盯盘轻一点", style: "干货", riskLevel: "low" },
+      { text: isLicaitong ? "先看风险等级" : "盯盘轻一点", style: "干货", riskLevel: "low" },
       { text: "先看清再判断", style: "工具", riskLevel: "low" },
-      { text: "小白看盘清单", style: "清单", riskLevel: "low" },
+      { text: isLicaitong ? "新手理财清单" : "小白看盘清单", style: "清单", riskLevel: "low" },
     ],
-    selectedCoverText: "盯盘轻一点",
-    content: [
-      `很多投资小白不是不想做功课，而是每天信息太碎：通勤刷到热点、午休看到行情变化、晚上才想起来复盘。`,
-      `我更建议把“盯盘”拆成轻一点的流程：先看公开信息，再看和自己关注方向有关的变化，最后记录不确定的地方。`,
-      `如果只是做日常信息整理，可以用腾讯微证券里的${featureName}相关能力，把行情、提醒和自选信息放到同一个入口里看。`,
-      `重点是：工具只能帮助你提高信息获取效率，不能替你判断买卖。看到任何热点，都要回到风险、估值和自身承受能力。`,
-      `市场有风险，投资需谨慎。`,
-    ].join("\n\n"),
+    selectedCoverText: isLicaitong ? "先看风险等级" : "盯盘轻一点",
+    content: isLicaitong
+      ? [
+          `很多理财新手不是不想开始，而是产品信息太碎：工资到账想存一点、周末想比较风险等级、月底才想起来复盘。`,
+          `我更建议把“了解理财”拆成轻一点的流程：先看这笔钱多久不用，再看风险等级和流动性，最后记录自己还不确定的地方。`,
+          `如果只是做公开信息整理，可以在${preset.brandName}里用${featureName}相关能力，把产品类型、风险等级和规则说明放到同一个入口里看。`,
+          `重点是：平台只能帮助你提高信息获取效率，不能替你判断买不买。看到任何推荐，都要回到风险承受能力和产品规则。`,
+          `市场有风险，投资需谨慎。`,
+        ].join("\n\n")
+      : [
+          `很多投资小白不是不想做功课，而是每天信息太碎：通勤刷到热点、午休看到行情变化、晚上才想起来复盘。`,
+          `我更建议把“盯盘”拆成轻一点的流程：先看公开信息，再看和自己关注方向有关的变化，最后记录不确定的地方。`,
+          `如果只是做日常信息整理，可以用${preset.brandName}里的${featureName}相关能力，把行情、提醒和自选信息放到同一个入口里看。`,
+          `重点是：工具只能帮助你提高信息获取效率，不能替你判断买卖。看到任何热点，都要回到风险、估值和自身承受能力。`,
+          `市场有风险，投资需谨慎。`,
+        ].join("\n\n"),
     insertStrategy: {
       featureName,
       userPainPoint: angle.userPainPoint || "",
-      scene: "碎片化盯盘和公开信息整理",
+      scene: isLicaitong ? "工资到账后的产品信息整理" : "碎片化盯盘和公开信息整理",
       insertPosition: "正文中段",
-      usedPhrase: `用腾讯微证券里的${featureName}相关能力做信息整理`,
+      usedPhrase: `用${preset.brandName}里的${featureName}相关能力做信息整理`,
       insertStrength: brief.embedLevel,
     },
-    tags: ["腾讯微证券", "投资小白", "财经干货", "小红书运营"],
-    interactionGuide: "你平时会在哪个时间点看市场信息？评论区可以写下你的习惯。",
+    tags: [preset.brandName, brief.targetUser, "财经干货", "小红书运营"],
+    interactionGuide: isLicaitong
+      ? "你发工资后通常会先做什么？评论区可以写下你的习惯。"
+      : "你平时会在哪个时间点看市场信息？评论区可以写下你的习惯。",
     riskReminder: "市场有风险，投资需谨慎。",
     imagePromptSuggestions: [
       {
         style: "dry-goods",
-        prompt: "3:4 小红书财经干货封面，深色中性背景，中心是一张简洁检查表，标题文字为“盯盘轻一点”，画面包含手机界面抽象元素，不出现具体股票名称、代码、收益截图或持仓截图，专业克制，留白充足",
-        coverText: "盯盘轻一点",
+        prompt: isLicaitong
+          ? "3:4 小红书理财干货封面，暖色生活场景背景，中心是一张简洁检查表，标题文字为“先看风险等级”，画面包含微信界面抽象元素，不出现具体收益率、产品名称或持仓截图，克制温暖，留白充足"
+          : "3:4 小红书财经干货封面，深色中性背景，中心是一张简洁检查表，标题文字为“盯盘轻一点”，画面包含手机界面抽象元素，不出现具体股票名称、代码、收益截图或持仓截图，专业克制，留白充足",
+        coverText: isLicaitong ? "先看风险等级" : "盯盘轻一点",
         riskNotes: ["不展示收益率、股票代码或交易建议。"],
       },
     ],
@@ -304,7 +378,14 @@ export function CopilotWorkbench() {
 
   useEffect(() => {
     setApiConfig(safeJsonParse(localStorage.getItem(STORAGE_KEYS.api) || "", DEFAULT_API_CONFIG));
-    setBrief({ ...DEFAULT_BRIEF, ...safeJsonParse(localStorage.getItem(STORAGE_KEYS.brief) || "", {}) });
+    const storedBrief = safeJsonParse<Partial<BriefInput>>(localStorage.getItem(STORAGE_KEYS.brief) || "", {});
+    const businessLine = normalizeBusinessLine(storedBrief.businessLine);
+    setBrief({
+      ...DEFAULT_BRIEF,
+      ...storedBrief,
+      businessLine,
+      targetUser: storedBrief.targetUser || getBusinessLinePreset(businessLine).defaultTargetUser,
+    });
     setMaterials(safeJsonParse(localStorage.getItem(STORAGE_KEYS.materials) || "", []));
     setDrafts(safeJsonParse(localStorage.getItem(STORAGE_KEYS.drafts) || "", []));
 
@@ -334,11 +415,27 @@ export function CopilotWorkbench() {
   const selectedAngles = useMemo(() => angles.filter((angle) => selectedAngleIds.includes(angle.angleId)), [angles, selectedAngleIds]);
   const activeResult = useMemo(() => results.find((item) => item.id === activeResultId) || results[0], [activeResultId, results]);
   const selectedType = CONTENT_TYPES.find((item) => item.value === brief.contentType);
+  const linePreset = useMemo(() => getBusinessLinePreset(brief.businessLine), [brief.businessLine]);
+  const businessLineFeatures = useMemo(
+    () => (knowledge?.features || []).filter((feature) => featureMatchesBusinessLine(feature, brief.businessLine)),
+    [brief.businessLine, knowledge],
+  );
   const filteredFeatures = useMemo(() => {
-    const all = knowledge?.features || [];
-    const byType = all.filter((feature) => feature.suitableContentTypes.includes(brief.contentType));
-    return byType.length ? byType : all.slice(0, 8);
-  }, [brief.contentType, knowledge]);
+    const byType = businessLineFeatures.filter((feature) => feature.suitableContentTypes.includes(brief.contentType));
+    return byType.length ? byType : businessLineFeatures.slice(0, 8);
+  }, [brief.contentType, businessLineFeatures]);
+
+  function switchBusinessLine(line: BusinessLine) {
+    if (line === brief.businessLine) return;
+    const preset = getBusinessLinePreset(line);
+    setBrief((current) => applyBusinessLineToBrief(current, line));
+    setAngles([]);
+    setSelectedAngleIds([]);
+    setResults([]);
+    setActiveResultId("");
+    setImageResult("");
+    setStatus(`已切换到${preset.label}，产品功能与默认主题已更新`);
+  }
 
   function updateBrief(patch: Partial<BriefInput>) {
     setBrief((current) => ({ ...current, ...patch }));
@@ -573,22 +670,48 @@ export function CopilotWorkbench() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-5 py-5">
-        <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                <Sparkles className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold tracking-normal">C3-V0 Copilot AI 工作台</h1>
-                <p className="text-sm text-muted-foreground">基于 G12 重构的五步内容创作最小可用版本</p>
+        <header className="flex flex-col gap-4 border-b border-border pb-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-semibold tracking-normal">C3 Copilot AI 工作台</h1>
+                  <p className="text-sm text-muted-foreground">一套工作流，支持微证券与理财通双业务线</p>
+                </div>
               </div>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant={hasTextApi(apiConfig) ? "success" : "warning"}>{hasTextApi(apiConfig) ? "文字 API 已配置" : "演示模式"}</Badge>
+              <Badge variant="secondary">{linePreset.shortLabel} · KB {knowledge?.knowledgeBaseVersion || "加载中"}</Badge>
+              <Badge variant="outline">草稿 {drafts.length}</Badge>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={hasTextApi(apiConfig) ? "success" : "warning"}>{hasTextApi(apiConfig) ? "文字 API 已配置" : "演示模式"}</Badge>
-            <Badge variant="secondary">KB {knowledge?.knowledgeBaseVersion || "加载中"}</Badge>
-            <Badge variant="outline">草稿 {drafts.length}</Badge>
+
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-medium">业务线</p>
+              <p className="text-sm text-muted-foreground">{linePreset.positioning}</p>
+            </div>
+            <div className="flex rounded-lg border border-border bg-muted/40 p-1">
+              {Object.values(BUSINESS_LINE_PRESETS).map((line) => (
+                <button
+                  key={line.id}
+                  type="button"
+                  onClick={() => switchBusinessLine(line.id)}
+                  className={cn(
+                    "rounded-md px-4 py-2 text-sm font-medium transition-colors",
+                    brief.businessLine === line.id
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-background",
+                  )}
+                >
+                  {line.label}
+                </button>
+              ))}
+            </div>
           </div>
         </header>
 
@@ -626,6 +749,7 @@ export function CopilotWorkbench() {
                 <CardDescription>当前生成上下文</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between gap-3"><span className="text-muted-foreground">业务线</span><strong>{linePreset.shortLabel}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">内容类型</span><strong>{selectedType?.label}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">目标人群</span><strong>{brief.targetUser}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">素材</span><strong>{materials.length} 条</strong></div>
@@ -646,10 +770,20 @@ export function CopilotWorkbench() {
             {step === 1 && (
               <Card>
                 <CardHeader>
-                  <CardTitle>1. API 配置</CardTitle>
-                  <CardDescription>API Key 仅保存在浏览器 localStorage。未配置文字 API 时，可使用本地演示生成完成流程验证。</CardDescription>
+                  <CardTitle>1. 环境与 API 配置</CardTitle>
+                  <CardDescription>先在页头选择业务线（微证券 / 理财通），再配置 API。Key 仅保存在浏览器 localStorage。</CardDescription>
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4 md:col-span-2">
+                    <Label>当前业务线</Label>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">{linePreset.label}</Badge>
+                      <span className="text-sm text-muted-foreground">{linePreset.positioning}</span>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      切换业务线后，Step 2 的产品功能、默认主题和目标人群会同步更新，并清空已选功能与生成结果。
+                    </p>
+                  </div>
                   <div className="space-y-2 md:col-span-2">
                     <Label>文字生成 API Key</Label>
                     <Input type="password" value={apiConfig.text.key} onChange={(event) => setApiConfig({ ...apiConfig, text: { ...apiConfig.text, key: event.target.value } })} placeholder="DeepSeek / OpenAI 兼容 Key" />
@@ -685,7 +819,7 @@ export function CopilotWorkbench() {
               <Card>
                 <CardHeader>
                   <CardTitle>2. 内容类型与素材/热点</CardTitle>
-                  <CardDescription>选择类型、用户、主推功能，并补充热点或素材。</CardDescription>
+                  <CardDescription>当前为 {linePreset.label}。选择类型、用户、主推功能，并补充热点或素材。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -713,17 +847,18 @@ export function CopilotWorkbench() {
                     <div className="space-y-2">
                       <Label>目标人群</Label>
                       <Select value={brief.targetUser} onChange={(event) => updateBrief({ targetUser: event.target.value })}>
-                        <option>投资小白</option>
-                        <option>忙碌上班族</option>
-                        <option>热点关注者</option>
-                        <option>微信高频用户</option>
-                        <option>轻量理财用户</option>
+                        {linePreset.targetUserOptions.map((user) => (
+                          <option key={user} value={user}>{user}</option>
+                        ))}
                       </Select>
                     </div>
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm font-medium"><Database className="h-4 w-4" /> 知识库功能选择</div>
+                    <div className="flex items-center justify-between gap-2 text-sm font-medium">
+                      <span className="flex items-center gap-2"><Database className="h-4 w-4" /> {linePreset.shortLabel} 知识库功能</span>
+                      <Badge variant="outline">{businessLineFeatures.length} 项可选</Badge>
+                    </div>
                     <div className="grid gap-2 md:grid-cols-2">
                       {filteredFeatures.slice(0, 8).map((feature) => (
                         <label key={feature.id} className="flex gap-3 rounded-md border border-border p-3 text-sm">
@@ -760,7 +895,7 @@ export function CopilotWorkbench() {
               <Card>
                 <CardHeader>
                   <CardTitle>3. 创意角度生成</CardTitle>
-                  <CardDescription>Prompt Engine 会带入 KB v3.2 的产品功能、模板、话术和合规规则。</CardDescription>
+                  <CardDescription>Prompt Engine 会按当前业务线检索 KB v3.3 的产品功能、模板、话术和合规规则。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-4">
@@ -926,10 +1061,10 @@ export function CopilotWorkbench() {
             <Card>
               <CardHeader>
                 <CardTitle>知识库调用</CardTitle>
-                <CardDescription>来自 G12 的 KB v3.2</CardDescription>
+                <CardDescription>{linePreset.shortLabel} · KB v{knowledge?.knowledgeBaseVersion || "3.3"}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">产品功能</span><strong>{knowledge?.counts?.features ?? "-"}</strong></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">当前业务线功能</span><strong>{businessLineFeatures.length}</strong></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">内容模板</span><strong>{knowledge?.counts?.templates ?? "-"}</strong></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">合规规则</span><strong>{knowledge?.counts?.complianceRules ?? "-"}</strong></div>
                 <div className="flex justify-between"><span className="text-muted-foreground">改写规则</span><strong>{knowledge?.counts?.rewriteRules ?? "-"}</strong></div>

@@ -451,6 +451,7 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
   const kb = loadKnowledgeBase(options);
   const features = kb.productFeatures.map((feature: AnyRecord) => ({
     id: feature.id,
+    businessLine: feature.businessLine || "all",
     name: feature.name,
     summary: feature.summary || "",
     aliases: toArray(feature.aliases),

@@ -9,6 +9,7 @@ export type GenerationMode = "image-text" | "video-script";
 export type BloggerLevel = "tail" | "middle" | "head";
 export type EmbedLevel = "none" | "low" | "medium" | "high";
 export type RiskLevel = "low" | "medium" | "high";
+export type BusinessLine = "weisec" | "licaitong";
 
 export interface ApiConfig {
   text: {
@@ -38,6 +39,7 @@ export interface Material {
 }
 
 export interface BriefInput {
+  businessLine: BusinessLine;
   contentType: ContentType;
   topic: string;
   targetUser: string;
@@ -130,6 +132,7 @@ export interface Draft extends GeneratedContent {
 
 export interface ProductFeatureView {
   id: string;
+  businessLine?: string;
   name: string;
   summary: string;
   aliases: string[];
