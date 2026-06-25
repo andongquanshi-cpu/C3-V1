@@ -1,0 +1,42 @@
+{
+  "version": "3.3",
+  "name": "Tencent Licaitong & WeSec Xiaohongshu AI Knowledge Base",
+  "generatedAt": "2026-06-22",
+  "sourceDocs": "docs/knowledgebase",
+  "files": {
+    "schema": "schema.json",
+    "brandVoice": "brand-voice.json",
+    "productFeatures": "product-features.json",
+    "contentTemplates": "content-templates.json",
+    "phraseLibrary": "phrase-library.json",
+    "complianceRules": "compliance-rules.json",
+    "cleanedComplianceRewriteRules": "compliance-rewrite-rules.cleaned.json",
+    "riskDisclaimers": "risk-disclaimers.json",
+    "platformRules": "platform-rules.json",
+    "visualGuidelines": "visual-guidelines.json",
+    "audienceProfiles": "audience-profiles.json"
+  },
+  "recommendedPromptRetrieval": {
+    "contentGeneration": [
+      "brandVoice by businessLine",
+      "1-2 contentTemplates",
+      "2-4 productFeatures",
+      "1 phraseLibrary group",
+      "required riskDisclaimers",
+      "high risk complianceRules + platformRules summary"
+    ],
+    "complianceReview": [
+      "complianceRules",
+      "rewriteRules",
+      "riskDisclaimers",
+      "platformRules",
+      "brandVoice.avoidExpressions"
+    ],
+    "coverGeneration": [
+      "visualGuidelines",
+      "contentTemplates.coverTextPatterns",
+      "platformRules.image",
+      "complianceRules"
+    ]
+  }
+}

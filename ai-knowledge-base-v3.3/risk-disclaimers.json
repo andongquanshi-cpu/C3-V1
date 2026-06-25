@@ -1,0 +1,98 @@
+{
+  "version": "3.3",
+  "source": "docs/knowledgebase/risk_disclaimer.md",
+  "globalRiskReminder": "市场有风险，投资需谨慎。",
+  "triggerKeywords": [
+    "投资",
+    "理财",
+    "基金",
+    "股票",
+    "行情",
+    "开户",
+    "交易",
+    "收益",
+    "涨跌"
+  ],
+  "items": [
+    {
+      "id": "disclaimer_general",
+      "scenario": "general",
+      "businessLine": "all",
+      "appliesTo": [
+        "all"
+      ],
+      "priority": 100,
+      "text": "投资有风险，入市需谨慎。本文内容仅供参考，不构成投资建议。",
+      "required": true
+    },
+    {
+      "id": "disclaimer_fund",
+      "scenario": "fund",
+      "businessLine": "all",
+      "appliesTo": [
+        "finance-tips",
+        "stock-tutorial"
+      ],
+      "priority": 90,
+      "text": "理财产品过往业绩不代表其未来表现，不等于实际收益，投资需谨慎。",
+      "required": false
+    },
+    {
+      "id": "disclaimer_wealth",
+      "scenario": "wealth",
+      "businessLine": "licaitong",
+      "appliesTo": [
+        "finance-tips",
+        "scenario-seeding"
+      ],
+      "priority": 88,
+      "text": "市场有风险，投资需谨慎。请根据自身风险承受能力理性投资。",
+      "required": false
+    },
+    {
+      "id": "disclaimer_securities",
+      "scenario": "securities",
+      "businessLine": "weisec",
+      "appliesTo": [
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "priority": 88,
+      "text": "本内容不构成任何投资建议，投资者应独立判断并承担投资风险。",
+      "required": false
+    },
+    {
+      "id": "disclaimer_content",
+      "scenario": "content",
+      "businessLine": "all",
+      "appliesTo": [
+        "all"
+      ],
+      "priority": 85,
+      "text": "产品收益受市场波动影响，实际收益可能与预期存在差异。",
+      "required": false
+    }
+  ],
+  "allTexts": [
+    "投资有风险，入市需谨慎。本文内容仅供参考，不构成投资建议。",
+    "理财产品过往业绩不代表其未来表现，不等于实际收益，投资需谨慎。",
+    "市场有风险，投资需谨慎。请根据自身风险承受能力理性投资。",
+    "本内容不构成任何投资建议，投资者应独立判断并承担投资风险。",
+    "产品收益受市场波动影响，实际收益可能与预期存在差异。",
+    "请仔细阅读产品说明书和风险揭示书，充分了解产品风险。",
+    "不同产品风险等级不同，请选择与自身风险承受能力匹配的产品。",
+    "基金投资有风险，可能发生亏损。基金的过往业绩不预示其未来表现。",
+    "基金管理人承诺以诚实信用、勤勉尽责的原则管理和运用基金资产，但不保证基金一定盈利，也不保证最低收益。",
+    "保险产品的具体保障范围、责任免除等内容以保险合同条款为准。",
+    "请仔细阅读保险合同条款，特别是责任免除条款，根据自身需求选择合适的产品。",
+    "贷款有风险，借款需谨慎。请根据自身还款能力合理借贷，避免过度负债。",
+    "逾期还款可能影响个人征信，请按时还款保持良好信用记录。",
+    "信用卡透支消费需按时还款，逾期将产生利息和违约金，并可能影响个人征信。",
+    "分期业务将产生手续费，具体费率以银行公示为准，请理性使用分期功能。",
+    "理财非存款，产品有风险，投资需谨慎。",
+    "本产品为非保本浮动收益类理财产品，不保证本金和收益。",
+    "📌 本文内容仅为个人使用体验分享，不代表任何官方建议，效果因人而异。",
+    "📌 本分享基于个人真实体验，仅供参考，实际效果可能因个人情况有所不同。",
+    "📌 产品信息来源于官方公开资料，如有变动请以官方最新信息为准。"
+  ]
+}

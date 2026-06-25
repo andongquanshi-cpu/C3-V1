@@ -1,0 +1,105 @@
+{
+  "version": "3.3",
+  "source": "docs/knowledgebase/platform_rule.md",
+  "items": [
+    {
+      "id": "platform_no_external_link",
+      "category": "外链引流",
+      "riskLevel": "high",
+      "description": "文案中不得包含外部链接、二维码、微信号、电话号码或网址域名。",
+      "forbiddenPatterns": [
+        "http://",
+        "https://",
+        "www.",
+        "加微信",
+        "扫码",
+        "点击链接"
+      ],
+      "safeAlternatives": [
+        "微信搜索腾讯微证券或腾讯理财通进入官方入口",
+        "查看主页介绍了解官方路径"
+      ],
+      "appliesTo": [
+        "all"
+      ]
+    },
+    {
+      "id": "platform_no_inducement",
+      "category": "诱导互动",
+      "riskLevel": "high",
+      "description": "禁止用利益诱导点赞、收藏、关注或评论。",
+      "forbiddenPatterns": [
+        "点赞就送",
+        "关注后私信送",
+        "评论666抽奖",
+        "收藏领红包"
+      ],
+      "safeAlternatives": [
+        "如果这篇对你有帮助，可以收藏方便以后查看",
+        "欢迎在评论区分享你的学习心得"
+      ],
+      "appliesTo": [
+        "all"
+      ]
+    },
+    {
+      "id": "platform_finance_content",
+      "category": "金融内容",
+      "riskLevel": "high",
+      "description": "金融类内容须避免收益承诺、具体标的推荐和未经核验的活动信息。",
+      "forbiddenPatterns": [
+        "稳赚",
+        "保本",
+        "必涨",
+        "荐股",
+        "跟买"
+      ],
+      "safeAlternatives": [
+        "仅作信息整理和学习参考",
+        "不构成投资建议"
+      ],
+      "appliesTo": [
+        "all"
+      ]
+    },
+    {
+      "id": "platform_image_format",
+      "category": "图片规范",
+      "riskLevel": "medium",
+      "description": "封面不宜使用具体股票代码、收益截图、持仓截图或强煽动视觉。",
+      "forbiddenPatterns": [
+        "收益截图",
+        "持仓截图",
+        "暴涨",
+        "抄底"
+      ],
+      "safeAlternatives": [
+        "使用生活场景或信息卡片式封面",
+        "3:4 比例小红书封面风"
+      ],
+      "appliesTo": [
+        "cover",
+        "image-text"
+      ]
+    },
+    {
+      "id": "platform_official_path_only",
+      "category": "官方路径",
+      "riskLevel": "high",
+      "description": "引导用户了解产品须使用官方路径，禁止私信领资料或扣1私你式导流。",
+      "forbiddenPatterns": [
+        "私信领取",
+        "扣1私你",
+        "加群交流",
+        "进群领"
+      ],
+      "safeAlternatives": [
+        "微信搜索官方小程序了解",
+        "通过官方页面查看功能和服务"
+      ],
+      "appliesTo": [
+        "all"
+      ]
+    }
+  ]
+}

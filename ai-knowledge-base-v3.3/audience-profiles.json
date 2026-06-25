@@ -1,0 +1,270 @@
+{
+  "version": "3.3",
+  "items": [
+    {
+      "id": "KB_LCT_AUDIENCE_001",
+      "businessLine": "licaitong",
+      "knowledgeType": "audience_profile",
+      "name": "理财通｜职场储蓄入门者",
+      "priority": "High",
+      "applicablePersonas": [
+        "职场新人",
+        "理财小白",
+        "轻储蓄用户"
+      ],
+      "applicableContentTypes": [
+        "图文帖",
+        "长笔记",
+        "短视频脚本"
+      ],
+      "description": "  - 工资到账后总是留不下钱   - 想开始理财，但不懂术语、怕踩坑   - 不想下载复杂理财 App，也不想天天盯   - 微信内完成大部分日常信息获取   - 在小红书、朋友圈、朋友聊天中接触理财概念   - 更信任“普通人经验分享”而非专业销售口吻",
+      "ageStage": "22-30 岁，毕业 1-5 年",
+      "occupation": "普通白领、初级运营、设计、行政、互联网/服务业新人",
+      "painPoints": [
+        "工资到账后总是留不下钱",
+        "想开始理财，但不懂术语、怕踩坑",
+        "不想下载复杂理财 App，也不想天天盯"
+      ],
+      "infoHabits": [
+        "微信内完成大部分日常信息获取",
+        "在小红书、朋友圈、朋友聊天中接触理财概念",
+        "更信任“普通人经验分享”而非专业销售口吻"
+      ],
+      "primaryColors": "",
+      "coreElements": "",
+      "styleKeywords": "",
+      "forbiddenVisuals": "",
+      "safeExpressions": [
+        "工资到账后先留一笔出来，剩下的再花，我反而更能存住钱。",
+        "我更在意省心，不想多装一个 App，也不想每天盯。",
+        "先把闲钱和备用金安排好，比一上来追热点更重要。",
+        "理财这件事对我来说，第一步不是赚多少，而是先建立习惯。"
+      ],
+      "forbiddenExpressions": [
+        "教你快速翻倍",
+        "工资太少也能靠这个逆袭",
+        "随便放进去都能赚",
+        "闭眼买就行"
+      ],
+      "applicableScenes": [
+        "工资到账后的强制储蓄",
+        "闲钱管理与备用金安排",
+        "理财小白第一次接触定投或自动转入",
+        "不想下载复杂理财 App 的微信高频用户"
+      ],
+      "promptSummary": "",
+      "source": "group 6 理财通页面、group 9 理财通工作流资产、Phase 2 业务梳理"
+    },
+    {
+      "id": "KB_LCT_AUDIENCE_002",
+      "businessLine": "licaitong",
+      "knowledgeType": "audience_profile",
+      "name": "理财通｜家庭稳健规划者",
+      "priority": "High",
+      "applicablePersonas": [
+        "家庭规划者",
+        "稳健投资者",
+        "家庭 CFO"
+      ],
+      "applicableContentTypes": [
+        "图文帖",
+        "长笔记"
+      ],
+      "description": "  - 家庭预算、教育金、备用金缺少清晰规划   - 不想高频操作，但又不想让钱长期闲置   - 家庭资产安排容易被日常支出打乱   - 关注长期规划、稳健理财、家庭预算类内容   - 更容易被“比例框架、分阶段安排、真实家庭案例”打动   - 倾向接受低焦虑、秩序化、安心感强的表达",
+      "ageStage": "28-40 岁，已婚或承担家庭责任",
+      "occupation": "有家庭责任的职场人、家长、家庭财务主理人",
+      "painPoints": [
+        "家庭预算、教育金、备用金缺少清晰规划",
+        "不想高频操作，但又不想让钱长期闲置",
+        "家庭资产安排容易被日常支出打乱"
+      ],
+      "infoHabits": [
+        "关注长期规划、稳健理财、家庭预算类内容",
+        "更容易被“比例框架、分阶段安排、真实家庭案例”打动",
+        "倾向接受低焦虑、秩序化、安心感强的表达"
+      ],
+      "primaryColors": "",
+      "coreElements": "",
+      "styleKeywords": "",
+      "forbiddenVisuals": "",
+      "safeExpressions": [
+        "家里用钱的地方很多，我更想先把底盘打稳。",
+        "比起追涨跌，我更关心这笔钱能不能长期按计划放着。",
+        "家庭理财最怕的不是赚得少，而是没规划。",
+        "能把教育金、备用金、长期存钱计划分开想，会更安心。"
+      ],
+      "forbiddenExpressions": [
+        "高收益又无风险",
+        "家庭资产这样配最赚",
+        "一把梭哈更有效率",
+        "不如直接上高波动产品"
+      ],
+      "applicableScenes": [
+        "为孩子教育金做长期准备",
+        "夫妻共同管理家庭备用金",
+        "家庭预算与稳健理财安排",
+        "想把存钱和消费分开管理"
+      ],
+      "promptSummary": "",
+      "source": "group 6 理财通页面、group 9 理财通工作流资产、家庭理财场景梳理"
+    },
+    {
+      "id": "KB_WS_AUDIENCE_001",
+      "businessLine": "weisec",
+      "knowledgeType": "audience_profile",
+      "name": "微证券｜微信内轻量入门型新股民",
+      "priority": "High",
+      "applicablePersonas": [
+        "校园理财探索生",
+        "理财小白",
+        "职场新人"
+      ],
+      "applicableContentTypes": [
+        "图文帖",
+        "短视频脚本"
+      ],
+      "description": "  - 看不懂术语，不知道从哪开始接触行情   - 不想下载多个工具，只想先轻量看看   - 害怕被硬核金融界面和专业表达劝退   - 高频使用微信、小红书、短视频内容获取信息   - 更信任“同龄人分享”而不是“专家说教”   - 愿意从热点、校园、实习、同学聊天等场景进入",
+      "ageStage": "18-26 岁，大学生、实习生、初入职场用户",
+      "occupation": "校园用户、理财零基础人群、入门型投资用户",
+      "painPoints": [
+        "看不懂术语，不知道从哪开始接触行情",
+        "不想下载多个工具，只想先轻量看看",
+        "害怕被硬核金融界面和专业表达劝退"
+      ],
+      "infoHabits": [
+        "高频使用微信、小红书、短视频内容获取信息",
+        "更信任“同龄人分享”而不是“专家说教”",
+        "愿意从热点、校园、实习、同学聊天等场景进入"
+      ],
+      "primaryColors": "",
+      "coreElements": "",
+      "styleKeywords": "",
+      "forbiddenVisuals": "",
+      "safeExpressions": [
+        "对新手来说，入口简单一点会少很多心理负担。",
+        "我更愿意先用微信里能打开的工具看看，再慢慢学。",
+        "先把行情看懂、概念搞清楚，比急着操作更重要。",
+        "如果只是想先轻量了解，可以从微信里搜微证券开始。"
+      ],
+      "forbiddenExpressions": [
+        "新手也能马上抓住买点",
+        "一上来就能靠它赚到",
+        "看一眼就知道买什么",
+        "AI 会直接告诉你怎么投"
+      ],
+      "applicableScenes": [
+        "第一次接触股票或行情信息",
+        "不想下载多个工具，只想先轻量看看",
+        "想用大白话理解术语和热点",
+        "从内容种草进入微信搜索体验"
+      ],
+      "promptSummary": "",
+      "source": "微证券业务介绍、Group12 微证券知识库、prompts/wzq/persona_campus_explorer.json"
+    },
+    {
+      "id": "KB_WS_AUDIENCE_002",
+      "businessLine": "weisec",
+      "knowledgeType": "audience_profile",
+      "name": "微证券｜忙碌热点跟进型上班族",
+      "priority": "High",
+      "applicablePersonas": [
+        "打工人真实日记",
+        "职场新人",
+        "热点追踪型用户"
+      ],
+      "applicableContentTypes": [
+        "图文帖",
+        "短视频脚本"
+      ],
+      "description": "  - 开会、通勤、午休时没法一直盯盘   - 热点一多就容易信息焦虑   - 想跟上行情，但不想切换多个工具   - 依赖微信、资讯推送、榜单和短内容入口   - 通勤、午休、下班后复盘是主要信息窗口   - 更偏好“场景化、效率型、不过度专业”的表达",
+      "ageStage": "22-32 岁，职场 1-8 年",
+      "occupation": "普通上班族、通勤族、时间有限的热点关注者",
+      "painPoints": [
+        "开会、通勤、午休时没法一直盯盘",
+        "热点一多就容易信息焦虑",
+        "想跟上行情，但不想切换多个工具"
+      ],
+      "infoHabits": [
+        "依赖微信、资讯推送、榜单和短内容入口",
+        "通勤、午休、下班后复盘是主要信息窗口",
+        "更偏好“场景化、效率型、不过度专业”的表达"
+      ],
+      "primaryColors": "",
+      "coreElements": "",
+      "styleKeywords": "",
+      "forbiddenVisuals": "",
+      "safeExpressions": [
+        "我没法一直盯着屏幕，所以更依赖提醒和固定信息入口。",
+        "热点来的时候，先弄明白发生了什么，比情绪上头更重要。",
+        "上班间隙能快速看一眼公开行情，对我来说就够用了。",
+        "把提醒、榜单和复盘入口组合起来，比到处找信息轻松很多。"
+      ],
+      "forbiddenExpressions": [
+        "提醒一到就能抓住机会",
+        "有热股榜就不怕买错",
+        "AI 帮你直接判断买卖点",
+        "盘中波动都能靠它吃到"
+      ],
+      "applicableScenes": [
+        "开会、通勤、午休时碎片化看行情",
+        "热点事件爆发后的快速理解",
+        "下班后做信息复盘",
+        "群聊讨论中的热点观察"
+      ],
+      "promptSummary": "",
+      "source": "微证券业务介绍、G12 功能桥接库、prompts/wzq/persona_salary_diary.json"
+    },
+    {
+      "id": "KB_WS_AUDIENCE_003",
+      "businessLine": "weisec",
+      "knowledgeType": "audience_profile",
+      "name": "微证券｜清醒避坑型年轻女性",
+      "priority": "Medium",
+      "applicablePersonas": [
+        "清醒搞钱女孩",
+        "进阶理财用户"
+      ],
+      "applicableContentTypes": [
+        "图文帖",
+        "短视频脚本"
+      ],
+      "description": "  - 容易被热点标题和群体情绪带节奏   - 厌恶焦虑营销、过度承诺和“机会感”叙事   - 想建立自己的判断框架，但缺少稳定工具和表达体系   - 高频浏览小红书、社交媒体、热搜与讨论帖   - 倾向收藏“避坑、拆解逻辑、反常识”内容   - 喜欢“有态度但不极端”的表达",
+      "ageStage": "22-32 岁，具备初步理财意识",
+      "occupation": "年轻白领、内容敏感型用户、独立判断倾向用户",
+      "painPoints": [
+        "容易被热点标题和群体情绪带节奏",
+        "厌恶焦虑营销、过度承诺和“机会感”叙事",
+        "想建立自己的判断框架，但缺少稳定工具和表达体系"
+      ],
+      "infoHabits": [
+        "高频浏览小红书、社交媒体、热搜与讨论帖",
+        "倾向收藏“避坑、拆解逻辑、反常识”内容",
+        "喜欢“有态度但不极端”的表达"
+      ],
+      "primaryColors": "",
+      "coreElements": "",
+      "styleKeywords": "",
+      "forbiddenVisuals": "",
+      "safeExpressions": [
+        "我更在意先搞懂逻辑，而不是跟风站队。",
+        "不是所有刷屏的话题都值得立刻代入自己。",
+        "真正有用的内容，不是替你下结论，而是帮你少踩坑。",
+        "先看公开信息，再决定要不要继续关注，会更稳一点。"
+      ],
+      "forbiddenExpressions": [
+        "别犹豫了，赶紧上车",
+        "所有人都在买，你也别错过",
+        "看完这个就知道该投什么",
+        "热门就是机会"
+      ],
+      "applicableScenes": [
+        "热点刷屏时的冷静拆解",
+        "新手避坑与反跟风内容",
+        "工具测评中强调“适合谁/不适合谁”",
+        "面向女性用户的清醒理财表达"
+      ],
+      "promptSummary": "",
+      "source": "prompts/wzq/persona_sober_girl.json、微证券热点内容场景梳理"
+    }
+  ]
+}

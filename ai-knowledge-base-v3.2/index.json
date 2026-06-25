@@ -1,0 +1,40 @@
+{
+  "version": "3.2",
+  "name": "Tencent WeSure Xiaohongshu AI Knowledge Base",
+  "generatedAt": "2026-05-18",
+  "files": {
+    "schema": "schema.json",
+    "productFeatures": "product-features.json",
+    "complianceRules": "compliance-rules.json",
+    "cleanedComplianceRewriteRules": "compliance-rewrite-rules.cleaned.json",
+    "contentTemplates": "content-templates.json",
+    "phraseLibrary": "phrase-library.json",
+    "brandVoice": "brand-voice.json"
+  },
+  "recommendedPromptRetrieval": {
+    "contentGeneration": [
+      "brandVoice",
+      "1-2 contentTemplates matching contentType",
+      "2-4 productFeatures matching contentType and targetUser",
+      "1 phraseLibrary group matching contentType",
+      "all high risk complianceRules plus contentType-specific rules"
+    ],
+    "complianceReview": [
+      "complianceRules",
+      "cleanedComplianceRewriteRules",
+      "brandVoice.avoidExpressions",
+      "brandVoice.requiredRiskReminders"
+    ],
+    "coverGeneration": [
+      "contentTemplates.coverTextPatterns",
+      "brandVoice.imageAndCoverGuidelines",
+      "complianceRules related to return promise, stock recommendation, specific asset display"
+    ]
+  },
+  "doNotUseDirectly": [
+    "Do not inject every file into a single prompt.",
+    "Do not use strongInsertPhrases without compliance review.",
+    "Do not use any expression listed in avoidExpressions or forbiddenPatterns.",
+    "Do not generate specific stock/fund names, codes, buy/sell points, or guaranteed returns."
+  ]
+}
