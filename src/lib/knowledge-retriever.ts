@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { normalizeBusinessLine, resolveKbTargetUser } from "@/lib/business-line";
 import { toArray } from "@/lib/utils";
 
 const CORE_HIGH_RISK_RULE_IDS = new Set([
@@ -80,6 +81,7 @@ export function resolveKnowledgeBasePath(customPath?: string) {
   const candidates = [
     customPath,
     process.env.AI_KNOWLEDGE_BASE_PATH,
+    path.join(process.cwd(), "ai-knowledge-base-v4.0"),
     path.join(process.cwd(), "ai-knowledge-base-v3.3"),
     path.join(process.cwd(), "ai-knowledge-base-v3.2"),
   ].filter(Boolean) as string[];
@@ -89,6 +91,17 @@ export function resolveKnowledgeBasePath(customPath?: string) {
     throw new Error(`未找到知识库目录。已尝试：${candidates.join(" | ")}`);
   }
   return resolved;
+}
+
+function resolveKbFile(basePath: string, index: AnyRecord, key: string, fallbackFile: string) {
+  const mapped = index?.files?.[key];
+  const relative = typeof mapped === "string" && mapped ? mapped : fallbackFile;
+  return relative.replace(/\\/g, "/");
+}
+
+function readKbJson(basePath: string, index: AnyRecord, key: string, fallbackFile: string, fallback: AnyRecord = {}) {
+  const fileName = resolveKbFile(basePath, index, key, fallbackFile);
+  return readJson(basePath, fileName, fallback);
 }
 
 function readJson(basePath: string, fileName: string, fallback: AnyRecord = {}) {
@@ -111,24 +124,25 @@ function matchesBusinessLine(item: AnyRecord, businessLine: string) {
 
 export function loadKnowledgeBase(options: KnowledgeOptions = {}) {
   const basePath = resolveKnowledgeBasePath(options.knowledgeBasePath);
-  const brandVoiceRaw = readJson(basePath, "brand-voice.json");
+  const index = readJson(basePath, "index.json");
+  const brandVoiceRaw = readKbJson(basePath, index, "brandVoice", "brand-voice.json");
   const brandVoiceItems = brandVoiceRaw.items
     ? brandVoiceRaw.items
     : [{ id: "brand_voice_legacy", businessLine: "weisec", ...brandVoiceRaw }];
   return {
     basePath,
-    index: readJson(basePath, "index.json"),
+    index,
     brandVoiceItems,
     defaultBusinessLine: brandVoiceRaw.defaultBusinessLine || "weisec",
-    productFeatures: readJson(basePath, "product-features.json", { items: [] }).items || [],
-    contentTemplates: readJson(basePath, "content-templates.json", { items: [] }).items || [],
-    phraseLibrary: readJson(basePath, "phrase-library.json", { items: [] }).items || [],
-    complianceRules: readJson(basePath, "compliance-rules.json", { items: [] }).items || [],
-    rewriteRules: readJson(basePath, "compliance-rewrite-rules.cleaned.json", { items: [] }).items || [],
-    riskDisclaimers: readJson(basePath, "risk-disclaimers.json", { items: [], globalRiskReminder: "" }),
-    platformRules: readJson(basePath, "platform-rules.json", { items: [] }).items || [],
-    visualGuidelines: readJson(basePath, "visual-guidelines.json", { items: [] }).items || [],
-    audienceProfiles: readJson(basePath, "audience-profiles.json", { items: [] }).items || [],
+    productFeatures: readKbJson(basePath, index, "productFeatures", "product-features.json", { items: [] }).items || [],
+    contentTemplates: readKbJson(basePath, index, "contentTemplates", "content-templates.json", { items: [] }).items || [],
+    phraseLibrary: readKbJson(basePath, index, "phraseLibrary", "phrase-library.json", { items: [] }).items || [],
+    complianceRules: readKbJson(basePath, index, "complianceRules", "compliance-rules.json", { items: [] }).items || [],
+    rewriteRules: readKbJson(basePath, index, "rewriteRules", "compliance-rewrite-rules.cleaned.json", { items: [] }).items || [],
+    riskDisclaimers: readKbJson(basePath, index, "riskDisclaimers", "risk-disclaimers.json", { items: [], globalRiskReminder: "" }),
+    platformRules: readKbJson(basePath, index, "platformRules", "platform-rules.json", { items: [] }).items || [],
+    visualGuidelines: readKbJson(basePath, index, "visualGuidelines", "visual-guidelines.json", { items: [] }).items || [],
+    audienceProfiles: readKbJson(basePath, index, "audienceProfiles", "audience-profiles.json", { items: [] }).items || [],
   };
 }
 
@@ -417,16 +431,23 @@ function buildDebugKnowledgeUsed(basePath: string, knowledge: AnyRecord, version
 export function retrieveKnowledge(input: KnowledgeInput = {}, options: KnowledgeOptions = {}) {
   const kb = loadKnowledgeBase(options);
   const businessLine = resolveBusinessLine(input);
-  const contentTypeCandidates = getContentTypeCandidates(input.contentType);
-  const purpose = normalizeText(input.task || input.promptTask || "");
-  const selectedFeatures = selectFeatures(kb.productFeatures, input, contentTypeCandidates, businessLine);
-  const selectedTemplates = selectTemplates(kb.contentTemplates, input, contentTypeCandidates, businessLine);
-  const phraseGroup = selectPhraseGroup(kb.phraseLibrary, input, contentTypeCandidates, businessLine);
-  const complianceRules = selectComplianceRules(kb.complianceRules, input, contentTypeCandidates);
+  const targetUserLabel = input.targetUser || input.targetUserSegment || "";
+  const resolvedInput = {
+    ...input,
+    targetUser: targetUserLabel
+      ? resolveKbTargetUser(normalizeBusinessLine(businessLine), targetUserLabel)
+      : targetUserLabel,
+  };
+  const contentTypeCandidates = getContentTypeCandidates(resolvedInput.contentType);
+  const purpose = normalizeText(resolvedInput.task || resolvedInput.promptTask || "");
+  const selectedFeatures = selectFeatures(kb.productFeatures, resolvedInput, contentTypeCandidates, businessLine);
+  const selectedTemplates = selectTemplates(kb.contentTemplates, resolvedInput, contentTypeCandidates, businessLine);
+  const phraseGroup = selectPhraseGroup(kb.phraseLibrary, resolvedInput, contentTypeCandidates, businessLine);
+  const complianceRules = selectComplianceRules(kb.complianceRules, resolvedInput, contentTypeCandidates);
   const rewriteRules = selectRewriteRules(kb.rewriteRules, complianceRules, options);
-  const brandVoice = pruneBrandVoice(kb.brandVoiceItems, input, businessLine);
-  const riskDisclaimers = selectRiskDisclaimers(kb.riskDisclaimers, input, contentTypeCandidates, businessLine);
-  const platformRules = selectPlatformRules(kb.platformRules, input, contentTypeCandidates, purpose);
+  const brandVoice = pruneBrandVoice(kb.brandVoiceItems, resolvedInput, businessLine);
+  const riskDisclaimers = selectRiskDisclaimers(kb.riskDisclaimers, resolvedInput, contentTypeCandidates, businessLine);
+  const platformRules = selectPlatformRules(kb.platformRules, resolvedInput, contentTypeCandidates, purpose);
   const visualGuidelines = purpose.includes("cover") ? selectVisualGuidelines(kb.visualGuidelines, businessLine) : [];
   const knowledge = {
     businessLine,
@@ -443,7 +464,7 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
 
   return {
     ...knowledge,
-    debugKnowledgeUsed: buildDebugKnowledgeUsed(kb.basePath, knowledge, kb.index.version || "3.3"),
+    debugKnowledgeUsed: buildDebugKnowledgeUsed(kb.basePath, knowledge, kb.index.version || "4.0"),
   };
 }
 
@@ -489,7 +510,7 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
 
   return {
     source: "ai-json",
-    knowledgeBaseVersion: kb.index.version || "3.3",
+    knowledgeBaseVersion: kb.index.version || "4.0",
     knowledgeBasePath: kb.basePath,
     legacyMarkdownMode: "compatibility-only",
     features,

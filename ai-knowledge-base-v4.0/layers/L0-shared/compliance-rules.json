@@ -1,0 +1,379 @@
+{
+  "version": "4.0",
+  "source": "v3.2 + docs/knowledgebase compliance_rule/risk_disclaimer excerpts",
+  "globalRiskReminder": "市场有风险，投资需谨慎。",
+  "items": [
+    {
+      "id": "risk_return_promise",
+      "riskType": "收益承诺",
+      "riskLevel": "high",
+      "description": "禁止明示或暗示稳定收益、保证收益、无风险收益、短期确定性收益或明显获益结果。",
+      "forbiddenPatterns": [
+        "保本",
+        "稳赚",
+        "必赚",
+        "高收益",
+        "保证收益",
+        "100%收益",
+        "零风险",
+        "无风险",
+        "天天涨停",
+        "一年翻几倍",
+        "每天赚",
+        "稳定赚钱",
+        "躺赚",
+        "稳赚不赔",
+        "保本保息",
+        "投资必赚"
+      ],
+      "unsafeExamples": [
+        "这个方法能稳定赚钱",
+        "这样买基本稳赚",
+        "一个月收益就能买车",
+        "零风险理财"
+      ],
+      "safeAlternatives": [
+        "历史表现不代表未来收益",
+        "仅作为公开信息观察和学习参考",
+        "需要结合自身风险承受能力判断",
+        "市场波动较大，投资需谨慎"
+      ],
+      "appliesTo": [
+        "all"
+      ],
+      "reviewAction": "block_or_rewrite",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_stock_or_fund_recommendation",
+      "riskType": "个股/基金推荐",
+      "riskLevel": "high",
+      "description": "禁止推荐明确股票、基金、代码、买卖点位、加仓减仓、股票池或名单，禁止将工具写成荐股或诊股能力。",
+      "forbiddenPatterns": [
+        "买入",
+        "卖出",
+        "加仓",
+        "减仓",
+        "买点",
+        "卖点",
+        "股票代码",
+        "免费送股票",
+        "股票池",
+        "股票名单",
+        "精选股票池",
+        "优质股票池",
+        "核心股票池",
+        "公布短线名单",
+        "金股",
+        "黑马股",
+        "牛股",
+        "妖股",
+        "精准诊股",
+        "AI选股帮你找到好标的",
+        "看榜单就够了"
+      ],
+      "unsafeExamples": [
+        "这只股票可以买",
+        "AI 帮你找到好标的",
+        "看微信热股榜单就知道买什么",
+        "80分以上赶紧加仓"
+      ],
+      "safeAlternatives": [
+        "可作为学习和观察方向",
+        "可以关注相关行业公开信息",
+        "榜单热度不代表投资价值",
+        "不构成个股或基金推荐"
+      ],
+      "appliesTo": [
+        "stock-tutorial",
+        "hotspot-analysis",
+        "tool-review",
+        "scenario-seeding",
+        "brand-seed"
+      ],
+      "reviewAction": "block_or_rewrite",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_trading_signal_prediction",
+      "riskType": "走势预测/交易信号",
+      "riskLevel": "high",
+      "description": "禁止提前知道走势、预测买卖点、锁定买卖时机、暗示工具可以捕捉确定性交易机会。",
+      "forbiddenPatterns": [
+        "提前知道",
+        "预测走势",
+        "预测买卖点",
+        "锁定买卖时机",
+        "第一时间抓住机会",
+        "不错过任何机会",
+        "不怕踏空",
+        "黄金波动机会",
+        "快人一步掌握机会",
+        "买卖点提示"
+      ],
+      "unsafeExamples": [
+        "第一时间抓住黄金波动机会",
+        "设置提醒后再也不怕踏空",
+        "工具帮你锁定买卖时机"
+      ],
+      "safeAlternatives": [
+        "及时了解公开行情变化",
+        "作为信息提醒和复盘参考",
+        "帮助减少公开信息遗漏",
+        "不代表投资建议或交易信号"
+      ],
+      "appliesTo": [
+        "hotspot-analysis",
+        "scenario-seeding",
+        "stock-tutorial"
+      ],
+      "reviewAction": "rewrite",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_private_traffic_inducement",
+      "riskType": "私域导流/诱导行为",
+      "riskLevel": "high",
+      "description": "禁止诱导加群、私信、领取股票代码、领取资料、股友交流群等导流行为。",
+      "forbiddenPatterns": [
+        "私信我",
+        "扣1私你",
+        "回复领取",
+        "免费加群",
+        "股票群",
+        "微信群号",
+        "进群交流",
+        "股友交流",
+        "股友交流群",
+        "领取股票代码",
+        "免费诊股"
+      ],
+      "unsafeExamples": [
+        "想要链接的扣1，私你",
+        "私信我拿优质股票代码",
+        "进群交流股票"
+      ],
+      "safeAlternatives": [
+        "可通过官方渠道了解",
+        "微信搜索腾讯微证券进入官方小程序",
+        "评论区交流学习思路，不涉及具体标的建议"
+      ],
+      "appliesTo": [
+        "all"
+      ],
+      "reviewAction": "block_or_rewrite",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_inside_information",
+      "riskType": "内幕/非公开信息暗示",
+      "riskLevel": "high",
+      "description": "禁止使用内幕、内参、机构秘密、泄露机密等暗示非公开信息来源的表达。",
+      "forbiddenPatterns": [
+        "内幕",
+        "内参",
+        "机构秘密",
+        "泄露机密",
+        "内部消息",
+        "秘密消息",
+        "投资内幕",
+        "微信里有金矿",
+        "信息差套利"
+      ],
+      "unsafeExamples": [
+        "投资内幕其实藏在微信里",
+        "机构秘密提前知道",
+        "用这个工具发现内幕"
+      ],
+      "safeAlternatives": [
+        "公开信息整理",
+        "公开资讯分析",
+        "市场热度观察",
+        "行业信息解读"
+      ],
+      "appliesTo": [
+        "hotspot-analysis",
+        "content-list",
+        "tool-review"
+      ],
+      "reviewAction": "rewrite",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_overstated_product_capability",
+      "riskType": "产品能力夸大",
+      "riskLevel": "medium",
+      "description": "禁止将产品能力描述为确定性、全覆盖、无延迟、万能、最优或替代专业判断。",
+      "forbiddenPatterns": [
+        "100%无延迟",
+        "最强",
+        "最好",
+        "唯一",
+        "没有之一",
+        "全网最",
+        "神器",
+        "外挂",
+        "无所不能",
+        "必备",
+        "一键搞定所有",
+        "不用自己判断"
+      ],
+      "unsafeExamples": [
+        "目前用过最顺手，没有之一",
+        "投资人必备外挂神器",
+        "不用自己判断"
+      ],
+      "safeAlternatives": [
+        "较为轻量",
+        "适合作为信息参考",
+        "可辅助理解公开信息",
+        "具体功能以官方页面为准"
+      ],
+      "appliesTo": [
+        "brand-seed",
+        "tool-review",
+        "scenario-seeding"
+      ],
+      "reviewAction": "rewrite",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_low_price_or_open_account_inducement",
+      "riskType": "低价/开户诱导",
+      "riskLevel": "medium",
+      "description": "避免用低价、红包、优惠、送钱等方式诱导开户或交易，涉及官方活动必须以真实活动规则为准。",
+      "forbiddenPatterns": [
+        "点击开户送",
+        "注册领红包",
+        "10元起投",
+        "一折购买",
+        "1元就能买",
+        "开户送钱",
+        "免费领福利"
+      ],
+      "unsafeExamples": [
+        "点击开户送红包",
+        "10元起投轻松赚钱"
+      ],
+      "safeAlternatives": [
+        "如需开户可通过官方渠道了解规则",
+        "活动信息以官方页面展示为准",
+        "先了解产品功能和风险提示"
+      ],
+      "appliesTo": [
+        "brand-seed",
+        "tool-review",
+        "scenario-seeding"
+      ],
+      "reviewAction": "rewrite_or_verify",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_specific_asset_display",
+      "riskType": "具体标的展示",
+      "riskLevel": "medium",
+      "description": "产品界面、截图、案例、封面中应避免展示具体股票名称、代码、持仓收益或可被理解为推荐的标的信息。",
+      "forbiddenPatterns": [
+        "展示具体股票代码",
+        "展示真实持仓收益",
+        "展示收益截图",
+        "展示买卖记录",
+        "具体股票名称搭配推荐"
+      ],
+      "unsafeExamples": [
+        "截图里突出某个股票代码并写机会来了",
+        "展示收益截图证明工具有效"
+      ],
+      "safeAlternatives": [
+        "使用模拟数据或模糊处理",
+        "展示泛化界面路径",
+        "用行业或板块公开信息替代具体标的推荐"
+      ],
+      "appliesTo": [
+        "image-text",
+        "video-script",
+        "cover",
+        "tool-review"
+      ],
+      "reviewAction": "manual_review_required",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "risk_missing_disclaimer",
+      "riskType": "风险提示缺失",
+      "riskLevel": "high",
+      "description": "涉及投资、股票、基金、行情、开户、交易、理财等内容时必须包含风险提示。",
+      "forbiddenPatterns": [
+        "缺少风险提示"
+      ],
+      "unsafeExamples": [
+        "正文讨论投资工具但没有风险提示"
+      ],
+      "safeAlternatives": [
+        "文末添加：市场有风险，投资需谨慎。",
+        "画面或封面涉及投资品类时添加风险提示"
+      ],
+      "appliesTo": [
+        "all"
+      ],
+      "reviewAction": "append_required",
+      "knowledgeLayer": "L0_shared",
+      "businessLine": "all",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    }
+  ],
+  "knowledgeLayer": "L0_shared",
+  "migratedFrom": "ai-knowledge-base-v3.3"
+}

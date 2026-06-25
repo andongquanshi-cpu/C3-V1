@@ -28,6 +28,7 @@ import {
   getContentTypeConfig,
   getContentTypeLabel,
   getContentTypesForLine,
+  getTargetUserSegment,
   normalizeBriefForBusinessLine,
   normalizeBusinessLine,
 } from "@/lib/business-line";
@@ -74,8 +75,8 @@ const DEFAULT_BRIEF: BriefInput = {
   businessLine: "weisec",
   contentType: "brand-seed",
   topic: "腾讯微证券小程序如何帮助投资小白做日常盯盘",
-  targetUser: "投资小白",
-  campaignGoal: "内容种草和功能认知",
+  targetUser: "入门新股民",
+  campaignGoal: "内容营销：提升「新手首选炒股工具」认知，引导用户微信搜索体验并转化为开户用户",
   bloggerLevel: "middle",
   embedLevel: "medium",
   contentLength: "medium",
@@ -410,6 +411,10 @@ export function CopilotWorkbench() {
   const selectedAngles = useMemo(() => angles.filter((angle) => selectedAngleIds.includes(angle.angleId)), [angles, selectedAngleIds]);
   const activeResult = useMemo(() => results.find((item) => item.id === activeResultId) || results[0], [activeResultId, results]);
   const linePreset = useMemo(() => getBusinessLinePreset(brief.businessLine), [brief.businessLine]);
+  const selectedTargetUser = useMemo(
+    () => getTargetUserSegment(brief.businessLine, brief.targetUser),
+    [brief.businessLine, brief.targetUser],
+  );
   const contentTypes = useMemo(() => getContentTypesForLine(brief.businessLine), [brief.businessLine]);
   const selectedType = useMemo(
     () => getContentTypeConfig(brief.businessLine, brief.contentType),
@@ -772,7 +777,8 @@ export function CopilotWorkbench() {
               <CardContent className="space-y-3 text-sm">
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">业务线</span><strong>{linePreset.shortLabel}</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">内容类型</span><strong>{selectedType?.label}</strong></div>
-                <div className="flex justify-between gap-3"><span className="text-muted-foreground">目标人群</span><strong>{brief.targetUser}</strong></div>
+                <div className="flex justify-between gap-3"><span className="text-muted-foreground">目标人群</span><strong className="text-right">{brief.targetUser}</strong></div>
+                <div className="rounded-md bg-muted p-3 text-xs leading-5 text-muted-foreground">{selectedTargetUser?.description || linePreset.campaignGoal}</div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">素材</span><strong>{materials.length} 条</strong></div>
                 <div className="flex justify-between gap-3"><span className="text-muted-foreground">角度</span><strong>{selectedAngles.length}/{angles.length}</strong></div>
                 <div className="rounded-md bg-muted p-3 text-muted-foreground">{brief.topic || "尚未填写主题"}</div>
@@ -840,7 +846,9 @@ export function CopilotWorkbench() {
               <Card>
                 <CardHeader>
                   <CardTitle>2. 内容类型与素材/热点</CardTitle>
-                  <CardDescription>当前为 {linePreset.label}。选择类型、用户、主推功能，并补充热点或素材。</CardDescription>
+                  <CardDescription>
+                    当前为 {linePreset.label}。内容营销目标：{linePreset.campaignGoal}
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -876,6 +884,9 @@ export function CopilotWorkbench() {
                           <option key={user} value={user}>{user}</option>
                         ))}
                       </Select>
+                      {selectedTargetUser ? (
+                        <p className="text-xs leading-5 text-muted-foreground">{selectedTargetUser.description}</p>
+                      ) : null}
                     </div>
                   </div>
 
@@ -929,7 +940,7 @@ export function CopilotWorkbench() {
               <Card>
                 <CardHeader>
                   <CardTitle>3. 创意角度生成</CardTitle>
-                  <CardDescription>先生成创意角度并勾选，再进入内容生成。Prompt Engine 会按当前业务线检索 KB v3.3。</CardDescription>
+                  <CardDescription>先生成创意角度并勾选，再进入内容生成。Prompt Engine 会按当前业务线检索 KB v4.0。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-4">
@@ -1122,7 +1133,7 @@ export function CopilotWorkbench() {
             <Card>
               <CardHeader>
                 <CardTitle>知识库调用</CardTitle>
-                <CardDescription>{linePreset.shortLabel} · KB v{knowledge?.knowledgeBaseVersion || "3.3"}</CardDescription>
+                <CardDescription>{linePreset.shortLabel} · KB v{knowledge?.knowledgeBaseVersion || "4.0"}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <div className="flex justify-between"><span className="text-muted-foreground">当前业务线功能</span><strong>{businessLineFeatures.length}</strong></div>

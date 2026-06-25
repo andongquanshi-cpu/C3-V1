@@ -9,7 +9,8 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "build:kb": "node scripts/build-knowledge-base.mjs"
+    "build:kb": "node scripts/build-knowledge-base.mjs",
+    "build:kb:v4": "node scripts/build-knowledge-base-v4.mjs"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
