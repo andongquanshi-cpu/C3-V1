@@ -25,6 +25,10 @@ import {
   BUSINESS_LINE_PRESETS,
   featureMatchesBusinessLine,
   getBusinessLinePreset,
+  getContentTypeConfig,
+  getContentTypeLabel,
+  getContentTypesForLine,
+  normalizeBriefForBusinessLine,
   normalizeBusinessLine,
 } from "@/lib/business-line";
 import type {
@@ -83,14 +87,6 @@ const DEFAULT_BRIEF: BriefInput = {
   materials: [],
 };
 
-const CONTENT_TYPES: Array<{ value: ContentType; label: string; description: string; needHotspot: boolean }> = [
-  { value: "stock-tutorial", label: "炒股教程类", description: "选股、盯盘、压力位等干货教学", needHotspot: false },
-  { value: "finance-tips", label: "理财干货类", description: "基金、理财技巧、资产配置表达", needHotspot: false },
-  { value: "personal-exp", label: "个人经验类", description: "心得、避坑、生活化投资场景", needHotspot: false },
-  { value: "hotspot-analysis", label: "热点分析类", description: "结合市场或政策热点做降维解读", needHotspot: true },
-  { value: "brand-seed", label: "品牌种草类", description: "腾讯微证券功能体验与使用教程", needHotspot: false },
-];
-
 const STEP_ITEMS = [
   { id: 1, label: "环境与 API", icon: KeyRound },
   { id: 2, label: "类型/素材", icon: Layers3 },
@@ -114,7 +110,7 @@ function hasTextApi(apiConfig: ApiConfig) {
 
 function buildDemoAngles(brief: BriefInput): CreativeAngle[] {
   const preset = getBusinessLinePreset(brief.businessLine);
-  const type = CONTENT_TYPES.find((item) => item.value === brief.contentType)?.label || "财经内容";
+  const type = getContentTypeLabel(brief.businessLine, brief.contentType);
   const isLicaitong = brief.businessLine === "licaitong";
   const demoAngles: CreativeAngle[] = isLicaitong
     ? [
@@ -380,12 +376,11 @@ export function CopilotWorkbench() {
     setApiConfig(safeJsonParse(localStorage.getItem(STORAGE_KEYS.api) || "", DEFAULT_API_CONFIG));
     const storedBrief = safeJsonParse<Partial<BriefInput>>(localStorage.getItem(STORAGE_KEYS.brief) || "", {});
     const businessLine = normalizeBusinessLine(storedBrief.businessLine);
-    setBrief({
+    setBrief(normalizeBriefForBusinessLine({
       ...DEFAULT_BRIEF,
       ...storedBrief,
       businessLine,
-      targetUser: storedBrief.targetUser || getBusinessLinePreset(businessLine).defaultTargetUser,
-    });
+    }));
     setMaterials(safeJsonParse(localStorage.getItem(STORAGE_KEYS.materials) || "", []));
     setDrafts(safeJsonParse(localStorage.getItem(STORAGE_KEYS.drafts) || "", []));
 
@@ -414,8 +409,12 @@ export function CopilotWorkbench() {
 
   const selectedAngles = useMemo(() => angles.filter((angle) => selectedAngleIds.includes(angle.angleId)), [angles, selectedAngleIds]);
   const activeResult = useMemo(() => results.find((item) => item.id === activeResultId) || results[0], [activeResultId, results]);
-  const selectedType = CONTENT_TYPES.find((item) => item.value === brief.contentType);
   const linePreset = useMemo(() => getBusinessLinePreset(brief.businessLine), [brief.businessLine]);
+  const contentTypes = useMemo(() => getContentTypesForLine(brief.businessLine), [brief.businessLine]);
+  const selectedType = useMemo(
+    () => getContentTypeConfig(brief.businessLine, brief.contentType),
+    [brief.businessLine, brief.contentType],
+  );
   const businessLineFeatures = useMemo(
     () => (knowledge?.features || []).filter((feature) => featureMatchesBusinessLine(feature, brief.businessLine)),
     [brief.businessLine, knowledge],
@@ -429,12 +428,32 @@ export function CopilotWorkbench() {
     if (line === brief.businessLine) return;
     const preset = getBusinessLinePreset(line);
     setBrief((current) => applyBusinessLineToBrief(current, line));
+    setMaterials([]);
     setAngles([]);
     setSelectedAngleIds([]);
     setResults([]);
     setActiveResultId("");
     setImageResult("");
-    setStatus(`已切换到${preset.label}，产品功能与默认主题已更新`);
+    setStatus(`已切换到${preset.label}，内容类型与 Brief 已更新`);
+  }
+
+  function selectContentType(contentType: ContentType) {
+    setBrief((current) => {
+      const next = { ...current, contentType };
+      const validIds = new Set(
+        (knowledge?.features || [])
+          .filter((feature) => featureMatchesBusinessLine(feature, current.businessLine))
+          .filter((feature) => feature.suitableContentTypes.includes(contentType))
+          .map((feature) => feature.id),
+      );
+      return {
+        ...next,
+        selectedFeatureIds: current.selectedFeatureIds.filter((id) => validIds.has(id)),
+        selectedFeatureNames: current.selectedFeatureNames.filter((name) =>
+          (knowledge?.features || []).some((feature) => feature.name === name && validIds.has(feature.id)),
+        ),
+      };
+    });
   }
 
   function updateBrief(patch: Partial<BriefInput>) {
@@ -486,7 +505,9 @@ export function CopilotWorkbench() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          query: `${brief.topic || "中国财经"} 今日 A股 理财 市场热点 小红书 内容选题`,
+          query: brief.businessLine === "licaitong"
+            ? `${brief.topic || "理财"} 基金 利率 政策 小红书 内容选题`
+            : `${brief.topic || "A股"} 行情 市场热点 政策 小红书 内容选题`,
           apiKey: apiConfig.hotspot.key,
           maxResults: 5,
           topic: "news",
@@ -822,19 +843,23 @@ export function CopilotWorkbench() {
                   <CardDescription>当前为 {linePreset.label}。选择类型、用户、主推功能，并补充热点或素材。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {CONTENT_TYPES.map((item) => (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {contentTypes.map((item) => (
                       <button
-                        key={item.value}
+                        key={`${brief.businessLine}-${item.value}`}
                         type="button"
-                        onClick={() => updateBrief({ contentType: item.value })}
-                        className={cn("rounded-lg border p-4 text-left transition-colors", brief.contentType === item.value ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-accent")}
+                        onClick={() => selectContentType(item.value)}
+                        className={cn(
+                          "rounded-lg border p-4 text-left transition-colors",
+                          brief.contentType === item.value ? "border-primary bg-primary/10" : "border-border bg-card hover:bg-accent",
+                        )}
                       >
-                        <div className="flex items-center justify-between gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                           <strong>{item.label}</strong>
-                          {item.needHotspot ? <Badge variant="warning">需要热点</Badge> : <Badge variant="secondary">可无热点</Badge>}
+                          {item.recommended ? <Badge variant="secondary">推荐</Badge> : null}
+                          {item.needHotspot ? <Badge variant="warning">建议热点</Badge> : <Badge variant="outline">素材可选</Badge>}
                         </div>
-                        <p className="mt-2 text-sm text-muted-foreground">{item.description}</p>
+                        <p className="mt-2 text-sm leading-6 text-muted-foreground">{item.description}</p>
                       </button>
                     ))}
                   </div>
@@ -855,24 +880,33 @@ export function CopilotWorkbench() {
                   </div>
 
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2 text-sm font-medium">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-medium">
                       <span className="flex items-center gap-2"><Database className="h-4 w-4" /> {linePreset.shortLabel} 知识库功能</span>
-                      <Badge variant="outline">{businessLineFeatures.length} 项可选</Badge>
+                      <Badge variant="outline">
+                        本类型 {filteredFeatures.length} 项 · 业务线共 {businessLineFeatures.length} 项
+                      </Badge>
                     </div>
-                    <div className="grid gap-2 md:grid-cols-2">
-                      {filteredFeatures.slice(0, 8).map((feature) => (
-                        <label key={feature.id} className="flex gap-3 rounded-md border border-border p-3 text-sm">
-                          <input type="checkbox" checked={brief.selectedFeatureIds.includes(feature.id)} onChange={(event) => toggleFeature(feature, event.target.checked)} />
-                          <span><strong>{feature.name}</strong><span className="block text-muted-foreground">{feature.summary}</span></span>
-                        </label>
-                      ))}
-                    </div>
+                    {filteredFeatures.length === 0 ? (
+                      <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                        当前内容类型暂无强匹配功能，生成时将由知识库按业务线自动检索。
+                      </p>
+                    ) : (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {filteredFeatures.map((feature) => (
+                          <label key={feature.id} className="flex gap-3 rounded-md border border-border p-3 text-sm">
+                            <input type="checkbox" checked={brief.selectedFeatureIds.includes(feature.id)} onChange={(event) => toggleFeature(feature, event.target.checked)} />
+                            <span><strong>{feature.name}</strong><span className="block text-muted-foreground">{feature.summary}</span></span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div className="grid gap-4 md:grid-cols-[1fr_auto]">
                     <div className="space-y-2">
-                      <Label>素材/热点输入</Label>
+                      <Label>素材 / 热点（选填）</Label>
                       <Textarea value={materialDraft} onChange={(event) => setMaterialDraft(event.target.value)} placeholder="粘贴新闻、用户洞察、热点摘要、竞品素材等" />
+                      {selectedType ? <p className="text-xs leading-5 text-muted-foreground">{selectedType.materialHint}</p> : null}
                     </div>
                     <div className="flex flex-col justify-end gap-2">
                       <Button type="button" onClick={addManualMaterial}>加入素材</Button>
@@ -885,7 +919,7 @@ export function CopilotWorkbench() {
                   </div>
 
                   <div className="flex justify-end">
-                    <Button onClick={() => setStep(3)}>进入创意角度</Button>
+                    <Button onClick={() => setStep(3)}>下一步：配置创意角度</Button>
                   </div>
                 </CardContent>
               </Card>
@@ -895,7 +929,7 @@ export function CopilotWorkbench() {
               <Card>
                 <CardHeader>
                   <CardTitle>3. 创意角度生成</CardTitle>
-                  <CardDescription>Prompt Engine 会按当前业务线检索 KB v3.3 的产品功能、模板、话术和合规规则。</CardDescription>
+                  <CardDescription>先生成创意角度并勾选，再进入内容生成。Prompt Engine 会按当前业务线检索 KB v3.3。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-4">
@@ -934,30 +968,43 @@ export function CopilotWorkbench() {
                     <Textarea value={brief.customRequirement || ""} onChange={(event) => updateBrief({ customRequirement: event.target.value })} placeholder="例如：更像小红书干货贴，减少营销感" />
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
-                    <Button onClick={generateAngles} disabled={isBusy}>生成创意角度</Button>
-                    <Button variant="secondary" onClick={generateContent} disabled={isBusy || (angles.length > 0 && selectedAngles.length === 0)}>按选中角度生成内容</Button>
-                  </div>
+                  <Button onClick={generateAngles} disabled={isBusy}>生成创意角度</Button>
 
-                  <div className="grid gap-3 md:grid-cols-2">
-                    {angles.map((angle) => (
-                      <label key={angle.angleId} className={cn("rounded-lg border p-4", selectedAngleIds.includes(angle.angleId) ? "border-primary bg-primary/10" : "border-border bg-card")}>
-                        <div className="flex items-start gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedAngleIds.includes(angle.angleId)}
-                            onChange={(event) => {
-                              setSelectedAngleIds((current) => event.target.checked ? [...current, angle.angleId] : current.filter((id) => id !== angle.angleId));
-                            }}
-                          />
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2"><strong>{angle.angleName}</strong><Badge variant={angle.riskLevel === "low" ? "success" : "warning"}>{angle.riskLevel}</Badge></div>
-                            <p className="text-sm text-muted-foreground">{angle.coreIdea}</p>
-                            <div className="flex flex-wrap gap-1">{angle.titleDirections.slice(0, 3).map((title) => <Badge key={title} variant="outline">{title}</Badge>)}</div>
+                  {angles.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">生成后会出现多个角度卡片，请勾选 1 个或多个再进入内容生成。</p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      {angles.map((angle) => (
+                        <label key={angle.angleId} className={cn("rounded-lg border p-4", selectedAngleIds.includes(angle.angleId) ? "border-primary bg-primary/10" : "border-border bg-card")}>
+                          <div className="flex items-start gap-3">
+                            <input
+                              type="checkbox"
+                              checked={selectedAngleIds.includes(angle.angleId)}
+                              onChange={(event) => {
+                                setSelectedAngleIds((current) => event.target.checked ? [...current, angle.angleId] : current.filter((id) => id !== angle.angleId));
+                              }}
+                            />
+                            <div className="space-y-2">
+                              <div className="flex flex-wrap items-center gap-2"><strong>{angle.angleName}</strong><Badge variant={angle.riskLevel === "low" ? "success" : "warning"}>{angle.riskLevel}</Badge></div>
+                              <p className="text-sm text-muted-foreground">{angle.coreIdea}</p>
+                              <div className="flex flex-wrap gap-1">{angle.titleDirections.slice(0, 3).map((title) => <Badge key={title} variant="outline">{title}</Badge>)}</div>
+                            </div>
                           </div>
-                        </div>
-                      </label>
-                    ))}
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="flex flex-col items-end gap-2 border-t border-border pt-4">
+                    {angles.length > 0 && selectedAngles.length === 0 ? (
+                      <p className="w-full text-sm text-muted-foreground">请至少勾选一个创意角度。</p>
+                    ) : null}
+                    <Button
+                      onClick={generateContent}
+                      disabled={isBusy || angles.length === 0 || selectedAngles.length === 0}
+                    >
+                      生成内容（已选 {selectedAngles.length} 个角度）
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -967,11 +1014,16 @@ export function CopilotWorkbench() {
               <Card>
                 <CardHeader>
                   <CardTitle>4. 内容生成与图片入口</CardTitle>
-                  <CardDescription>查看正文、合规摘要和图片 Prompt。配置图片 API 后可从这里触发生成。</CardDescription>
+                  <CardDescription>基于 Step 3 选中的角度生成正文、合规审查与封面 Prompt。</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-5">
                   {results.length === 0 ? (
-                    <div className="rounded-md border border-border p-5 text-sm text-muted-foreground">还没有生成内容。可以返回第 3 步生成角度，或直接点击下方按钮用当前 brief 生成演示内容。</div>
+                    <div className="rounded-md border border-border p-5 text-sm text-muted-foreground">
+                      还没有生成内容。请返回第 3 步生成并勾选创意角度，再点击「生成内容」。
+                      <div className="mt-4">
+                        <Button variant="secondary" size="sm" onClick={() => setStep(3)}>返回创意角度</Button>
+                      </div>
+                    </div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
                       {results.map((item) => (
@@ -1015,10 +1067,14 @@ export function CopilotWorkbench() {
                     </div>
                   )}
 
-                  <div className="flex gap-2">
-                    <Button onClick={generateContent} disabled={isBusy}>生成内容</Button>
-                    <Button variant="secondary" onClick={() => setStep(5)}>进入审核/草稿</Button>
-                  </div>
+                  {results.length > 0 ? (
+                    <div className="flex gap-2">
+                      <Button variant="secondary" onClick={generateContent} disabled={isBusy || selectedAngles.length === 0}>
+                        重新生成
+                      </Button>
+                      <Button variant="secondary" onClick={() => setStep(5)}>进入审核/草稿</Button>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
             )}
@@ -1044,7 +1100,12 @@ export function CopilotWorkbench() {
                         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                           <div>
                             <strong>{draft.selectedTitle}</strong>
-                            <p className="mt-1 text-sm text-muted-foreground">{new Date(draft.savedAt).toLocaleString()} · {draft.generationSnapshot.contentType}</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {new Date(draft.savedAt).toLocaleString()} · {getContentTypeLabel(
+                                normalizeBusinessLine(draft.generationSnapshot.businessLine),
+                                draft.generationSnapshot.contentType,
+                              )}
+                            </p>
                           </div>
                           <Badge variant={draft.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}>{draft.complianceReport?.publishReadiness || "needs_review"}</Badge>
                         </div>
