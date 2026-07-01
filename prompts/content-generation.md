@@ -3,7 +3,7 @@
 创作任务：
 - 内容类型：{{contentType}}
 - 生成模式：{{generationMode}}
-- 篇幅：{{length}}
+- 篇幅/时长：{{length}}
 - 博主层级：{{bloggerLevel}}
 - 产品植入强度：{{embedLevel}}
 - 主题/热点：{{topic}}
@@ -39,7 +39,7 @@
 生成要求：
 1. 生成内容必须贴合选中创意角度，不要混用多个角度导致主题发散。
 2. 标题生成 3 个候选，封面文案生成 3 个候选。
-3. 正文必须口语化、分段清晰、有小红书阅读感。
+3. 正文必须口语化、分段清晰、有小红书阅读感；若 generationMode 为 video-script，content 字段输出口播视频脚本（分镜+口播句），总时长控制在指定秒数内。
 4. 产品植入必须发生在合理场景中，说明用户痛点、产品动作、植入位置和使用句。
 5. 优先使用 selectedFeatures 中的 safeClaims 和 softInsertPhrases。
 6. 不得使用 forbiddenClaims、avoidExpressions、forbiddenPatterns 中的表达。

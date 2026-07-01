@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
+import { getHotspotApiKey } from "@/lib/server-api-config";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const {
       query,
-      apiKey,
       maxResults = 5,
       topic,
       timeRange,
@@ -16,8 +16,11 @@ export async function POST(request: Request) {
       excludeDomains,
     } = body;
 
+    const apiKey = getHotspotApiKey();
     if (!query) return NextResponse.json({ error: "缺少 query 参数" }, { status: 400 });
-    if (!apiKey) return NextResponse.json({ error: "请先配置 Tavily API Key" }, { status: 400 });
+    if (!apiKey) {
+      return NextResponse.json({ error: "服务端未配置 TAVILY_API_KEY" }, { status: 503 });
+    }
 
     const response = await fetch("https://api.tavily.com/search", {
       method: "POST",

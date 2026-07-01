@@ -47,11 +47,9 @@ select {
 }
 
 .workflow-grid {
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr);
 }
 
-@media (max-width: 1180px) {
-  .workflow-grid {
-    grid-template-columns: 1fr;
-  }
+.workbench-shell {
+  max-width: 72rem;
 }

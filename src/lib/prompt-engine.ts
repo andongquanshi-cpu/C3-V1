@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { retrieveKnowledge } from "@/lib/knowledge-retriever";
+import { formatContentLengthForPrompt, normalizeContentLength } from "@/lib/licaitong-workflow";
 import { buildPersonaContentPrompt } from "@/lib/persona-loader";
 
 type AnyRecord = Record<string, any>;
@@ -81,10 +82,13 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
 }
 
 export function buildContentGenerationPrompt(input: AnyRecord = {}) {
+  const generationMode = input.generationMode || "image-text";
+  const contentLength = normalizeContentLength(input.contentLength || input.length, generationMode);
+  const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
   return buildPrompt("content-generation.md", input, "content-generation", (data, knowledge) => ({
     contentType: data.contentType || "brand-seed",
-    generationMode: data.generationMode || "image-text",
-    length: data.length || data.contentLength || "medium",
+    generationMode,
+    length: lengthHint,
     bloggerLevel: data.bloggerLevel || "middle",
     embedLevel: data.embedLevel || "medium",
     topic: data.topic || data.hotspot || "未提供",
@@ -112,6 +116,10 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
   const personaId = dataPersonaId(input);
   if (!personaId) throw new Error("personaContent 需要 personaId");
 
+  const generationMode = input.generationMode || "image-text";
+  const contentLength = normalizeContentLength(input.contentLength || input.length, generationMode);
+  const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
+
   const knowledge = retrieveKnowledge({ ...input, promptTask: "content-generation" }, input.knowledgeOptions || {});
   const personaPrompt = buildPersonaContentPrompt(
     personaId,
@@ -119,7 +127,8 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       contentType: input.contentType || "brand-seed",
       topic: input.topic || input.hotspot || "未提供",
       targetUser: input.targetUser || "投资小白",
-      contentLength: input.contentLength || input.length || "medium",
+      contentLength: lengthHint,
+      generationMode,
       selectedAngle: input.selectedAngle || input.angle || "未提供",
       customRequirement: input.customRequirement || input.customPrompt || "无",
       topicMaterials: input.topicMaterials || input.materials || [],

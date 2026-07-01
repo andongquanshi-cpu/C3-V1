@@ -1,0 +1,268 @@
+{
+  "version": "1.0",
+  "offerId": "fixed-income-plus",
+  "offerLabel": "固收+",
+  "businessLine": "licaitong",
+  "description": "理财通固收+主推卖点包。合规改写版，禁止收益承诺与荐基表述。",
+  "items": [
+    {
+      "id": "fplus_curated_zone",
+      "businessLine": "licaitong",
+      "offerId": "fixed-income-plus",
+      "name": "大家盈 · 严选专区",
+      "summary": "理财通在固收+方向提供严选专区，帮助用户缩小比较范围，减少自己逐一研究产品信息的负担。具体产品以页面展示为准。",
+      "aliases": ["大家盈", "严选专区", "固收+严选"],
+      "suitableContentTypes": ["finance-tips", "personal-exp", "brand-seed", "scenario-seeding"],
+      "suitableCreationScenes": ["pain-story", "dry-goods-list", "newcomer-guide"],
+      "suitableUserSegments": ["宝妈", "白领", "学生", "理财新手"],
+      "userPainPoints": [
+        "产品太多不知道从哪里看起",
+        "怕选错、怕踩雷",
+        "没有时间研究底层资产"
+      ],
+      "useCases": [
+        "在固收+严选专区浏览平台整理的产品信息",
+        "先比较风险等级和期限再决定是否深入了解",
+        "把专区当作缩小选择范围的入口，而非唯一答案"
+      ],
+      "productActions": [
+        "微信 → 我 → 服务 → 理财通 → 进入固收+ / 大家盈相关专区",
+        "查看产品详情、风险揭示和法律文件"
+      ],
+      "safeClaims": [
+        "严选专区帮我把比较范围缩小了，不用自己大海捞针",
+        "我会先看风险等级和期限，再决定要不要继续了解",
+        "专区是信息整理入口，不是替我做购买决定"
+      ],
+      "softInsertPhrases": [
+        "如果你也纠结选哪个，可以先去理财通的严选专区看看，至少不用自己从零开始筛。",
+        "我习惯先在专区里把风险等级和期限对一遍，再决定要不要往下研究。"
+      ],
+      "strongInsertPhrases": [
+        "理财通有个固收+严选专区，适合想少踩坑、又怕信息太散的新手。"
+      ],
+      "forbiddenClaims": [
+        "不得写成平台替用户选定唯一最佳产品",
+        "不得把严选解释成保本或低风险保证",
+        "不得使用「尖子生」「必买」等荐基措辞"
+      ],
+      "riskNotes": [
+        "严选不等于无风险；具体产品须阅读风险揭示并以页面信息为准。"
+      ],
+      "priority": 95,
+      "knowledgeLayer": "L2_product",
+      "applicablePersonaIds": ["concept_teacher", "family_planner", "peer_diary"],
+      "scenarioTags": ["choice-overload"],
+      "campaignTags": ["fixed-income-plus"],
+      "accountTierTags": []
+    },
+
+
+
+    {
+      "id": "fplus_virtual_trial",
+      "businessLine": "licaitong",
+      "offerId": "fixed-income-plus",
+      "name": "虚拟理财金体验",
+      "summary": "理财通提供虚拟理财金等体验活动，帮助新手在规则范围内感受产品波动与流程。活动规则、期限与补贴方式以官方页面为准，体验结果不代表真实投资表现。",
+      "aliases": ["虚拟理财金", "零成本试水", "体验金"],
+      "suitableContentTypes": ["personal-exp", "brand-seed", "finance-tips", "scenario-seeding"],
+      "suitableCreationScenes": ["newcomer-guide", "review-diary"],
+      "suitableUserSegments": ["学生", "白领", "宝妈", "理财新手"],
+      "userPainPoints": [
+        "不敢用真钱第一次试",
+        "不知道固收+波动到底什么感觉",
+        "怕操作失误"
+      ],
+      "useCases": [
+        "领取或参与虚拟理财金体验活动",
+        "在规则范围内熟悉申购、持有、查看净值等流程",
+        "用体验建立对波动的合理预期，再决定是否用真实资金"
+      ],
+      "productActions": [
+        "在理财通活动页查看虚拟理财金规则",
+        "按页面提示完成体验流程"
+      ],
+      "safeClaims": [
+        "先用体验金熟悉流程，比一上来就投真钱更从容",
+        "体验规则以活动页为准，体验和真实投资不是一回事",
+        "我更把它当成「练手」，不是「稳赚」"
+      ],
+      "softInsertPhrases": [
+        "如果你也怕第一次就掏真金白银，可以看看理财通有没有虚拟理财金之类的体验活动，规则以页面为准。",
+        "我先在体验环境里走了一遍流程，至少知道波动是怎么回事。"
+      ],
+      "strongInsertPhrases": [],
+      "forbiddenClaims": [
+        "不得承诺体验期亏损一定由平台补贴",
+        "不得说体验收益可预期或可延续到真实投资",
+        "不得省略「活动规则以页面为准」"
+      ],
+      "riskNotes": [
+        "体验活动有适用范围与期限；体验表现不代表未来真实投资结果。"
+      ],
+      "priority": 92,
+      "knowledgeLayer": "L2_product",
+      "applicablePersonaIds": ["peer_diary", "concept_teacher"],
+      "scenarioTags": ["first-try"],
+      "campaignTags": ["fixed-income-plus"],
+      "accountTierTags": []
+    },
+
+
+
+    {
+      "id": "fplus_long_term_zone",
+      "businessLine": "licaitong",
+      "offerId": "fixed-income-plus",
+      "name": "长期理财专区",
+      "summary": "理财通设有以中长期稳健类产品为主的专区，并披露相关运作信息，帮助用户建立长期视角。历史数据不代表未来表现，不得作收益承诺。",
+      "aliases": ["长期理财专区", "长期持有", "运作数据"],
+      "suitableContentTypes": ["finance-tips", "personal-exp", "scenario-seeding"],
+      "suitableCreationScenes": ["review-diary", "dry-goods-list"],
+      "suitableUserSegments": ["宝妈", "白领", "家庭稳健规划者"],
+      "userPainPoints": [
+        "不知道哪些钱适合放更长期",
+        "容易被短期波动带节奏",
+        "想看清平台公开信息再判断"
+      ],
+      "useCases": [
+        "在长期理财专区浏览产品类型与公开运作信息",
+        "把教育金、备用金等与用途匹配后再做了解",
+        "定期复盘持有情况，不频繁追涨杀跌"
+      ],
+      "productActions": [
+        "进入理财通长期理财相关专区",
+        "阅读产品资料与平台披露信息"
+      ],
+      "safeClaims": [
+        "长期专区适合先建立「这笔钱放多久」的概念",
+        "平台披露的是历史运作信息，不等于未来表现",
+        "我更关注用途和风险等级，不盯短期涨跌"
+      ],
+      "softInsertPhrases": [
+        "如果你这笔钱三五年内不太会用，可以在理财通的长期专区里先把公开信息看一遍。",
+        "专区里的运作数据是参考，不是承诺以后也这样。"
+      ],
+      "strongInsertPhrases": [],
+      "forbiddenClaims": [
+        "不得使用「100%盈利」「稳赚」等表述",
+        "不得把历史统计写成未来收益保证",
+        "不得省略风险提示"
+      ],
+      "riskNotes": [
+        "长期持有不等于无风险；历史运作数据不代表未来表现。"
+      ],
+      "priority": 88,
+      "knowledgeLayer": "L2_product",
+      "applicablePersonaIds": ["family_planner", "concept_teacher"],
+      "scenarioTags": ["long-term"],
+      "campaignTags": ["fixed-income-plus"],
+      "accountTierTags": []
+    },
+
+
+
+    {
+      "id": "fplus_flexible_redeem",
+      "businessLine": "licaitong",
+      "offerId": "fixed-income-plus",
+      "name": "灵活申赎（E 类份额）",
+      "summary": "部分固收+相关产品提供相对灵活的申赎安排（如持有满一定期限后免赎回费等，以产品页面为准），适合对流动性有要求的用户。不等于随时无损退出。",
+      "aliases": ["灵活申赎", "E类份额", "30天免赎回费"],
+      "suitableContentTypes": ["finance-tips", "personal-exp", "scenario-seeding"],
+      "suitableCreationScenes": ["pain-story", "dry-goods-list"],
+      "suitableUserSegments": ["白领", "宝妈", "轻量理财用户"],
+      "userPainPoints": [
+        "怕钱被锁死急用时取不出",
+        "不知道申赎规则",
+        "稳健和灵活想要兼顾"
+      ],
+      "useCases": [
+        "在选购前阅读申赎规则与持有期限要求",
+        "把短期要用的钱和长期备用金分开安排",
+        "在严选专区里筛选符合流动性需求的产品类型"
+      ],
+      "productActions": [
+        "产品详情页查看申赎规则、费率与持有期限",
+        "确认是否为 E 类份额及具体条件"
+      ],
+      "safeClaims": [
+        "买之前我会先看申赎规则，别等用钱时才发现限制",
+        "灵活是相对的，具体以产品页面为准",
+        "短期要用的钱我会单独留出来，不和长期配置混在一起"
+      ],
+      "softInsertPhrases": [
+        "如果你也怕流动性，选购前先翻一下申赎规则，有的产品持有满一定期限后赎回费会不一样。",
+        "稳健不等于把钱都锁死，关键是先看规则再匹配用途。"
+      ],
+      "strongInsertPhrases": [],
+      "forbiddenClaims": [
+        "不得说「随时无损取出」",
+        "不得省略持有期限与费率条件",
+        "不得把灵活申赎写成保本"
+      ],
+      "riskNotes": [
+        "申赎规则、费率因产品而异；提前赎回可能产生费用或限制。"
+      ],
+      "priority": 86,
+      "knowledgeLayer": "L2_product",
+      "applicablePersonaIds": ["family_planner", "concept_teacher", "peer_diary"],
+      "scenarioTags": ["liquidity"],
+      "campaignTags": ["fixed-income-plus"],
+      "accountTierTags": []
+    },
+
+
+    
+    {
+      "id": "fplus_ai_assist",
+      "businessLine": "licaitong",
+      "offerId": "fixed-income-plus",
+      "name": "AI 辅助了解产品",
+      "summary": "理财通提供 AI 问答等能力，帮助用户整理公开产品信息、对比字段与理解术语。属于信息辅助工具，不构成投资建议或买卖推荐。",
+      "aliases": ["问问DeepSeek", "AI辅助", "混元金融大模型"],
+      "suitableContentTypes": ["finance-tips", "stock-tutorial", "brand-seed"],
+      "suitableCreationScenes": ["newcomer-guide", "dry-goods-list"],
+      "suitableUserSegments": ["学生", "白领", "理财新手"],
+      "userPainPoints": [
+        "看不懂产品说明书",
+        "字段太多不知比较什么",
+        "想有人帮梳理公开信息"
+      ],
+      "useCases": [
+        "在理财通内向 AI 提问产品类型、术语或公开字段含义",
+        "用 AI 整理对比思路，再自行阅读法律文件",
+        "把 AI 当作信息整理助手，而非「替我决定买不买」"
+      ],
+      "productActions": [
+        "在理财通相关入口使用 AI 问答",
+        "结合产品详情页与风险揭示交叉验证"
+      ],
+      "safeClaims": [
+        "AI 适合帮我把公开信息理顺，不适合替我做购买决定",
+        "我会把 AI 回答和官方产品页对照着看",
+        "工具是辅助理解，不是投资建议"
+      ],
+      "softInsertPhrases": [
+        "有些术语看不懂时，我会先在理财通里用 AI 把公开信息捋一遍，再自己看风险揭示。",
+        "它更像「翻译器」，不是「荐基器」。"
+      ],
+      "strongInsertPhrases": [],
+      "forbiddenClaims": [
+        "不得说 AI 推荐购买某产品",
+        "不得把 AI 解读写成买卖信号",
+        "不得省略「不构成投资建议」"
+      ],
+      "riskNotes": [
+        "AI 输出可能存在偏差，须以产品法律文件与官方页面为准。"
+      ],
+      "priority": 84,
+      "knowledgeLayer": "L2_product",
+      "applicablePersonaIds": ["concept_teacher", "hotspot_observer"],
+      "scenarioTags": ["ai-assist"],
+      "campaignTags": ["fixed-income-plus"],
+      "accountTierTags": []
+    }
+  ]
+}

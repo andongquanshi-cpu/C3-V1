@@ -55,6 +55,8 @@ interface KnowledgeInput {
   templateLimit?: number;
   phraseGroupId?: string;
   phraseId?: string;
+  offerId?: string;
+  creationScene?: string;
 }
 
 interface KnowledgeOptions {
@@ -143,7 +145,28 @@ export function loadKnowledgeBase(options: KnowledgeOptions = {}) {
     platformRules: readKbJson(basePath, index, "platformRules", "platform-rules.json", { items: [] }).items || [],
     visualGuidelines: readKbJson(basePath, index, "visualGuidelines", "visual-guidelines.json", { items: [] }).items || [],
     audienceProfiles: readKbJson(basePath, index, "audienceProfiles", "audience-profiles.json", { items: [] }).items || [],
+    offerPackFixedIncomePlus: readKbJson(
+      basePath,
+      index,
+      "offerPackFixedIncomePlus",
+      "layers/L2-product/offer-packs/fixed-income-plus.json",
+      { items: [] },
+    ).items || [],
   };
+}
+
+function resolveRetrievalFeatures(kb: ReturnType<typeof loadKnowledgeBase>, input: KnowledgeInput) {
+  const offerId = normalizeText(input.offerId || "");
+  const useOfferPack = offerId === "fixed-income-plus" || offerId === "fixed_income_plus";
+  if (useOfferPack && kb.offerPackFixedIncomePlus.length) {
+    return kb.offerPackFixedIncomePlus;
+  }
+  if (useOfferPack) {
+    return kb.productFeatures.filter((feature: AnyRecord) =>
+      toArray(feature.campaignTags).includes("fixed-income-plus"),
+    );
+  }
+  return kb.productFeatures;
 }
 
 function scoreTextMatches(fields: unknown, terms: unknown, weight: number) {
@@ -176,6 +199,8 @@ function scoreFeature(feature: AnyRecord, input: KnowledgeInput, contentTypeCand
   if (requestedFeatureIds.includes(feature.id)) score += 100;
   if (requestedFeatureNames.some((name) => feature.name === name || toArray(feature.aliases).includes(name))) score += 100;
   if (toArray(feature.suitableContentTypes).some((type) => contentTypeCandidates.includes(String(type)))) score += 20;
+  const creationScene = normalizeText(input.creationScene || "");
+  if (creationScene && toArray(feature.suitableCreationScenes).includes(creationScene)) score += 25;
   if (scoreTextMatches(feature.suitableUserSegments, [targetUser], 12)) score += 12;
   score += scoreTextMatches([feature.aliases, feature.userPainPoints, feature.useCases, feature.summary], [targetUser, input.topic, input.campaignGoal], 2);
   return score;
@@ -440,7 +465,8 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
   };
   const contentTypeCandidates = getContentTypeCandidates(resolvedInput.contentType);
   const purpose = normalizeText(resolvedInput.task || resolvedInput.promptTask || "");
-  const selectedFeatures = selectFeatures(kb.productFeatures, resolvedInput, contentTypeCandidates, businessLine);
+  const featurePool = resolveRetrievalFeatures(kb, resolvedInput);
+  const selectedFeatures = selectFeatures(featurePool, resolvedInput, contentTypeCandidates, businessLine);
   const selectedTemplates = selectTemplates(kb.contentTemplates, resolvedInput, contentTypeCandidates, businessLine);
   const phraseGroup = selectPhraseGroup(kb.phraseLibrary, resolvedInput, contentTypeCandidates, businessLine);
   const complianceRules = selectComplianceRules(kb.complianceRules, resolvedInput, contentTypeCandidates);
@@ -470,9 +496,10 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
 
 export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
   const kb = loadKnowledgeBase(options);
-  const features = kb.productFeatures.map((feature: AnyRecord) => ({
+  const mapFeature = (feature: AnyRecord, sourceFile: string) => ({
     id: feature.id,
     businessLine: feature.businessLine || "all",
+    offerId: feature.offerId,
     name: feature.name,
     summary: feature.summary || "",
     aliases: toArray(feature.aliases),
@@ -480,10 +507,15 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
     recommendedPhrases: toArray(feature.softInsertPhrases),
     complianceTaboo: toArray(feature.forbiddenClaims),
     suitableContentTypes: toArray(feature.suitableContentTypes),
+    suitableCreationScenes: toArray(feature.suitableCreationScenes),
     suitableUserSegments: toArray(feature.suitableUserSegments),
     priority: feature.priority || 0,
-    sourceFile: "product-features.json",
-  }));
+    sourceFile,
+  });
+  const features = [
+    ...kb.productFeatures.map((feature: AnyRecord) => mapFeature(feature, "product-features.json")),
+    ...kb.offerPackFixedIncomePlus.map((feature: AnyRecord) => mapFeature(feature, "offer-packs/fixed-income-plus.json")),
+  ];
 
   const complianceRules = kb.complianceRules.map((rule: AnyRecord) => [rule.riskType, rule.description].filter(Boolean).join("：") || rule.id);
   const scripts = kb.phraseLibrary.reduce((acc: Record<string, unknown>, group: AnyRecord) => {
@@ -521,6 +553,7 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
     jsonKb: {
       brandVoice: kb.brandVoiceItems,
       productFeatures: kb.productFeatures,
+      offerPackFixedIncomePlus: kb.offerPackFixedIncomePlus,
       contentTemplates: kb.contentTemplates,
       phraseLibrary: kb.phraseLibrary,
       complianceRules: kb.complianceRules,
@@ -531,7 +564,8 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
       audienceProfiles: kb.audienceProfiles,
     },
     counts: {
-      features: kb.productFeatures.length,
+      features: features.length,
+      offerPackFeatures: kb.offerPackFixedIncomePlus.length,
       templates: kb.contentTemplates.length,
       phraseGroups: kb.phraseLibrary.length,
       complianceRules: kb.complianceRules.length,

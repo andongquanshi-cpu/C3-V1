@@ -27,7 +27,8 @@
       "label": "产品层",
       "scope": "businessLine",
       "files": [
-        "layers/L2-product/product-features.json"
+        "layers/L2-product/product-features.json",
+        "layers/L2-product/offer-packs/fixed-income-plus.json"
       ]
     },
     "L3_content_pattern": {
@@ -64,6 +65,7 @@
     "brandVoice": "layers/L1-brand/brand-voice.json",
     "visualGuidelines": "layers/L1-brand/visual-guidelines.json",
     "productFeatures": "layers/L2-product/product-features.json",
+    "offerPackFixedIncomePlus": "layers/L2-product/offer-packs/fixed-income-plus.json",
     "contentTemplates": "layers/L3-content-pattern/content-templates.json",
     "phraseLibrary": "layers/L3-content-pattern/phrase-library.json",
     "audienceProfiles": "layers/L4-audience/audience-profiles.json"

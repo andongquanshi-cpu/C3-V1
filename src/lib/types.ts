@@ -6,10 +6,28 @@ export type ContentType =
   | "brand-seed";
 
 export type GenerationMode = "image-text" | "video-script";
+/** 图文正文字数区间（小红书正文上限 1000 字） */
+export type TextContentLength = "under-200" | "200-500" | "500-1000" | "long-form";
+/** 视频脚本时长 */
+export type VideoScriptDuration = "15s" | "30s" | "60s";
+export type ContentLength = TextContentLength | VideoScriptDuration;
 export type BloggerLevel = "tail" | "middle" | "head";
 export type EmbedLevel = "none" | "low" | "medium" | "high";
 export type RiskLevel = "low" | "medium" | "high";
 export type BusinessLine = "weisec" | "licaitong";
+
+/** 理财通 Offer（本期深化 fixed-income-plus） */
+export type LicaitongOfferId = "fixed-income-plus" | "lingqiantong" | "weizhitou";
+
+/** 理财通创作场景 */
+export type LicaitongCreationScene =
+  | "newcomer-guide"
+  | "review-diary"
+  | "pain-story"
+  | "dry-goods-list";
+
+/** 理财通读者身份（由人设带出或只读展示） */
+export type LicaitongAudienceTag = "student" | "mama" | "white-collar";
 
 export interface ApiConfig {
   text: {
@@ -40,6 +58,12 @@ export interface Material {
 
 export interface BriefInput {
   businessLine: BusinessLine;
+  /** 理财通：主推 Offer */
+  offerId?: LicaitongOfferId;
+  /** 理财通：创作场景 */
+  creationScene?: LicaitongCreationScene;
+  /** 理财通：读者身份标签（通常由人设推断） */
+  audienceTag?: LicaitongAudienceTag;
   contentType: ContentType;
   topic: string;
   targetUser: string;
@@ -48,7 +72,7 @@ export interface BriefInput {
   campaignGoal?: string;
   bloggerLevel: BloggerLevel;
   embedLevel: EmbedLevel;
-  contentLength: "short" | "medium" | "long";
+  contentLength: ContentLength;
   generationMode: GenerationMode;
   generateCount: number;
   customRequirement?: string;
@@ -133,6 +157,7 @@ export interface Draft extends GeneratedContent {
 export interface ProductFeatureView {
   id: string;
   businessLine?: string;
+  offerId?: string;
   name: string;
   summary: string;
   aliases: string[];
@@ -140,6 +165,7 @@ export interface ProductFeatureView {
   recommendedPhrases: string[];
   complianceTaboo: string[];
   suitableContentTypes: string[];
+  suitableCreationScenes?: string[];
   suitableUserSegments: string[];
   priority: number;
   sourceFile: string;
