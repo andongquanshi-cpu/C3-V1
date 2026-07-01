@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, CheckCircle2, ImageIcon, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Archive, CheckCircle2, ImageIcon, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LicaitongBriefPanel } from "@/components/workspace/LicaitongBriefPanel";
 import { LicaitongAnglesPanel } from "@/components/workspace/LicaitongAnglesPanel";
 import { BriefSummaryCard } from "@/components/workspace/BriefSummaryCard";
+import { DraftBoxPanel } from "@/components/workspace/DraftBoxPanel";
 import { WorkflowStepper } from "@/components/workspace/WorkflowStepper";
 import { buildLicaitongDefaults, normalizeContentLength } from "@/lib/licaitong-workflow";
-import { parseLLMJson, safeJsonParse } from "@/lib/utils";
+import { parseLLMJson, safeJsonParse, cn } from "@/lib/utils";
 import {
+  buildAnglesConfigFingerprint,
   buildDefaultCompliance,
   normalizeAngles,
   normalizeCompliance,
@@ -37,8 +39,9 @@ const LICAITONG_STEPS = [
   { id: 1, label: "创作配置" },
   { id: 2, label: "创意角度" },
   { id: 3, label: "生成内容" },
-  { id: 4, label: "审核草稿" },
 ];
+
+type WorkbenchView = "workflow" | "drafts";
 
 const LLM_NOT_CONFIGURED =
   "服务端未配置 LLM_API_KEY，请在项目根目录 .env 中设置后重启开发服务器";
@@ -64,6 +67,7 @@ interface ApiStatus {
 }
 
 export function LicaitongWorkbench() {
+  const [view, setView] = useState<WorkbenchView>("workflow");
   const [step, setStep] = useState(1);
   const [brief, setBrief] = useState<BriefInput>(DEFAULT_BRIEF);
   const [knowledge, setKnowledge] = useState<KnowledgeListView | null>(null);
@@ -76,7 +80,11 @@ export function LicaitongWorkbench() {
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeResultId, setActiveResultId] = useState("");
   const [status, setStatus] = useState("");
-  const [isBusy, setIsBusy] = useState(false);
+  const [isSearchingHotspot, setIsSearchingHotspot] = useState(false);
+  const [isGeneratingAngles, setIsGeneratingAngles] = useState(false);
+  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [anglesGeneratedForKey, setAnglesGeneratedForKey] = useState<string | null>(null);
   const [imageResult, setImageResult] = useState("");
 
   useEffect(() => {
@@ -138,6 +146,20 @@ export function LicaitongWorkbench() {
     () => results.find((r) => r.id === activeResultId) || results[0],
     [activeResultId, results],
   );
+  const anglesConfigKey = useMemo(
+    () => buildAnglesConfigFingerprint(brief, materials),
+    [brief, materials],
+  );
+  const anglesUpToDate = anglesGeneratedForKey === anglesConfigKey && angles.length > 0;
+
+  useEffect(() => {
+    if (isGeneratingAngles) return;
+    if (anglesGeneratedForKey && anglesConfigKey !== anglesGeneratedForKey) {
+      setAngles([]);
+      setSelectedAngleIds([]);
+      setAnglesGeneratedForKey(null);
+    }
+  }, [anglesConfigKey, anglesGeneratedForKey, isGeneratingAngles]);
 
   function updateBrief(patch: Partial<BriefInput>) {
     setBrief((current) => ({ ...current, ...patch }));
@@ -159,7 +181,7 @@ export function LicaitongWorkbench() {
   }
 
   async function searchHotspot() {
-    setIsBusy(true);
+    setIsSearchingHotspot(true);
     setStatus("正在搜索热点...");
     try {
       const response = await fetch("/api/tavily-proxy", {
@@ -187,7 +209,7 @@ export function LicaitongWorkbench() {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "热点搜索失败，可手动粘贴素材");
     } finally {
-      setIsBusy(false);
+      setIsSearchingHotspot(false);
     }
   }
 
@@ -221,10 +243,12 @@ export function LicaitongWorkbench() {
   }
 
   async function generateAngles() {
-    setIsBusy(true);
+    const configKey = anglesConfigKey;
+    setIsGeneratingAngles(true);
     setStatus("正在检索固收+ 知识库并生成创意角度...");
     setAngles([]);
     setSelectedAngleIds([]);
+    setAnglesGeneratedForKey(null);
     try {
       if (!apiStatus.ready) throw new Error(LLM_NOT_CONFIGURED);
       const input = { ...brief, materials };
@@ -232,12 +256,13 @@ export function LicaitongWorkbench() {
       const raw = await callTextModel(prompt, { temperature: 0.35, maxTokens: 8192 });
       const normalized = normalizeAngles(parseLLMJson(raw), brief);
       setAngles(normalized);
-      setSelectedAngleIds(normalized.slice(0, brief.generateCount).map((a) => a.angleId));
-      setStatus(`已生成 ${normalized.length} 个创意角度`);
+      setSelectedAngleIds([]);
+      setAnglesGeneratedForKey(configKey);
+      setStatus(`已生成 ${normalized.length} 个创意角度，请勾选要写成稿的角度`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "创意角度生成失败");
     } finally {
-      setIsBusy(false);
+      setIsGeneratingAngles(false);
     }
   }
 
@@ -250,7 +275,7 @@ export function LicaitongWorkbench() {
       setStatus("请至少选择一个创意角度");
       return;
     }
-    setIsBusy(true);
+    setIsGeneratingContent(true);
     setStatus("正在生成正文并完成合规审查...");
     setImageResult("");
     try {
@@ -280,12 +305,13 @@ export function LicaitongWorkbench() {
       }
       setResults(nextResults);
       setActiveResultId(nextResults[0]?.id || "");
+      setView("workflow");
       setStep(3);
       setStatus(`已生成 ${nextResults.length} 条内容`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "内容生成失败");
     } finally {
-      setIsBusy(false);
+      setIsGeneratingContent(false);
     }
   }
 
@@ -293,7 +319,7 @@ export function LicaitongWorkbench() {
     const prompt = activeResult?.imagePromptSuggestions?.[0]?.prompt;
     if (!prompt) return setStatus("当前内容没有图片 Prompt");
     if (!apiStatus.image) return setStatus("服务端未配置 IMAGE_API_KEY");
-    setIsBusy(true);
+    setIsGeneratingImage(true);
     try {
       const response = await fetch("/api/image-proxy", {
         method: "POST",
@@ -307,7 +333,7 @@ export function LicaitongWorkbench() {
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "图片生成失败");
     } finally {
-      setIsBusy(false);
+      setIsGeneratingImage(false);
     }
   }
 
@@ -316,16 +342,49 @@ export function LicaitongWorkbench() {
     const draft: Draft = {
       ...activeResult,
       savedAt: new Date().toISOString(),
+      draftEntryId: uid("draft"),
       generationSnapshot: { ...brief, materials },
     };
     setDrafts((current) => [draft, ...current].slice(0, 30));
-    setStep(4);
+    setView("drafts");
     setStatus("已保存到草稿箱");
+  }
+
+  function deleteDraft(draftEntryId: string) {
+    setDrafts((current) => current.filter((item) => (item.draftEntryId || `${item.id}_${item.savedAt}`) !== draftEntryId));
+    setStatus("草稿已删除");
+  }
+
+  function goToWorkflowStep(nextStep: number) {
+    setView("workflow");
+    if (nextStep <= step) setStep(nextStep);
   }
 
   return (
     <div className="space-y-6">
-      <WorkflowStepper steps={LICAITONG_STEPS} current={step} onStepClick={(s) => s <= step && setStep(s)} />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <WorkflowStepper steps={LICAITONG_STEPS} current={step} onStepClick={goToWorkflowStep} />
+        </div>
+        <button
+          type="button"
+          onClick={() => setView((current) => (current === "drafts" ? "workflow" : "drafts"))}
+          className={cn(
+            "inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+            view === "drafts"
+              ? "border-primary/50 bg-primary/10 text-primary"
+              : "border-border/80 bg-card/40 text-muted-foreground hover:border-primary/30 hover:text-foreground",
+          )}
+        >
+          <Archive className="h-4 w-4" />
+          <span>草稿箱</span>
+          {drafts.length > 0 ? (
+            <Badge variant={view === "drafts" ? "default" : "secondary"} className="h-5 min-w-5 justify-center px-1.5 text-[10px]">
+              {drafts.length}
+            </Badge>
+          ) : null}
+        </button>
+      </div>
 
       {!apiStatus.ready ? (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
@@ -348,13 +407,21 @@ export function LicaitongWorkbench() {
       ) : null}
 
       <div className="min-w-0 space-y-6">
-        {step === 1 && (
+        {view === "drafts" ? (
+          <DraftBoxPanel
+            drafts={drafts}
+            onDeleteDraft={deleteDraft}
+            onBackToWorkflow={() => setView("workflow")}
+          />
+        ) : null}
+
+        {view === "workflow" && step === 1 && (
             <LicaitongBriefPanel
               brief={brief}
               materials={materials}
               materialDraft={materialDraft}
               offerFeatures={offerFeatures}
-              isBusy={isBusy}
+              isBusy={isSearchingHotspot}
               onBriefChange={(patch) => {
                 if (typeof patch === "function") setBrief((c) => patch(c));
                 else updateBrief(patch);
@@ -362,11 +429,14 @@ export function LicaitongWorkbench() {
               onMaterialDraftChange={setMaterialDraft}
               onAddMaterial={addManualMaterial}
               onSearchHotspot={searchHotspot}
-              onContinue={() => setStep(2)}
+              onContinue={() => {
+                setView("workflow");
+                setStep(2);
+              }}
             />
           )}
 
-          {step === 2 && (
+          {view === "workflow" && step === 2 && (
             <div className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
               <aside className="xl:sticky xl:top-4 xl:self-start">
                 <BriefSummaryCard
@@ -381,7 +451,9 @@ export function LicaitongWorkbench() {
                 brief={brief}
                 angles={angles}
                 selectedAngleIds={selectedAngleIds}
-                isBusy={isBusy}
+                isGeneratingAngles={isGeneratingAngles}
+                isGeneratingContent={isGeneratingContent}
+                anglesUpToDate={anglesUpToDate}
                 apiReady={apiStatus.ready}
                 onBriefChange={updateBrief}
                 onBriefReplace={(updater) => setBrief(updater)}
@@ -393,7 +465,7 @@ export function LicaitongWorkbench() {
             </div>
           )}
 
-          {step === 3 && (
+          {view === "workflow" && step === 3 && (
             <div className="space-y-5">
               {results.length === 0 ? (
                 <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
@@ -434,7 +506,9 @@ export function LicaitongWorkbench() {
                           <div className="mb-2 flex items-center gap-2 font-medium text-sm"><ImageIcon className="h-4 w-4" /> 封面 Prompt</div>
                           <p className="max-h-40 overflow-auto text-xs leading-5 text-muted-foreground">{activeResult.imagePromptSuggestions[0]?.prompt}</p>
                           {apiStatus.image ? (
-                            <Button className="mt-3 w-full" variant="secondary" size="sm" onClick={generateImage} disabled={isBusy}>生成封面图</Button>
+                            <Button className="mt-3 w-full" variant="secondary" size="sm" onClick={generateImage} disabled={isGeneratingImage}>
+                              {isGeneratingImage ? "生成中…" : "生成封面图"}
+                            </Button>
                           ) : null}
                         </section>
                         <Button className="w-full" onClick={saveActiveDraft}><CheckCircle2 className="h-4 w-4" /> 保存草稿</Button>
@@ -442,28 +516,6 @@ export function LicaitongWorkbench() {
                     </div>
                   ) : null}
                 </>
-              )}
-            </div>
-          )}
-
-          {step === 4 && (
-            <div className="space-y-4 rounded-xl border border-border/80 bg-card/50 p-5 sm:p-6">
-              <h2 className="text-lg font-semibold">草稿箱</h2>
-              {drafts.length === 0 ? (
-                <p className="text-sm text-muted-foreground">暂无草稿。生成内容后点击「保存草稿」。</p>
-              ) : (
-                drafts.map((draft) => (
-                  <div key={draft.id + draft.savedAt} className="rounded-lg border border-border p-4">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <strong>{draft.selectedTitle}</strong>
-                      <Badge variant={draft.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}>
-                        {draft.complianceReport?.publishReadiness || "needs_review"}
-                      </Badge>
-                    </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{new Date(draft.savedAt).toLocaleString()}</p>
-                    <p className="mt-3 line-clamp-3 text-sm text-muted-foreground">{draft.content}</p>
-                  </div>
-                ))
               )}
             </div>
           )}

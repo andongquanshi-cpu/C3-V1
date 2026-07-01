@@ -69,7 +69,14 @@ function buildPrompt(templateName: string, input: AnyRecord, taskName: string, v
   };
 }
 
+function clampGenerateCount(value: unknown) {
+  const count = Number(value);
+  if (!Number.isFinite(count)) return 3;
+  return Math.min(5, Math.max(1, Math.round(count)));
+}
+
 export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
+  const generateCount = clampGenerateCount(input.generateCount);
   return buildPrompt("creative-angles.md", input, "creative-angles", (data) => ({
     contentType: data.contentType || "brand-seed",
     topic: data.topic || data.hotspot || "未提供",
@@ -78,6 +85,7 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
     embedLevel: data.embedLevel || "medium",
     bloggerLevel: data.bloggerLevel || "middle",
     customRequirement: data.customRequirement || data.customPrompt || "无",
+    generateCount,
   }));
 }
 

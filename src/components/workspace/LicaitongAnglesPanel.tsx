@@ -19,7 +19,9 @@ interface LicaitongAnglesPanelProps {
   brief: BriefInput;
   angles: CreativeAngle[];
   selectedAngleIds: string[];
-  isBusy: boolean;
+  isGeneratingAngles: boolean;
+  isGeneratingContent: boolean;
+  anglesUpToDate: boolean;
   apiReady: boolean;
   onBriefChange: (patch: Partial<BriefInput>) => void;
   onBriefReplace: (updater: (current: BriefInput) => BriefInput) => void;
@@ -84,7 +86,9 @@ export function LicaitongAnglesPanel({
   brief,
   angles,
   selectedAngleIds,
-  isBusy,
+  isGeneratingAngles,
+  isGeneratingContent,
+  anglesUpToDate,
   apiReady,
   onBriefChange,
   onBriefReplace,
@@ -155,13 +159,13 @@ export function LicaitongAnglesPanel({
             </div>
           </div>
           <div className="mt-4 flex justify-end">
-            {isBusy ? (
+            {isGeneratingAngles ? (
               <Button size="lg" disabled className="min-w-[200px]">
                 <Loader2 className="h-4 w-4 animate-spin" />
                 生成中…
               </Button>
-            ) : angles.length > 0 ? (
-              <Button size="lg" variant="secondary" onClick={onGenerateAngles} disabled={!apiReady} className="min-w-[200px]">
+            ) : anglesUpToDate ? (
+              <Button size="lg" variant="secondary" disabled className="min-w-[200px]">
                 <RefreshCw className="h-4 w-4" />
                 重新生成
               </Button>
@@ -192,7 +196,7 @@ export function LicaitongAnglesPanel({
             }
           />
 
-          {isBusy && angles.length === 0 ? (
+          {isGeneratingAngles && angles.length === 0 ? (
             <div className="flex items-center justify-center gap-2 rounded-xl border border-dashed border-border/80 py-14 text-sm text-muted-foreground">
               <Loader2 className="h-4 w-4 animate-spin" />
               生成中…
@@ -287,9 +291,18 @@ export function LicaitongAnglesPanel({
           <Button
             size="lg"
             onClick={onGenerateContent}
-            disabled={isBusy || !apiReady || angles.length === 0 || selectedAngleIds.length === 0}
+            disabled={
+              isGeneratingContent || isGeneratingAngles || !apiReady || angles.length === 0 || selectedAngleIds.length === 0
+            }
           >
-            生成正文{selectedAngleIds.length > 0 ? `（${selectedAngleIds.length}）` : ""}
+            {isGeneratingContent ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                生成中…
+              </>
+            ) : (
+              <>生成正文{selectedAngleIds.length > 0 ? `（${selectedAngleIds.length}）` : ""}</>
+            )}
           </Button>
         </div>
       </div>

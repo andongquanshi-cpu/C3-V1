@@ -1,9 +1,28 @@
-import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent } from "@/lib/types";
+import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent, Material } from "@/lib/types";
 
 type LooseRecord = Record<string, unknown>;
 
 export function uid(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+}
+
+/** 创作配置 + 角度生成参数指纹，用于判断当前角度是否仍有效 */
+export function buildAnglesConfigFingerprint(brief: BriefInput, materials: Material[]) {
+  return JSON.stringify({
+    offerId: brief.offerId,
+    creationScene: brief.creationScene,
+    audienceTag: brief.audienceTag,
+    personaId: brief.personaId,
+    personaVariant: brief.personaVariant,
+    selectedFeatureIds: [...brief.selectedFeatureIds].sort(),
+    topic: brief.topic,
+    targetUser: brief.targetUser,
+    contentType: brief.contentType,
+    materialIds: materials.map((item) => item.id).sort(),
+    generateCount: brief.generateCount,
+    embedLevel: brief.embedLevel,
+    customRequirement: brief.customRequirement || "",
+  });
 }
 
 function asRecord(value: unknown): LooseRecord {
@@ -118,7 +137,8 @@ export function buildDefaultCompliance(content: GeneratedContent): ComplianceRep
 export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngle[] {
   const parsed = value as { angles?: CreativeAngle[] } | CreativeAngle[];
   const angles = Array.isArray(parsed) ? parsed : Array.isArray(parsed.angles) ? parsed.angles : [];
-  return angles.slice(0, 8).map((angle, index) => ({
+  const limit = Math.min(5, Math.max(1, Math.round(Number(brief.generateCount) || 3)));
+  return angles.slice(0, limit).map((angle, index) => ({
     angleId: angle.angleId || `angle_${String(index + 1).padStart(3, "0")}`,
     angleName: angle.angleName || `创意角度 ${index + 1}`,
     angleType: angle.angleType || "内容角度",

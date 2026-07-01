@@ -151,6 +151,7 @@ export interface ComplianceReport {
 
 export interface Draft extends GeneratedContent {
   savedAt: string;
+  draftEntryId?: string;
   generationSnapshot: BriefInput;
 }
 

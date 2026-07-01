@@ -431,3 +431,42 @@ export function applyGenerationModeChange(brief: BriefInput, mode: GenerationMod
     contentLength: normalizeContentLength(brief.contentLength, mode),
   };
 }
+
+const EMBED_LEVEL_LABELS: Record<string, string> = {
+  none: "无",
+  low: "低",
+  medium: "中",
+  high: "高",
+};
+
+export interface DraftArchiveField {
+  label: string;
+  value: string;
+}
+
+/** 草稿归档用 Brief 摘要（保存时快照，与第二步实时 Brief 侧栏不同） */
+export function buildDraftArchiveFields(snapshot: BriefInput, angleName: string): DraftArchiveField[] {
+  const offer = getLicaitongOffer(snapshot.offerId);
+  const scene = getLicaitongScene(snapshot.creationScene);
+  const persona = LICAITONG_PERSONAS.find((item) => item.id === snapshot.personaId);
+  const lengthLabel =
+    getContentLengthOptions(snapshot.generationMode).find((item) => item.value === snapshot.contentLength)?.label || "-";
+  const materialCount = snapshot.materials?.length ?? 0;
+
+  return [
+    { label: "创意角度", value: angleName },
+    { label: "主推 Offer", value: offer.label },
+    { label: "创作场景", value: scene.label },
+    { label: "博主人设", value: persona?.label || "-" },
+    { label: "目标读者", value: snapshot.targetUser },
+    {
+      label: "主推功能",
+      value: snapshot.selectedFeatureNames?.join("、") || `${snapshot.selectedFeatureIds.length} 项`,
+    },
+    { label: "内容形式", value: snapshot.generationMode === "video-script" ? "视频脚本" : "图文内容" },
+    { label: getContentLengthFieldLabel(snapshot.generationMode), value: lengthLabel },
+    { label: "植入强度", value: EMBED_LEVEL_LABELS[snapshot.embedLevel] || snapshot.embedLevel },
+    { label: "素材", value: `${materialCount} 条` },
+    ...(snapshot.topic ? [{ label: "主题", value: snapshot.topic }] : []),
+  ];
+}
