@@ -1,7 +1,102 @@
 import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent } from "@/lib/types";
 
+type LooseRecord = Record<string, unknown>;
+
 export function uid(prefix: string) {
   return `${prefix}_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`;
+}
+
+function asRecord(value: unknown): LooseRecord {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as LooseRecord) : {};
+}
+
+function asString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+/** 将 personaContent 等人设专用 JSON 映射为 contentGeneration 标准字段 */
+export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedContent> & LooseRecord {
+  const data = asRecord(value);
+  if (asString(data.content)) return data as Partial<GeneratedContent> & LooseRecord;
+
+  const opening = asString(data.opening);
+  const body = asString(data.body);
+  const closing = asString(data.closing);
+  const content = [opening, body, closing].filter(Boolean).join("\n\n");
+
+  const titleOptions = Array.isArray(data.titleOptions) ? data.titleOptions : [];
+  const titleCandidates =
+    Array.isArray(data.titleCandidates) && data.titleCandidates.length > 0
+      ? (data.titleCandidates as GeneratedContent["titleCandidates"])
+      : titleOptions
+          .map((item) => {
+            const row = asRecord(item);
+            const text = asString(row.text);
+            if (!text) return null;
+            return {
+              text,
+              type: asString(row.type) || undefined,
+              riskLevel: (row.riskLevel as GeneratedContent["titleCandidates"][number]["riskLevel"]) || "low",
+            };
+          })
+          .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  const imageTextSuggestions = Array.isArray(data.imageTextSuggestions) ? data.imageTextSuggestions : [];
+  const imagePromptSuggestions =
+    Array.isArray(data.imagePromptSuggestions) && data.imagePromptSuggestions.length > 0
+      ? (data.imagePromptSuggestions as GeneratedContent["imagePromptSuggestions"])
+      : imageTextSuggestions
+          .map((item) => {
+            const row = asRecord(item);
+            const scene = asString(row.scene);
+            const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String).join("；") : "";
+            const prompt = asString(row.prompt) || [scene, visualNotes].filter(Boolean).join("。");
+            if (!prompt) return null;
+            return {
+              style: asString(row.style) || "default",
+              prompt,
+              coverText: asString(row.coverText) || undefined,
+              riskNotes: Array.isArray(row.riskNotes) ? row.riskNotes.map(String) : [],
+            };
+          })
+          .filter((item): item is NonNullable<typeof item> => Boolean(item));
+
+  const naturalInsertion = asRecord(data.naturalInsertion);
+  const insertStrategy =
+    data.insertStrategy && Object.keys(asRecord(data.insertStrategy)).length > 0
+      ? (data.insertStrategy as Record<string, string>)
+      : naturalInsertion.productName || naturalInsertion.sceneContext
+        ? {
+            featureName: asString(naturalInsertion.productName),
+            scene: asString(naturalInsertion.sceneContext),
+            usedPhrase: asString(naturalInsertion.usedPhrase),
+            whyNatural: asString(naturalInsertion.whyNatural),
+          }
+        : {};
+
+  const coverFromImage =
+    imagePromptSuggestions[0]?.coverText ||
+    (imageTextSuggestions[0] ? asString(asRecord(imageTextSuggestions[0]).coverText) : "");
+
+  const coverTextCandidates =
+    Array.isArray(data.coverTextCandidates) && data.coverTextCandidates.length > 0
+      ? (data.coverTextCandidates as GeneratedContent["coverTextCandidates"])
+      : coverFromImage
+        ? [{ text: coverFromImage, style: "人设封面", riskLevel: "low" as const }]
+        : [];
+
+  return {
+    ...data,
+    content,
+    titleCandidates,
+    selectedTitle: asString(data.selectedTitle) || titleCandidates[0]?.text,
+    coverTextCandidates,
+    selectedCoverText: asString(data.selectedCoverText) || coverTextCandidates[0]?.text,
+    imagePromptSuggestions,
+    insertStrategy,
+    interactionGuide: asString(data.interactionGuide) || asString(data.cta),
+    tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
+  };
 }
 
 export function buildDefaultCompliance(content: GeneratedContent): ComplianceReport {
@@ -43,7 +138,7 @@ export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngl
 }
 
 export function normalizeContent(value: unknown, angle: CreativeAngle): GeneratedContent {
-  const data = value as Partial<GeneratedContent>;
+  const data = adaptPersonaContentPayload(value) as Partial<GeneratedContent>;
   return {
     id: uid("content"),
     angleId: data.angleId || angle.angleId,

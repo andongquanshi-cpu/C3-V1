@@ -264,8 +264,11 @@ export function LicaitongWorkbench() {
           templateId: angle.recommendedTemplateId,
           selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
         });
-        const rawContent = await callTextModel(contentPrompt, { maxTokens: 4096 });
+        const rawContent = await callTextModel(contentPrompt, { maxTokens: 8192 });
         const content = normalizeContent(parseLLMJson(rawContent), angle);
+        if (!content.content.trim()) {
+          throw new Error("模型返回的正文为空，请重试或检查人设 Prompt 输出格式");
+        }
         const compliancePrompt = await buildPrompt("complianceReview", {
           ...brief,
           generatedContent: content,
