@@ -4,7 +4,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const STANDARDS = path.join(process.cwd(), "personas/standards");
+const STANDARDS = path.join(process.cwd(), "ai-knowledge-base-v5.0/layers/L4-audience/licaitong/persona-standards");
 const WZQ_IDS = new Set(["campus_explorer", "salary_diary", "sober_guard", "family_planner"]);
 
 const SPECS = {

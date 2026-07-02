@@ -3,8 +3,7 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { LicaitongWorkbench } from "@/components/workspace/LicaitongWorkbench";
+import { BusinessLineWorkbench } from "@/components/workspace/BusinessLineWorkbench";
 import { BUSINESS_LINE_PRESETS } from "@/lib/business-line";
 import { cn } from "@/lib/utils";
 import type { BusinessLine } from "@/lib/types";
@@ -27,7 +26,9 @@ export function CopilotWorkbench() {
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Badge variant="outline" className="hidden text-xs sm:inline-flex">KB v4.0</Badge>
+            <Badge variant="outline" className="hidden text-xs sm:inline-flex">
+              KB v5.0
+            </Badge>
             <div className="flex rounded-lg border border-border bg-muted/30 p-0.5">
               {Object.values(BUSINESS_LINE_PRESETS).map((line) => (
                 <button
@@ -50,19 +51,7 @@ export function CopilotWorkbench() {
       </div>
 
       <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
-        {businessLine === "licaitong" ? (
-          <LicaitongWorkbench />
-        ) : (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-card/30 px-6 py-20 text-center">
-            <h2 className="text-lg font-semibold">微证券工作台正在改版</h2>
-            <p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">
-              本期优先交付理财通固收+ 流程。微证券将沿用相同的产品架构（Offer → 场景 → 人设 → 生成），敬请期待。
-            </p>
-            <Button className="mt-6" onClick={() => setBusinessLine("licaitong")}>
-              前往理财通创作
-            </Button>
-          </div>
-        )}
+        <BusinessLineWorkbench key={businessLine} businessLine={businessLine} />
       </div>
     </main>
   );

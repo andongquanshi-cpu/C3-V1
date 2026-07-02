@@ -15,8 +15,8 @@
     "L1_brand": "品牌调性、视觉规范 — 按 businessLine 分叉",
     "L2_product": "产品功能与植入事实 — 必须按 businessLine 分叉",
     "L3_content_pattern": "内容模板与话术 — businessLine × contentType",
-    "L4_audience": "表达上下文 — target-readers（写给谁）+ persona-options（谁来说）；口吻在 personas/",
-    "L5_persona": "表达层在 personas/ 目录，通过 applicablePersonaIds 关联",
+    "L4_audience": "表达上下文 — target-readers + persona-options（路由/Brief 摘要）+ persona-standards（完整 prompt，按业务线分目录）",
+    "L5_persona": "已合并入 L4 persona-standards（deprecated）",
     "L6_scenario": "预留：场景包、活动战役、账号层级表达策略"
   },
   "commonFields": [
@@ -188,7 +188,7 @@
         "priority",
         "status"
       ],
-      "note": "identity/style/differentiation 为业务线选型摘要；完整 prompt 仍以 personas/standards 为准。"
+      "note": "identity/style/differentiation 为 Brief 选型摘要；完整 prompt 在同目录 persona-standards/{personaId}.json。"
     },
   }
 }

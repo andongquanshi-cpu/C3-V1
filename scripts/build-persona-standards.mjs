@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const STANDARDS = path.join(process.cwd(), "personas/standards");
+const STANDARDS = path.join(process.cwd(), "ai-knowledge-base-v5.0/layers/L4-audience/licaitong/persona-standards");
 
 const DEFAULT_KB = {
   required: ["kb_xhs_viral_methodology", "kb_weixin_security_feature_mapping", "kb_financial_compliance"],

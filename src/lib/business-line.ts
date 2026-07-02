@@ -13,7 +13,7 @@ export interface TargetUserSegment {
   id: string;
   label: string;
   description: string;
-  /** 对齐 personas/audiences.json */
+  /** 对齐 L4 target-readers（audienceTag） */
   audienceId?: string;
   /** 对齐 KB L4 检索名 */
   kbMatchName?: string;
@@ -114,38 +114,29 @@ export const BUSINESS_LINE_PRESETS: Record<BusinessLine, BusinessLinePreset> = {
     positioning: "新手首选的轻量炒股信息与工具入口，敏捷、清醒、不带节奏",
     promotionBackground:
       "2026 年 A 股市场持续活跃，每年大量新投资者入市。微证券希望抓住市场红利期，以内容与广告多触点获取增量用户，扩大新用户规模。",
-    campaignGoal: "内容营销：提升「新手首选炒股工具」认知，引导用户微信搜索体验并转化为开户用户",
+    campaignGoal: "内容营销：面向学生/白领提升微证券认知，引导微信搜索体验并了解开户",
     campaignGoalAds: "效果广告：吸引用户开户",
     defaultContentType: "brand-seed",
-    defaultTopic: "上班族如何在微信里轻量盯盘，而不影响工作效率",
-    defaultTargetUser: "入门新股民",
+    defaultTopic: "大学生第一次在微信里了解微证券，开户前我会先看什么",
+    defaultTargetUser: "学生",
     targetUserSegments: [
       {
-        id: "ws_audience_001",
-        label: "入门新股民",
-        audienceId: "ws_audience_001",
-        kbMatchName: "微信内轻量入门型新股民",
+        id: "student",
+        label: "学生",
+        audienceId: "student",
+        kbMatchName: "校园轻量入门型学生",
         description:
-          "23-35 岁白领/学生，尚未开户，想入门炒股；怕术语多、界面复杂，偏好微信里轻量看看。",
+          "18-24 岁大学生/实习生，尚未开户或观望中；怕术语、怕复杂，偏好微信低门槛体验与同龄人种草。",
         offerFocus: "account-opening",
       },
       {
-        id: "ws_audience_002",
-        label: "忙碌热点上班族",
-        audienceId: "ws_audience_002",
-        kbMatchName: "忙碌热点跟进型上班族",
+        id: "white-collar",
+        label: "白领",
+        audienceId: "white-collar",
+        kbMatchName: "职场碎片盯版型白领",
         description:
-          "上班通勤碎片时间盯盘，又要跟热点；依赖提醒、榜单、问元宝等信息整理，不想多装 App。",
-        offerFocus: "general",
-      },
-      {
-        id: "ws_audience_003",
-        label: "清醒避坑型",
-        audienceId: "ws_audience_003",
-        kbMatchName: "清醒避坑型年轻女性",
-        description:
-          "有初步理财意识，反感焦虑营销；想要冷静拆解、少跟风，建立自己的判断框架。",
-        offerFocus: "general",
+          "22-35 岁职场白领，碎片时间盯盘/追热点；希望微信内高效看行情、了解正规券商开户流程。",
+        offerFocus: "account-opening",
       },
     ],
     targetUserOptions: [],

@@ -3,13 +3,15 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  FALLBACK_LICAITONG_WORKFLOW,
   getContentLengthOptions,
-  getLicaitongOffer,
-  getLicaitongScene,
-  type LicaitongWorkflowConfig,
-} from "@/lib/licaitong-workflow";
+  getOffer,
+  getScene,
+  getWorkflowFallback,
+  type BusinessLineWorkflowConfig,
+} from "@/lib/business-line-workflow";
+import { getBusinessLinePreset } from "@/lib/business-line";
 import { getPrimaryMaterial, getSelectedMaterials } from "@/lib/hotspot-workflow";
+import { getWeisecPersonaDisplayLabel } from "@/lib/weisec-persona-ui";
 import type { BriefInput, Material } from "@/lib/types";
 
 interface BriefSummaryCardProps {
@@ -18,7 +20,7 @@ interface BriefSummaryCardProps {
   anglesSelected: number;
   anglesTotal: number;
   kbVersion?: string;
-  workflowConfig?: LicaitongWorkflowConfig;
+  workflowConfig?: BusinessLineWorkflowConfig;
 }
 
 export function BriefSummaryCard({
@@ -27,11 +29,23 @@ export function BriefSummaryCard({
   anglesSelected,
   anglesTotal,
   kbVersion,
-  workflowConfig = FALLBACK_LICAITONG_WORKFLOW,
+  workflowConfig,
 }: BriefSummaryCardProps) {
-  const offer = getLicaitongOffer(brief.offerId, workflowConfig);
-  const scene = getLicaitongScene(brief.creationScene, workflowConfig);
-  const persona = workflowConfig.personas.find((item) => item.id === brief.personaId);
+  const businessLine = brief.businessLine;
+  const cfg = workflowConfig || getWorkflowFallback(businessLine);
+  const preset = getBusinessLinePreset(businessLine);
+  const offer = getOffer(brief.offerId, cfg, businessLine);
+  const scene = getScene(brief.creationScene, cfg, businessLine);
+  const persona = cfg.personas.find((item) => item.id === brief.personaId);
+  const personaLabel =
+    businessLine === "weisec"
+      ? getWeisecPersonaDisplayLabel(
+          brief,
+          cfg.personas,
+          brief.creationScene || cfg.defaultBrief.creationScene,
+          brief.audienceTag || cfg.defaultBrief.audienceTag,
+        ) || persona?.label
+      : persona?.label;
   const lengthLabel =
     getContentLengthOptions(brief.generationMode).find((item) => item.value === brief.contentLength)?.label || "-";
   const selectedMaterials = getSelectedMaterials(materials);
@@ -44,16 +58,18 @@ export function BriefSummaryCard({
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="flex flex-wrap gap-1.5">
-          <Badge variant="secondary">理财通</Badge>
-          <Badge>{offer.label}</Badge>
+          <Badge variant="secondary">{preset.shortLabel}</Badge>
+          {!cfg.hideOfferSelection && offer ? <Badge>{offer.label}</Badge> : null}
           {kbVersion ? <Badge variant="outline">KB {kbVersion}</Badge> : null}
         </div>
 
         <dl className="space-y-2.5">
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">主推 Offer</dt>
-            <dd className="text-right font-medium">{offer.label}</dd>
-          </div>
+          {!cfg.hideOfferSelection && offer ? (
+            <div className="flex justify-between gap-3">
+              <dt className="shrink-0 text-muted-foreground">主推 Offer</dt>
+              <dd className="text-right font-medium">{offer.label}</dd>
+            </div>
+          ) : null}
           <div className="flex justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">创作场景</dt>
             <dd className="text-right font-medium">{scene.label}</dd>
@@ -64,7 +80,7 @@ export function BriefSummaryCard({
           </div>
           <div className="flex justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">博主人设</dt>
-            <dd className="text-right font-medium">{persona?.label || "-"}</dd>
+            <dd className="text-right font-medium">{personaLabel || "-"}</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">主推功能</dt>
@@ -88,9 +104,7 @@ export function BriefSummaryCard({
           </div>
           <div className="flex justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">创意角度</dt>
-            <dd className="font-medium">
-              {anglesTotal > 0 ? `${anglesSelected}/${anglesTotal}` : "待生成"}
-            </dd>
+            <dd className="font-medium">{anglesTotal > 0 ? `${anglesSelected}/${anglesTotal}` : "待生成"}</dd>
           </div>
         </dl>
 

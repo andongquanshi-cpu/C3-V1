@@ -7,41 +7,42 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  HOTSPOT_TABS,
+  getHotspotTabs,
   getSelectedMaterials,
   requiresHotspotMaterials,
+  sceneRequiresHotspotMaterials,
   type HotspotTabId,
 } from "@/lib/hotspot-workflow";
 import { formatMaterialSource } from "@/lib/hotspot-display";
 import {
-  applyLicaitongAudienceChange,
-  applyLicaitongOfferChange,
-  applyLicaitongPersonaChange,
-  applyLicaitongSceneChange,
-  FALLBACK_LICAITONG_WORKFLOW,
+  applyAudienceChange,
+  applyOfferChange,
+  applyPersonaChange,
+  applySceneChange,
   getPersonaRecommendation,
   getPersonaRecommendationLabel,
-  getPersonasForLicaitongUI,
-  toggleLicaitongFeature,
-  type LicaitongWorkflowConfig,
-} from "@/lib/licaitong-workflow";
+  getPersonasForUI,
+  getWorkflowFallback,
+  isFeatureSelectionActive,
+  toggleFeature,
+  type BusinessLineWorkflowConfig,
+} from "@/lib/business-line-workflow";
+import {
+  expandPersonasForBriefUI,
+  getPersonaUiRecommendation,
+  isPersonaUiSelected,
+  type PersonaUiEntry,
+} from "@/lib/weisec-persona-ui";
 import { cn } from "@/lib/utils";
-import type {
-  BriefInput,
-  LicaitongAudienceTag,
-  LicaitongCreationScene,
-  LicaitongOfferId,
-  Material,
-  ProductFeatureView,
-} from "@/lib/types";
+import type { BriefInput, BusinessLine, Material, ProductFeatureView } from "@/lib/types";
 import { ChevronRight, Loader2, Search, Star, X } from "lucide-react";
 
-interface LicaitongBriefPanelProps {
+interface BriefPanelProps {
   brief: BriefInput;
   materials: Material[];
   materialDraft: string;
   offerFeatures: ProductFeatureView[];
-  workflowConfig?: LicaitongWorkflowConfig;
+  workflowConfig?: BusinessLineWorkflowConfig;
   hotspotPanelOpen: boolean;
   activeHotspotTab: HotspotTabId;
   customHotspotQuery: string;
@@ -188,12 +189,12 @@ function HotspotFeedItem({
   );
 }
 
-export function LicaitongBriefPanel({
+export function BriefPanel({
   brief,
   materials,
   materialDraft,
   offerFeatures,
-  workflowConfig = FALLBACK_LICAITONG_WORKFLOW,
+  workflowConfig,
   hotspotPanelOpen,
   activeHotspotTab,
   customHotspotQuery,
@@ -211,31 +212,79 @@ export function LicaitongBriefPanel({
   onSetPrimaryMaterial,
   onRemoveMaterial,
   onContinue,
-}: LicaitongBriefPanelProps) {
-  const scene = brief.creationScene || workflowConfig.defaultBrief.creationScene;
-  const audienceTag = brief.audienceTag || workflowConfig.defaultBrief.audienceTag;
-  const personas = getPersonasForLicaitongUI(scene, audienceTag, workflowConfig);
+}: BriefPanelProps) {
+  const businessLine: BusinessLine = brief.businessLine;
+  const cfg = workflowConfig || getWorkflowFallback(businessLine);
+  const scene = brief.creationScene || cfg.defaultBrief.creationScene;
+  const audienceTag = brief.audienceTag || cfg.defaultBrief.audienceTag;
+  const licaitongPersonas = getPersonasForUI(scene, audienceTag, cfg, businessLine);
+  const weisecPersonaGroups =
+    businessLine === "weisec" ? expandPersonasForBriefUI(cfg.personas, scene, audienceTag, businessLine) : null;
   const featureNameById = Object.fromEntries(offerFeatures.map((item) => [item.id, item.name]));
-  const atFeatureLimit = brief.selectedFeatureIds.length >= workflowConfig.fplusFeatureLimit;
-  const hotspotRequired = requiresHotspotMaterials(brief.personaId);
+  const atFeatureLimit = brief.selectedFeatureIds.length >= cfg.featureLimit;
+  const showFeatureSelection = isFeatureSelectionActive(brief, cfg, businessLine);
+  const hotspotTabs = getHotspotTabs(businessLine);
+  const hotspotRequired = requiresHotspotMaterials({
+    personaId: brief.personaId,
+    creationScene: scene,
+    config: cfg,
+  });
+  const hotspotRequirementLabel = !hotspotRequired
+    ? null
+    : sceneRequiresHotspotMaterials(scene, cfg)
+      ? "市场热点解读需选热点"
+      : brief.personaId === "hotspot_observer"
+        ? "市场观察员需选热点"
+        : "需至少 1 条热点素材";
   const selectedMaterials = getSelectedMaterials(materials);
   const pastedMaterials = selectedMaterials.filter((item) => item.source === "手动输入");
   const candidateSelectedIds = new Set(
     hotspotCandidates.filter((item) => materials.some((m) => m.id === item.id && m.selected !== false)).map((item) => item.id),
   );
 
-  function selectOffer(offerId: LicaitongOfferId) {
-    const offer = workflowConfig.offers.find((item) => item.id === offerId);
+  function selectOffer(offerId: string) {
+    const offer = cfg.offers.find((item) => item.id === offerId);
     if (!offer?.enabled || brief.offerId === offerId) return;
-    onBriefChange((current) => applyLicaitongOfferChange(current, offerId, featureNameById, workflowConfig));
+    onBriefChange((current) => applyOfferChange(current, offerId, featureNameById, cfg));
   }
 
-  function selectScene(nextScene: LicaitongCreationScene) {
-    onBriefChange((current) => applyLicaitongSceneChange(current, nextScene, featureNameById, workflowConfig));
+  function selectScene(nextScene: string) {
+    onBriefChange((current) => applySceneChange(current, nextScene, featureNameById, cfg));
   }
 
-  function selectAudience(tag: LicaitongAudienceTag) {
-    onBriefChange((current) => applyLicaitongAudienceChange(current, tag, workflowConfig));
+  function selectPersona(personaId: string) {
+    onBriefChange((current) => applyPersonaChange(current, personaId, cfg));
+  }
+
+  function selectAudience(tag: string) {
+    onBriefChange((current) => applyAudienceChange(current, tag, cfg));
+  }
+
+  function renderWeisecPersonaEntry(entry: PersonaUiEntry) {
+    const recommendation = getPersonaUiRecommendation(entry, scene, audienceTag, businessLine);
+    const recommendationLabel = getPersonaRecommendationLabel(recommendation);
+    const selected = isPersonaUiSelected(brief, entry);
+    return (
+      <button
+        key={entry.uiKey}
+        type="button"
+        onClick={() => selectPersona(entry.personaId)}
+        className={cn(
+          "w-full rounded-lg border px-3 py-2.5 text-left transition-all",
+          selected ? "border-primary bg-primary/10" : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
+        )}
+      >
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className="text-sm">{entry.label}</strong>
+          {recommendationLabel ? (
+            <Badge variant="outline" className="px-1 py-0 text-[9px]">
+              {recommendationLabel}
+            </Badge>
+          ) : null}
+        </div>
+        <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{entry.description}</p>
+      </button>
+    );
   }
 
   function handlePasteKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -248,41 +297,56 @@ export function LicaitongBriefPanel({
   return (
     <div className="space-y-5">
       <div className="grid gap-4 lg:grid-cols-3 lg:items-start">
-        <Column index={1} title="选定 Offer" hint="主推产品 + 功能卖点">
-          <div className="grid grid-cols-3 gap-1.5">
-            {workflowConfig.offers.map((offer) => (
-              <button
-                key={offer.id}
-                type="button"
-                disabled={!offer.enabled}
-                title={!offer.enabled ? offer.description : undefined}
-                onClick={() => selectOffer(offer.id)}
-                className={cn(
-                  "flex flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center transition-all",
-                  !offer.enabled && "cursor-not-allowed opacity-40",
-                  brief.offerId === offer.id
-                    ? "border-primary bg-primary/10"
-                    : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
-                )}
-              >
-                <strong className="text-xs leading-tight">{offer.label}</strong>
-                {offer.badge ? (
-                  <Badge variant={offer.enabled ? "secondary" : "outline"} className="px-1 py-0 text-[9px] leading-3">
-                    {offer.enabled ? "主推" : "待开"}
-                  </Badge>
-                ) : null}
-              </button>
-            ))}
-          </div>
+        <Column
+          index={1}
+          title={cfg.hideOfferSelection ? "主推功能" : "选定 Offer"}
+          hint={cfg.hideOfferSelection ? "本篇重点介绍的能力（最多选 " + cfg.featureLimit + " 个）" : "主推产品 + 功能卖点"}
+        >
+          {!cfg.hideOfferSelection ? (
+            <div className="grid grid-cols-3 gap-1.5">
+              {cfg.offers.map((offer) => (
+                <button
+                  key={offer.id}
+                  type="button"
+                  disabled={!offer.enabled}
+                  title={!offer.enabled ? offer.description : undefined}
+                  onClick={() => selectOffer(offer.id)}
+                  className={cn(
+                    "flex flex-col items-center justify-center gap-1 rounded-lg border px-1.5 py-2 text-center transition-all",
+                    !offer.enabled && "cursor-not-allowed opacity-40",
+                    brief.offerId === offer.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
+                  )}
+                >
+                  <strong className="text-xs leading-tight">{offer.label}</strong>
+                  {offer.badge ? (
+                    <Badge variant={offer.enabled ? "secondary" : "outline"} className="px-1 py-0 text-[9px] leading-3">
+                      {offer.enabled ? "主推" : "待开"}
+                    </Badge>
+                  ) : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
-          {brief.offerId === "fixed-income-plus" ? (
+          {showFeatureSelection ? (
             <>
-              <div className="flex items-center justify-between px-0.5 pt-0.5">
-                <span className="text-xs font-medium text-muted-foreground">主推功能</span>
-                <span className="text-[10px] text-muted-foreground">
-                  {brief.selectedFeatureIds.length}/{workflowConfig.fplusFeatureLimit}
-                </span>
-              </div>
+              {!cfg.hideOfferSelection ? (
+                <div className="flex items-center justify-between px-0.5 pt-0.5">
+                  <span className="text-xs font-medium text-muted-foreground">主推功能</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {brief.selectedFeatureIds.length}/{cfg.featureLimit}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between px-0.5 pb-0.5">
+                  <span className="text-[10px] text-muted-foreground">已选</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {brief.selectedFeatureIds.length}/{cfg.featureLimit}
+                  </span>
+                </div>
+              )}
               {offerFeatures.map((feature) => {
                 const checked = brief.selectedFeatureIds.includes(feature.id);
                 const disabled = !checked && atFeatureLimit;
@@ -302,14 +366,14 @@ export function LicaitongBriefPanel({
                       disabled={disabled}
                       onChange={(event) =>
                         onBriefChange((current) =>
-                          toggleLicaitongFeature(current, feature.id, feature.name, event.target.checked, workflowConfig),
+                          toggleFeature(current, feature.id, feature.name, event.target.checked, cfg),
                         )
                       }
                     />
                     <span className="min-w-0">
                       <strong className="block text-xs font-medium leading-tight">{feature.name}</strong>
                       <span className="mt-0.5 block text-[11px] leading-snug text-muted-foreground line-clamp-2">
-                        {workflowConfig.fplusFeatureUiSummaries[feature.id] || feature.summary}
+                        {cfg.featureUiSummaries[feature.id] || feature.summary}
                       </span>
                     </span>
                   </label>
@@ -320,7 +384,7 @@ export function LicaitongBriefPanel({
         </Column>
 
         <Column index={2} title="创作场景" hint="这篇笔记怎么写">
-          {workflowConfig.creationScenes.map((item) => (
+          {cfg.creationScenes.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -340,8 +404,8 @@ export function LicaitongBriefPanel({
 
         <Column index={3} title="创作人设" hint="写给谁 + 谁在说，可自由组合">
           <p className="px-0.5 text-xs font-medium text-muted-foreground">目标读者</p>
-          <div className="grid grid-cols-3 gap-1.5">
-            {workflowConfig.audiences.map((item) => (
+          <div className={cn("grid gap-1.5", cfg.audiences.length <= 2 ? "grid-cols-2" : "grid-cols-3")}>
+            {cfg.audiences.map((item) => (
               <button
                 key={item.id}
                 type="button"
@@ -359,33 +423,37 @@ export function LicaitongBriefPanel({
           </div>
 
           <p className="px-0.5 pt-1 text-xs font-medium text-muted-foreground">博主人设</p>
-          {personas.map((persona) => {
-            const recommendation = getPersonaRecommendation(persona.id, scene, audienceTag, workflowConfig);
-            const recommendationLabel = getPersonaRecommendationLabel(recommendation);
-            return (
-              <button
-                key={persona.id}
-                type="button"
-                onClick={() => onBriefChange((current) => applyLicaitongPersonaChange(current, persona.id, workflowConfig))}
-                className={cn(
-                  "w-full rounded-lg border px-3 py-2.5 text-left transition-all",
-                  brief.personaId === persona.id
-                    ? "border-primary bg-primary/10"
-                    : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
-                )}
-              >
-                <div className="flex items-center gap-2">
-                  <strong className="text-sm">{persona.label}</strong>
-                  {recommendationLabel ? (
-                    <Badge variant="outline" className="px-1 py-0 text-[9px]">
-                      {recommendationLabel}
-                    </Badge>
-                  ) : null}
-                </div>
-                <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{persona.description}</p>
-              </button>
-            );
-          })}
+          {weisecPersonaGroups ? (
+            weisecPersonaGroups.primary.map((entry) => renderWeisecPersonaEntry(entry))
+          ) : (
+            licaitongPersonas.map((persona) => {
+              const recommendation = getPersonaRecommendation(persona.id, scene, audienceTag, cfg, businessLine);
+              const recommendationLabel = getPersonaRecommendationLabel(recommendation);
+              return (
+                <button
+                  key={persona.id}
+                  type="button"
+                  onClick={() => selectPersona(persona.id)}
+                  className={cn(
+                    "w-full rounded-lg border px-3 py-2.5 text-left transition-all",
+                    brief.personaId === persona.id
+                      ? "border-primary bg-primary/10"
+                      : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    <strong className="text-sm">{persona.label}</strong>
+                    {recommendationLabel ? (
+                      <Badge variant="outline" className="px-1 py-0 text-[9px]">
+                        {recommendationLabel}
+                      </Badge>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-[11px] leading-4 text-muted-foreground">{persona.description}</p>
+                </button>
+              );
+            })
+          )}
         </Column>
       </div>
 
@@ -407,9 +475,9 @@ export function LicaitongBriefPanel({
                 <Label className="shrink-0 text-xs">
                   {hotspotRequired ? "热点素材（必选）" : "素材 / 热点（选填）"}
                 </Label>
-                {hotspotRequired ? (
+                {hotspotRequired && hotspotRequirementLabel ? (
                   <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px] text-amber-600 dark:text-amber-400">
-                    市场观察员需选热点
+                    {hotspotRequirementLabel}
                   </Badge>
                 ) : null}
               </div>
@@ -443,7 +511,7 @@ export function LicaitongBriefPanel({
               <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-1">
-                    {HOTSPOT_TABS.map((tab) => (
+                    {hotspotTabs.map((tab) => (
                       <button
                         key={tab.id}
                         type="button"
@@ -548,4 +616,8 @@ export function LicaitongBriefPanel({
       </div>
     </div>
   );
+}
+
+export function LicaitongBriefPanel(props: BriefPanelProps) {
+  return <BriefPanel {...props} />;
 }

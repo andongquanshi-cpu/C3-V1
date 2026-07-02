@@ -148,7 +148,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
   if (!personaId) throw new Error("personaContent 需要 personaId");
 
   if (!isPersonasLibraryAvailable()) {
-    console.warn("[prompt-engine] personas/ 缺失，personaContent 降级为 contentGeneration");
+    console.warn("[prompt-engine] L4 人设库缺失，personaContent 降级为 contentGeneration");
     return buildContentGenerationPrompt(input);
   }
 
@@ -183,6 +183,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       debugKnowledgeUsed: knowledge.debugKnowledgeUsed,
     },
     input.personaVariant,
+    businessLine === "licaitong" ? "licaitong" : "weisec",
   );
 
   const globalSystem = buildSystemPrompt(knowledge);

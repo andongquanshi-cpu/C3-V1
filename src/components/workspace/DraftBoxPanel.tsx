@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ArrowLeft, ChevronRight, ShieldCheck, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { buildDraftArchiveFields, getLicaitongOffer } from "@/lib/licaitong-workflow";
+import { buildDraftArchiveFields, getOffer, getWorkflowFallback } from "@/lib/business-line-workflow";
 import { cn } from "@/lib/utils";
 import type { Draft } from "@/lib/types";
 
@@ -29,7 +29,11 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
   const selectedDraft = drafts.find((item) => draftKey(item) === selectedId);
 
   if (selectedDraft) {
-    const archiveFields = buildDraftArchiveFields(selectedDraft.generationSnapshot, selectedDraft.angleName);
+    const archiveFields = buildDraftArchiveFields(
+      selectedDraft.generationSnapshot,
+      selectedDraft.angleName,
+      getWorkflowFallback(selectedDraft.generationSnapshot.businessLine),
+    );
     const key = draftKey(selectedDraft);
 
     return (
@@ -164,7 +168,11 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
                         {draft.angleName}
                       </Badge>
                       <Badge variant="outline" className="text-[10px] font-normal">
-                        {getLicaitongOffer(draft.generationSnapshot.offerId).label}
+                        {getOffer(
+                          draft.generationSnapshot.offerId,
+                          getWorkflowFallback(draft.generationSnapshot.businessLine),
+                          draft.generationSnapshot.businessLine,
+                        ).label}
                       </Badge>
                     </div>
                     <p className="line-clamp-2 text-sm leading-relaxed text-muted-foreground">{draft.content}</p>

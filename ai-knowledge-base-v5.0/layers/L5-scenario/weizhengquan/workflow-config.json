@@ -1,0 +1,61 @@
+{
+  "version": "5.0",
+  "businessLine": "weisec",
+  "knowledgeLayer": "L6_scenario",
+  "featureSource": "product-features",
+  "hideOfferSelection": true,
+  "description": "微证券创作工作台：无独立 Offer，Step1 直接选主推功能；创作场景四档，与人设一一对应，减少交叉。",
+  "offers": [],
+  "creationScenes": [
+    {
+      "id": "newcomer-guide",
+      "label": "新手入门指南",
+      "description": "术语降维、功能怎么读、第一步怎么用。偏教学步骤，不是日记也不是测评。",
+      "contentType": "stock-tutorial"
+    },
+    {
+      "id": "tool-review",
+      "label": "炒股工具测评",
+      "description": "客观对比、优缺点、适合谁/不适合谁。真实体验或冷静拆解，避免硬广。",
+      "contentType": "finance-tips"
+    },
+    {
+      "id": "life-story-seed",
+      "label": "生活化讲故事",
+      "description": "第一人称场景种草：通勤、午休、家庭复盘等真实生活里的轻量使用。",
+      "contentType": "personal-exp"
+    },
+    {
+      "id": "market-hotspot",
+      "label": "市场热点解读",
+      "description": "基于素材做事件梳理与公开信息降维，需配合热点/资讯素材。",
+      "contentType": "hotspot-analysis",
+      "requiresHotspotMaterials": true
+    }
+  ],
+  "offerDefaults": {
+    "wzq-platform": {
+      "featureLimit": 2,
+      "defaultFeaturesByScene": {
+        "newcomer-guide": ["wzq_yuanbao_ai", "wzq_wechat_trading"],
+        "tool-review": ["wzq_wechat_trading", "wzq_wechat_alerts"],
+        "life-story-seed": ["wzq_wechat_trading", "wzq_news_digest"],
+        "market-hotspot": ["wzq_hot_rankings", "wzq_yuanbao_ai"]
+      },
+      "featureUiSummaries": {
+        "wzq_wechat_alerts": "目标价/公告提醒直达微信，信息辅助，非买卖信号。",
+        "wzq_yuanbao_ai": "大白话解答术语与行情，整理公开信息，不构成投资建议。",
+        "wzq_hot_rankings": "热搜榜+TOP榜看热点方向，公开信息入口，不构成荐股。",
+        "wzq_news_digest": "早午晚报推送财经资讯与公告摘要，辅助了解市场变化。",
+        "wzq_wechat_trading": "微信极简入口+头部券商合作通道，资金第三方存管。"
+      }
+    }
+  },
+  "defaultBrief": {
+    "offerId": "wzq-platform",
+    "creationScene": "life-story-seed",
+    "audienceTag": "student",
+    "topic": "大学生第一次在微信里了解微证券，开户前我会先看什么",
+    "campaignGoal": "内容营销：面向学生/白领提升微证券认知，引导微信搜索体验并了解开户"
+  }
+}

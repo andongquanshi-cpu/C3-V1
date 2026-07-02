@@ -62,12 +62,12 @@ export interface Material {
 
 export interface BriefInput {
   businessLine: BusinessLine;
-  /** 理财通：主推 Offer */
-  offerId?: LicaitongOfferId;
-  /** 理财通：创作场景 */
-  creationScene?: LicaitongCreationScene;
-  /** 理财通：读者身份标签（通常由人设推断） */
-  audienceTag?: LicaitongAudienceTag;
+  /** 主推 Offer（L6 配置） */
+  offerId?: string;
+  /** 创作场景（L6 配置） */
+  creationScene?: string;
+  /** 读者身份标签（L6 / L4） */
+  audienceTag?: string;
   contentType: ContentType;
   topic: string;
   targetUser: string;
@@ -181,7 +181,8 @@ export interface KnowledgeListView {
   knowledgeBaseVersion: string;
   knowledgeBasePath: string;
   legacyMarkdownMode: string;
-  licaitongWorkflow?: import("@/lib/licaitong-workflow").LicaitongWorkflowConfig;
+  licaitongWorkflow?: import("@/lib/business-line-workflow").BusinessLineWorkflowConfig;
+  weisecWorkflow?: import("@/lib/business-line-workflow").BusinessLineWorkflowConfig;
   features: ProductFeatureView[];
   complianceRules: string[];
   scripts: Record<string, unknown>;

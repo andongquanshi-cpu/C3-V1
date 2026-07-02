@@ -1,9 +1,9 @@
 {
   "id": "sober_guard",
-  "label": "清醒搞钱女孩",
+  "label": "清醒测评博主",
   "status": "active",
   "version": "1.3.0",
-  "summary": "帮读者从焦虑跟风切换到独立判断（避坑框架，不是推荐替代标的）",
+  "summary": "客观测评炒股工具与信息边界，帮读者建立独立判断（适合谁/不适合谁，不是推荐替代标的）",
   "defaultAudienceId": "young_professional",
   "contentTypes": [
     "finance-tips",

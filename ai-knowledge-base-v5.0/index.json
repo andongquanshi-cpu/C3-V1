@@ -78,19 +78,16 @@
       "files": {
         "licaitong": [
           "layers/L4-audience/licaitong/target-readers.json",
-          "layers/L4-audience/licaitong/persona-options.json"
+          "layers/L4-audience/licaitong/persona-options.json",
+          "layers/L4-audience/licaitong/persona-standards"
         ],
         "weizhengquan": [
           "layers/L4-audience/weizhengquan/target-readers.json",
-          "layers/L4-audience/weizhengquan/persona-options.json"
+          "layers/L4-audience/weizhengquan/persona-options.json",
+          "layers/L4-audience/weizhengquan/persona-standards"
         ]
       },
-      "retrievalNote": "target-readers = 写给谁看；persona-options = 谁来说（路由）。口吻标准在 personas/standards。"
-    },
-    "L5_persona": {
-      "label": "表达层（外部）",
-      "scope": "personas/",
-      "note": "口吻与结构在 personas/standards，通过 applicablePersonaIds 与 KB 关联"
+      "retrievalNote": "target-readers = 写给谁看；persona-options = 谁来说（路由 + Brief 摘要）；persona-standards = 完整 prompt 与结构标准（按业务线分目录）。"
     },
     "L6_scenario": {
       "label": "场景层（预留）",
@@ -142,7 +139,12 @@
       "licaitong": "layers/L4-audience/licaitong/persona-options.json",
       "weisec": "layers/L4-audience/weizhengquan/persona-options.json"
     },
-    "licaitongWorkflowConfig": "layers/L6-scenario/licaitong/workflow-config.json"
+    "personaStandards": {
+      "licaitong": "layers/L4-audience/licaitong/persona-standards",
+      "weisec": "layers/L4-audience/weizhengquan/persona-standards"
+    },
+    "licaitongWorkflowConfig": "layers/L6-scenario/licaitong/workflow-config.json",
+    "weisecWorkflowConfig": "layers/L6-scenario/weizhengquan/workflow-config.json"
   },
   "recommendedPromptRetrieval": {
     "creativeAngles": [
@@ -159,7 +161,7 @@
       "L0 riskDisclaimers + complianceRules + platformRules",
       "optional L4 targetReaders by targetUser / audienceTag",
       "optional L4 personaOptions for routing",
-      "optional L5 persona voice via personaId (personas/standards)"
+      "optional L4 persona voice via personaId (layers/L4-audience/{line}/persona-standards)"
     ],
     "complianceReview": [
       "L0 complianceRules",

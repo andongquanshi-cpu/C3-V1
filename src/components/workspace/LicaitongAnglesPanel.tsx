@@ -11,12 +11,12 @@ import {
   applyGenerationModeChange,
   getContentLengthFieldLabel,
   getContentLengthOptions,
-} from "@/lib/licaitong-workflow";
+} from "@/lib/business-line-workflow";
 import { EMBED_LEVEL_OPTIONS } from "@/lib/embed-level";
 import { cn } from "@/lib/utils";
 import type { BriefInput, CreativeAngle } from "@/lib/types";
 
-interface LicaitongAnglesPanelProps {
+interface AnglesPanelProps {
   brief: BriefInput;
   angles: CreativeAngle[];
   selectedAngleIds: string[];
@@ -83,7 +83,7 @@ function SegmentedControl<T extends string>({
   );
 }
 
-export function LicaitongAnglesPanel({
+export function AnglesPanel({
   brief,
   angles,
   selectedAngleIds,
@@ -97,7 +97,7 @@ export function LicaitongAnglesPanel({
   onGenerateAngles,
   onGenerateContent,
   onBackToConfig,
-}: LicaitongAnglesPanelProps) {
+}: AnglesPanelProps) {
   function toggleAngle(angleId: string, checked: boolean) {
     onSelectedAngleIdsChange(
       checked ? [...selectedAngleIds, angleId] : selectedAngleIds.filter((id) => id !== angleId),
@@ -315,4 +315,8 @@ export function LicaitongAnglesPanel({
       </div>
     </div>
   );
+}
+
+export function LicaitongAnglesPanel(props: AnglesPanelProps) {
+  return <AnglesPanel {...props} />;
 }

@@ -2,130 +2,93 @@
   "version": "5.0",
   "knowledgeLayer": "L4_target_reader",
   "businessLine": "weisec",
-  "description": "内容目标读者：Brief 里「写给谁看」，对应 targetUser / audienceId。",
+  "description": "微证券目标读者：聚焦开户拉新，仅学生与白领两档（比理财通场景更窄、更聚焦）。",
   "items": [
     {
-      "id": "ws_audience_001",
-      "audienceId": "ws_audience_001",
+      "id": "student",
+      "audienceTag": "student",
+      "audienceId": "student",
       "businessLine": "weisec",
       "knowledgeType": "target_reader",
-      "label": "入门新股民",
-      "targetUserLabel": "入门新股民",
-      "kbMatchName": "微信内轻量入门型新股民",
-      "kbProfileId": "KB_WS_AUDIENCE_001",
-      "hint": "零基础、怕术语、想微信里轻量看看",
+      "label": "学生",
+      "targetUserLabel": "学生",
+      "kbMatchName": "校园轻量入门型学生",
+      "kbProfileId": "KB_WS_AUDIENCE_STUDENT",
+      "hint": "校园语境、低门槛、同龄人带入开户",
       "priority": "High",
-      "ageStage": "18-26 岁，大学生、实习生、初入职场用户",
-      "occupation": "校园用户、理财零基础人群、入门型投资用户",
+      "ageStage": "18-24 岁，大学生、实习生",
+      "occupation": "校园用户、理财零基础、尚未开户或刚有开户意向",
       "painPoints": [
-        "看不懂术语，不知道从哪开始接触行情",
-        "不想下载多个工具，只想先轻量看看",
-        "害怕被硬核金融界面和专业表达劝退"
+        "同学都在聊行情，自己看不懂术语、不知道从哪开始",
+        "不想下载复杂 App，希望微信里就能先体验再决定是否开户",
+        "怕被硬核界面和专业话术劝退，更信任同龄人分享"
       ],
       "infoHabits": [
-        "高频使用微信、小红书、短视频内容获取信息",
-        "更信任「同龄人分享」而不是「专家说教」",
-        "愿意从热点、校园、实习、同学聊天等场景进入"
+        "小红书、短视频、同学群聊是主要信息入口",
+        "愿意从校园、实习、零花钱、宿舍场景进入",
+        "偏好第一人称日记、清单式安利、步骤清晰的入门内容"
       ],
-      "tone": "简单、直接、低门槛",
+      "tone": "活泼、亲切、低门槛、不催促",
       "safeExpressions": [
-        "对新手来说，入口简单一点会少很多心理负担。",
-        "我更愿意先用微信里能打开的工具看看，再慢慢学。",
-        "先把行情看懂、概念搞清楚，比急着操作更重要。",
-        "如果只是想先轻量了解，可以从微信里搜微证券开始。"
+        "对新手来说，入口简单一点，开户前的心理负担会小很多。",
+        "我更愿意先在微信里搜微证券看看，搞懂界面再考虑开户。",
+        "先把公开信息和术语搞懂，比急着操作更重要。",
+        "同学推荐的工具，我会先看适不适合我这种零基础。"
       ],
       "forbiddenExpressions": [
-        "新手也能马上抓住买点",
-        "一上来就能靠它赚到",
+        "学生也能马上抓住买点",
+        "开户就能赚到",
         "看一眼就知道买什么",
-        "AI 会直接告诉你怎么投"
+        "错过开户就亏了"
       ],
       "suitablePersonaIds": ["peer_diary", "concept_teacher"],
-      "applicableContentTypes": ["brand-seed", "stock-tutorial", "personal-exp"],
-      "promptSummary": "写给尚未开户、想轻量入门的新股民；强调微信入口、术语降维、不催促操作。",
-      "source": "KB_WS_AUDIENCE_001"
+      "applicableContentTypes": ["stock-tutorial", "personal-exp", "finance-tips", "brand-seed"],
+      "promptSummary": "写给尚未开户或观望中的大学生/实习生；强调微信低门槛体验、术语降维，自然引导了解开户流程，不承诺收益。",
+      "conversionGoal": "account-opening",
+      "source": "微证券 Brief UI · 2026-07"
     },
     {
-      "id": "ws_audience_002",
-      "audienceId": "ws_audience_002",
+      "id": "white-collar",
+      "audienceTag": "white-collar",
+      "audienceId": "white-collar",
       "businessLine": "weisec",
       "knowledgeType": "target_reader",
-      "label": "忙碌热点上班族",
-      "targetUserLabel": "忙碌热点上班族",
-      "kbMatchName": "忙碌热点跟进型上班族",
-      "kbProfileId": "KB_WS_AUDIENCE_002",
-      "hint": "碎片时间、热点焦虑、效率型信息",
+      "label": "白领",
+      "targetUserLabel": "白领",
+      "kbMatchName": "职场碎片盯版型白领",
+      "kbProfileId": "KB_WS_AUDIENCE_WHITE_COLLAR",
+      "hint": "通勤午休、效率工具、碎片时间完成开户",
       "priority": "High",
-      "ageStage": "22-32 岁，职场 1-8 年",
-      "occupation": "普通上班族、通勤族、时间有限的热点关注者",
+      "ageStage": "22-35 岁，职场 1-10 年",
+      "occupation": "普通白领、通勤族、时间有限但想入门或转户的用户",
       "painPoints": [
-        "开会、通勤、午休时没法一直盯盘",
-        "热点一多就容易信息焦虑",
-        "想跟上行情，但不想切换多个工具"
+        "开会通勤没法盯盘，希望微信里快速看行情、收提醒",
+        "热点多、信息焦虑，想要高效入口而不是多装 App",
+        "开户流程怕繁琐，希望正规券商通道且步骤清晰"
       ],
       "infoHabits": [
-        "依赖微信、资讯推送、榜单和短内容入口",
-        "通勤、午休、下班后复盘是主要信息窗口",
-        "更偏好「场景化、效率型、不过度专业」的表达"
+        "依赖微信、推送、榜单等碎片信息入口",
+        "通勤、午休、下班复盘是主要使用窗口",
+        "偏好场景化测评、工具对比、热点解读与反焦虑表达"
       ],
-      "tone": "务实、轻量、场景化",
+      "tone": "务实、轻量、场景化、效率导向",
       "safeExpressions": [
-        "我没法一直盯着屏幕，所以更依赖提醒和固定信息入口。",
-        "热点来的时候，先弄明白发生了什么，比情绪上头更重要。",
-        "上班间隙能快速看一眼公开行情，对我来说就够用了。",
-        "把提醒、榜单和复盘入口组合起来，比到处找信息轻松很多。"
+        "我没法一直盯盘，更依赖微信里的提醒和固定入口。",
+        "开户前我会先看合作券商和流程是否清晰，资金存管说明也要看清楚。",
+        "上班间隙能快速看一眼公开行情，对我来说比复杂软件实用。",
+        "工具适合谁、不适合谁，比硬广「赶紧开户」更有帮助。"
       ],
       "forbiddenExpressions": [
         "提醒一到就能抓住机会",
-        "有热股榜就不怕买错",
+        "开户就能稳赚",
         "AI 帮你直接判断买卖点",
-        "盘中波动都能靠它吃到"
+        "所有人都在买你也别错过"
       ],
-      "suitablePersonaIds": ["peer_diary", "hotspot_observer"],
-      "applicableContentTypes": ["hotspot-analysis", "brand-seed", "personal-exp"],
-      "promptSummary": "写给时间碎片化的上班族；强调提醒、榜单、快速理解热点，不承诺买卖点。",
-      "source": "KB_WS_AUDIENCE_002"
-    },
-    {
-      "id": "ws_audience_003",
-      "audienceId": "ws_audience_003",
-      "businessLine": "weisec",
-      "knowledgeType": "target_reader",
-      "label": "清醒避坑型",
-      "targetUserLabel": "清醒避坑型",
-      "kbMatchName": "清醒避坑型年轻女性",
-      "kbProfileId": "KB_WS_AUDIENCE_003",
-      "hint": "反跟风、少焦虑营销、要判断框架",
-      "priority": "Medium",
-      "ageStage": "22-32 岁，具备初步理财意识",
-      "occupation": "年轻白领、内容敏感型用户、独立判断倾向用户",
-      "painPoints": [
-        "容易被热点标题和群体情绪带节奏",
-        "厌恶焦虑营销、过度承诺和「机会感」叙事",
-        "想建立自己的判断框架，但缺少稳定工具和表达体系"
-      ],
-      "infoHabits": [
-        "高频浏览小红书、社交媒体、热搜与讨论帖",
-        "倾向收藏「避坑、拆解逻辑、反常识」内容",
-        "喜欢「有态度但不极端」的表达"
-      ],
-      "tone": "清醒、有态度、不煽动",
-      "safeExpressions": [
-        "我更在意先搞懂逻辑，而不是跟风站队。",
-        "不是所有刷屏的话题都值得立刻代入自己。",
-        "真正有用的内容，不是替你下结论，而是帮你少踩坑。",
-        "先看公开信息，再决定要不要继续关注，会更稳一点。"
-      ],
-      "forbiddenExpressions": [
-        "别犹豫了，赶紧上车",
-        "所有人都在买，你也别错过",
-        "看完这个就知道该投什么",
-        "热门就是机会"
-      ],
-      "suitablePersonaIds": ["sober_guard"],
-      "applicableContentTypes": ["hotspot-analysis", "finance-tips"],
-      "promptSummary": "写给反感焦虑营销、需要判断框架的用户；拆解逻辑、避坑、不替读者下结论。",
-      "source": "KB_WS_AUDIENCE_003"
+      "suitablePersonaIds": ["peer_diary", "concept_teacher", "hotspot_observer", "sober_guard"],
+      "applicableContentTypes": ["personal-exp", "finance-tips", "hotspot-analysis", "stock-tutorial", "brand-seed"],
+      "promptSummary": "写给忙碌白领与年轻职场人；强调微信极简、碎片使用、正规券商开户通道，可结合热点/测评/避坑，引导体验并了解开户。",
+      "conversionGoal": "account-opening",
+      "source": "微证券 Brief UI · 2026-07"
     }
   ]
 }

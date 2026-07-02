@@ -1,7 +1,10 @@
 import fs from "node:fs";
 import path from "node:path";
-import { buildLicaitongWorkflowConfig, mergeLicaitongWorkflowConfig } from "@/lib/licaitong-workflow-config";
-import { FALLBACK_LICAITONG_WORKFLOW } from "@/lib/licaitong-workflow";
+import { buildWorkflowConfig, mergeWorkflowConfig } from "@/lib/business-line-workflow-config";
+import {
+  FALLBACK_LICAITONG_WORKFLOW,
+  FALLBACK_WEISEC_WORKFLOW,
+} from "@/lib/business-line-workflow";
 import { normalizeBusinessLine, resolveKbTargetUser } from "@/lib/business-line";
 import {
   normalizeEmbedLevel,
@@ -785,8 +788,11 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
     .join("\n\n");
 
   const licaitongWorkflow = kb.isV5
-    ? mergeLicaitongWorkflowConfig(buildLicaitongWorkflowConfig(kb), FALLBACK_LICAITONG_WORKFLOW)
+    ? mergeWorkflowConfig(buildWorkflowConfig(kb, "licaitong"), FALLBACK_LICAITONG_WORKFLOW)
     : FALLBACK_LICAITONG_WORKFLOW;
+  const weisecWorkflow = kb.isV5
+    ? mergeWorkflowConfig(buildWorkflowConfig(kb, "weisec"), FALLBACK_WEISEC_WORKFLOW)
+    : FALLBACK_WEISEC_WORKFLOW;
 
   return {
     source: "ai-json",
@@ -794,6 +800,7 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
     knowledgeBasePath: kb.basePath,
     legacyMarkdownMode: "compatibility-only",
     licaitongWorkflow,
+    weisecWorkflow,
     features,
     complianceRules,
     scripts,
