@@ -15,59 +15,6 @@
   ],
   "items": [
     {
-      "id": "disclaimer_general",
-      "scenario": "general",
-      "businessLine": "all",
-      "appliesTo": [
-        "all"
-      ],
-      "priority": 100,
-      "text": "投资有风险，入市需谨慎。本文内容仅供参考，不构成投资建议。",
-      "required": true,
-      "knowledgeLayer": "L0_shared",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "disclaimer_fund",
-      "scenario": "fund",
-      "businessLine": "all",
-      "appliesTo": [
-        "finance-tips",
-        "stock-tutorial"
-      ],
-      "priority": 90,
-      "text": "理财产品过往业绩不代表其未来表现，不等于实际收益，投资需谨慎。",
-      "required": false,
-      "knowledgeLayer": "L0_shared",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "disclaimer_wealth",
-      "scenario": "wealth",
-      "businessLine": "licaitong",
-      "appliesTo": [
-        "finance-tips",
-        "scenario-seeding"
-      ],
-      "priority": 88,
-      "text": "市场有风险，投资需谨慎。请根据自身风险承受能力理性投资。",
-      "required": false,
-      "knowledgeLayer": "L0_shared",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
       "id": "disclaimer_securities",
       "scenario": "securities",
       "businessLine": "weisec",
@@ -77,23 +24,6 @@
       ],
       "priority": 88,
       "text": "本内容不构成任何投资建议，投资者应独立判断并承担投资风险。",
-      "required": false,
-      "knowledgeLayer": "L0_shared",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "disclaimer_content",
-      "scenario": "content",
-      "businessLine": "all",
-      "appliesTo": [
-        "all"
-      ],
-      "priority": 85,
-      "text": "产品收益受市场波动影响，实际收益可能与预期存在差异。",
       "required": false,
       "knowledgeLayer": "L0_shared",
       "applicablePersonaIds": [],

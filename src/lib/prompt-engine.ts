@@ -1,8 +1,15 @@
 import fs from "node:fs";
 import path from "node:path";
 import { retrieveKnowledge } from "@/lib/knowledge-retriever";
+import { formatEmbedLevelForPrompt } from "@/lib/embed-level";
+import { buildBusinessLineRuntimeLock, resolveBrandName } from "@/lib/business-line-prompt";
 import { formatContentLengthForPrompt, normalizeContentLength } from "@/lib/licaitong-workflow";
-import { buildPersonaContentPrompt } from "@/lib/persona-loader";
+import { buildPersonaContentPrompt, isPersonasLibraryAvailable } from "@/lib/persona-loader";
+import {
+  formatTopicMaterialsForPrompt,
+  getPrimaryMaterialTitle,
+  resolvePromptMaterials,
+} from "@/lib/topic-materials";
 
 type AnyRecord = Record<string, any>;
 
@@ -77,14 +84,18 @@ function clampGenerateCount(value: unknown) {
 
 export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
   const generateCount = clampGenerateCount(input.generateCount);
+  const materials = resolvePromptMaterials(input);
+  const topicMaterialsText = formatTopicMaterialsForPrompt(materials);
+  const primaryHotspot = getPrimaryMaterialTitle(materials);
   return buildPrompt("creative-angles.md", input, "creative-angles", (data) => ({
     contentType: data.contentType || "brand-seed",
-    topic: data.topic || data.hotspot || "未提供",
+    topic: primaryHotspot || data.topic || data.hotspot || "未提供",
     targetUser: data.targetUser || "投资小白",
     campaignGoal: data.campaignGoal || "内容种草和功能认知",
-    embedLevel: data.embedLevel || "medium",
+    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
     bloggerLevel: data.bloggerLevel || "middle",
     customRequirement: data.customRequirement || data.customPrompt || "无",
+    topicMaterials: topicMaterialsText,
     generateCount,
   }));
 }
@@ -93,18 +104,30 @@ export function buildContentGenerationPrompt(input: AnyRecord = {}) {
   const generationMode = input.generationMode || "image-text";
   const contentLength = normalizeContentLength(input.contentLength || input.length, generationMode);
   const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
-  return buildPrompt("content-generation.md", input, "content-generation", (data, knowledge) => ({
+  const built = buildPrompt("content-generation.md", input, "content-generation", (data, knowledge) => ({
     contentType: data.contentType || "brand-seed",
     generationMode,
     length: lengthHint,
     bloggerLevel: data.bloggerLevel || "middle",
-    embedLevel: data.embedLevel || "medium",
+    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
     topic: data.topic || data.hotspot || "未提供",
     customRequirement: data.customRequirement || data.customPrompt || "无",
     selectedAngle: data.selectedAngle || data.angle || "未提供，请基于主题生成一个保守安全的单一角度",
     selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
     topicMaterials: data.topicMaterials || data.materials || [],
   }));
+  const businessLine = built.knowledge?.businessLine || input.businessLine || "weisec";
+  const runtimeLock = buildBusinessLineRuntimeLock(businessLine, built.knowledge?.brandVoice, input.embedLevel);
+  const user = `${built.user}\n\n${runtimeLock}`;
+  return {
+    ...built,
+    user,
+    prompt: `${built.system}\n\n${user}`,
+    messages: [
+      { role: "system", content: built.system },
+      { role: "user", content: user },
+    ],
+  };
 }
 
 export function buildComplianceReviewPrompt(input: AnyRecord = {}) {
@@ -124,11 +147,19 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
   const personaId = dataPersonaId(input);
   if (!personaId) throw new Error("personaContent 需要 personaId");
 
+  if (!isPersonasLibraryAvailable()) {
+    console.warn("[prompt-engine] personas/ 缺失，personaContent 降级为 contentGeneration");
+    return buildContentGenerationPrompt(input);
+  }
+
   const generationMode = input.generationMode || "image-text";
   const contentLength = normalizeContentLength(input.contentLength || input.length, generationMode);
   const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
 
   const knowledge = retrieveKnowledge({ ...input, promptTask: "content-generation" }, input.knowledgeOptions || {});
+  const businessLine = knowledge.businessLine || input.businessLine || "weisec";
+  const runtimeLock = buildBusinessLineRuntimeLock(businessLine, knowledge.brandVoice, input.embedLevel);
+
   const personaPrompt = buildPersonaContentPrompt(
     personaId,
     {
@@ -137,7 +168,9 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       targetUser: input.targetUser || "投资小白",
       contentLength: lengthHint,
       generationMode,
+      businessLine: resolveBrandName(businessLine),
       selectedAngle: input.selectedAngle || input.angle || "未提供",
+      embedLevel: formatEmbedLevelForPrompt(input.embedLevel || "low"),
       customRequirement: input.customRequirement || input.customPrompt || "无",
       topicMaterials: input.topicMaterials || input.materials || [],
       selectedFeatures: knowledge.selectedFeatures,
@@ -153,13 +186,15 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
   );
 
   const globalSystem = buildSystemPrompt(knowledge);
+  const personaSystem = `${personaPrompt.system}\n\n${runtimeLock}`;
+  const personaUser = `${personaPrompt.user}\n\n${runtimeLock}`;
   return {
     ...personaPrompt,
-    system: `${globalSystem}\n\n${personaPrompt.system}`,
-    prompt: `${globalSystem}\n\n${personaPrompt.system}\n\n${personaPrompt.user}`,
+    system: `${globalSystem}\n\n${personaSystem}`,
+    prompt: `${globalSystem}\n\n${personaSystem}\n\n${personaUser}`,
     messages: [
-      { role: "system", content: `${globalSystem}\n\n${personaPrompt.system}` },
-      { role: "user", content: personaPrompt.user },
+      { role: "system", content: `${globalSystem}\n\n${personaSystem}` },
+      { role: "user", content: personaUser },
     ],
     knowledge,
     debugKnowledgeUsed: knowledge.debugKnowledgeUsed,

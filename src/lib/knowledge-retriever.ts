@@ -1,6 +1,14 @@
 import fs from "node:fs";
 import path from "node:path";
+import { buildLicaitongWorkflowConfig, mergeLicaitongWorkflowConfig } from "@/lib/licaitong-workflow-config";
+import { FALLBACK_LICAITONG_WORKFLOW } from "@/lib/licaitong-workflow";
 import { normalizeBusinessLine, resolveKbTargetUser } from "@/lib/business-line";
+import {
+  normalizeEmbedLevel,
+  resolveFeatureInjectionLimit,
+  shouldIncludeStrongInsertPhrases,
+} from "@/lib/embed-level";
+import { collectMaterialRetrievalTerms } from "@/lib/topic-materials";
 import { toArray } from "@/lib/utils";
 
 const CORE_HIGH_RISK_RULE_IDS = new Set([
@@ -21,13 +29,6 @@ const CONTENT_TYPE_ALIASES: Record<string, string[]> = {
   "tool-review": ["tool-review", "brand-seed"],
   "scenario-seeding": ["scenario-seeding", "personal-exp", "brand-seed"],
   "content-list": ["content-list", "finance-tips"],
-};
-
-const EMBED_FEATURE_LIMITS: Record<string, number> = {
-  none: 0,
-  low: 2,
-  medium: 3,
-  high: 4,
 };
 
 interface KnowledgeInput {
@@ -57,6 +58,8 @@ interface KnowledgeInput {
   phraseId?: string;
   offerId?: string;
   creationScene?: string;
+  materials?: Array<{ title?: string; body?: string; source?: string; isPrimary?: boolean; selected?: boolean }>;
+  topicMaterials?: Array<{ title?: string; body?: string; source?: string; isPrimary?: boolean; selected?: boolean }>;
 }
 
 interface KnowledgeOptions {
@@ -83,6 +86,7 @@ export function resolveKnowledgeBasePath(customPath?: string) {
   const candidates = [
     customPath,
     process.env.AI_KNOWLEDGE_BASE_PATH,
+    path.join(process.cwd(), "ai-knowledge-base-v5.0"),
     path.join(process.cwd(), "ai-knowledge-base-v4.0"),
     path.join(process.cwd(), "ai-knowledge-base-v3.3"),
     path.join(process.cwd(), "ai-knowledge-base-v3.2"),
@@ -93,6 +97,226 @@ export function resolveKnowledgeBasePath(customPath?: string) {
     throw new Error(`未找到知识库目录。已尝试：${candidates.join(" | ")}`);
   }
   return resolved;
+}
+
+function isV5KnowledgeBase(index: AnyRecord) {
+  return (
+    String(index.version || "").startsWith("5") ||
+    index.architecture === "single-kb-multi-layer-multi-folder"
+  );
+}
+
+type KbBusinessLine = "licaitong" | "weisec";
+
+function resolveIndexFilePath(
+  index: AnyRecord,
+  key: string,
+  line?: KbBusinessLine | "shared",
+): string | null {
+  const mapped = index?.files?.[key];
+  if (typeof mapped === "string" && mapped) return mapped.replace(/\\/g, "/");
+  if (mapped && typeof mapped === "object" && line) {
+    const relative = mapped[line];
+    return typeof relative === "string" && relative ? relative.replace(/\\/g, "/") : null;
+  }
+  return null;
+}
+
+function extractItems(doc: AnyRecord | null | undefined) {
+  if (!doc) return [] as AnyRecord[];
+  return Array.isArray(doc.items) ? (doc.items as AnyRecord[]) : [];
+}
+
+function normalizeBrandVoiceDoc(doc: AnyRecord, fallbackLine: KbBusinessLine) {
+  if (extractItems(doc).length) {
+    return extractItems(doc).map((item) => ({
+      ...item,
+      businessLine: item.businessLine || fallbackLine,
+    }));
+  }
+  if (doc.brand || doc.positioning) {
+    return [{ id: `brand_voice_${fallbackLine}`, businessLine: fallbackLine, ...doc }];
+  }
+  return [] as AnyRecord[];
+}
+
+function normalizeVisualGuidelinesDoc(doc: AnyRecord) {
+  return extractItems(doc);
+}
+
+interface LineKnowledgeBundle {
+  brandVoiceItems: AnyRecord[];
+  productFeatures: AnyRecord[];
+  contentTemplates: AnyRecord[];
+  phraseLibrary: AnyRecord[];
+  visualGuidelines: AnyRecord[];
+  targetReaders: AnyRecord[];
+  personaOptions: AnyRecord[];
+  riskDisclaimersExtra: AnyRecord[];
+}
+
+function readKbDoc(basePath: string, relativePath: string | null, fallback: AnyRecord = {}) {
+  if (!relativePath) return fallback;
+  return readJson(basePath, relativePath, fallback);
+}
+
+function resolveSharedFilePath(index: AnyRecord, key: string) {
+  return resolveIndexFilePath(index, key) || resolveIndexFilePath(index, key, "shared");
+}
+
+function loadV5LineBundle(basePath: string, index: AnyRecord, line: KbBusinessLine): LineKnowledgeBundle {
+  const brandVoiceDoc = readKbDoc(basePath, resolveIndexFilePath(index, "brandVoice", line), {});
+  const productDoc = readKbDoc(basePath, resolveIndexFilePath(index, "productFeatures", line), { items: [] });
+  const templatesDoc = readKbDoc(basePath, resolveIndexFilePath(index, "contentTemplates", line), { items: [] });
+  const phraseDoc = readKbDoc(basePath, resolveIndexFilePath(index, "phraseLibrary", line), { items: [] });
+  const visualDoc = readKbDoc(basePath, resolveIndexFilePath(index, "visualGuidelines", line), { items: [] });
+  const readersDoc = readKbDoc(
+    basePath,
+    resolveIndexFilePath(index, "targetReaders", line) || resolveIndexFilePath(index, "audienceProfiles", line),
+    { items: [] },
+  );
+  const personaDoc = readKbDoc(basePath, resolveIndexFilePath(index, "personaOptions", line), { items: [] });
+  const riskLineDoc = readKbDoc(basePath, resolveIndexFilePath(index, "riskDisclaimers", line), { items: [] });
+
+  return {
+    brandVoiceItems: normalizeBrandVoiceDoc(brandVoiceDoc, line),
+    productFeatures: extractItems(productDoc),
+    contentTemplates: extractItems(templatesDoc),
+    phraseLibrary: extractItems(phraseDoc),
+    visualGuidelines: normalizeVisualGuidelinesDoc(visualDoc),
+    targetReaders: extractItems(readersDoc),
+    personaOptions: extractItems(personaDoc),
+    riskDisclaimersExtra: extractItems(riskLineDoc),
+  };
+}
+
+function loadV5KnowledgeBase(basePath: string, index: AnyRecord) {
+  const lineBundles: Record<KbBusinessLine, LineKnowledgeBundle> = {
+    licaitong: loadV5LineBundle(basePath, index, "licaitong"),
+    weisec: loadV5LineBundle(basePath, index, "weisec"),
+  };
+
+  const complianceRules = extractItems(readKbDoc(basePath, resolveSharedFilePath(index, "complianceRules"), { items: [] }));
+  const rewriteRules = extractItems(readKbDoc(basePath, resolveSharedFilePath(index, "rewriteRules"), { items: [] }));
+  const platformRules = extractItems(readKbDoc(basePath, resolveSharedFilePath(index, "platformRules"), { items: [] }));
+  const riskDisclaimersShared = readKbDoc(basePath, resolveIndexFilePath(index, "riskDisclaimers", "shared"), {
+    items: [],
+    globalRiskReminder: "",
+  });
+
+  const offerPackPath =
+    typeof index?.files?.offerPackFixedIncomePlus === "string" ? index.files.offerPackFixedIncomePlus : null;
+  const offerPackFixedIncomePlus = extractItems(
+    offerPackPath ? readKbDoc(basePath, offerPackPath, { items: [] }) : { items: [] },
+  );
+
+  const brandVoiceItems = [...lineBundles.licaitong.brandVoiceItems, ...lineBundles.weisec.brandVoiceItems];
+  const productFeatures = [...lineBundles.licaitong.productFeatures, ...lineBundles.weisec.productFeatures];
+  const contentTemplates = [...lineBundles.licaitong.contentTemplates, ...lineBundles.weisec.contentTemplates];
+  const phraseLibrary = [...lineBundles.licaitong.phraseLibrary, ...lineBundles.weisec.phraseLibrary];
+  const visualGuidelines = [...lineBundles.licaitong.visualGuidelines, ...lineBundles.weisec.visualGuidelines];
+  const audienceProfiles = [...lineBundles.licaitong.targetReaders, ...lineBundles.weisec.targetReaders];
+  const personaOptions = [...lineBundles.licaitong.personaOptions, ...lineBundles.weisec.personaOptions];
+
+  return {
+    basePath,
+    index,
+    isV5: true,
+    lineBundles,
+    riskDisclaimersShared,
+    defaultBusinessLine: index.businessLineFolders ? "weisec" : "weisec",
+    brandVoiceItems,
+    productFeatures,
+    contentTemplates,
+    phraseLibrary,
+    complianceRules,
+    rewriteRules,
+    riskDisclaimers: riskDisclaimersShared,
+    platformRules,
+    visualGuidelines,
+    audienceProfiles,
+    personaOptions,
+    offerPackFixedIncomePlus,
+  };
+}
+
+function loadV4KnowledgeBase(basePath: string, index: AnyRecord) {
+  const brandVoiceRaw = readKbJson(basePath, index, "brandVoice", "brand-voice.json");
+  const brandVoiceItems = brandVoiceRaw.items
+    ? brandVoiceRaw.items
+    : [{ id: "brand_voice_legacy", businessLine: "weisec", ...brandVoiceRaw }];
+  return {
+    basePath,
+    index,
+    isV5: false,
+    lineBundles: undefined as Record<KbBusinessLine, LineKnowledgeBundle> | undefined,
+    riskDisclaimersShared: undefined as AnyRecord | undefined,
+    defaultBusinessLine: brandVoiceRaw.defaultBusinessLine || "weisec",
+    brandVoiceItems,
+    productFeatures: readKbJson(basePath, index, "productFeatures", "product-features.json", { items: [] }).items || [],
+    contentTemplates: readKbJson(basePath, index, "contentTemplates", "content-templates.json", { items: [] }).items || [],
+    phraseLibrary: readKbJson(basePath, index, "phraseLibrary", "phrase-library.json", { items: [] }).items || [],
+    complianceRules: readKbJson(basePath, index, "complianceRules", "compliance-rules.json", { items: [] }).items || [],
+    rewriteRules: readKbJson(basePath, index, "rewriteRules", "compliance-rewrite-rules.cleaned.json", { items: [] }).items || [],
+    riskDisclaimers: readKbJson(basePath, index, "riskDisclaimers", "risk-disclaimers.json", {
+      items: [],
+      globalRiskReminder: "",
+    }),
+    platformRules: readKbJson(basePath, index, "platformRules", "platform-rules.json", { items: [] }).items || [],
+    visualGuidelines: readKbJson(basePath, index, "visualGuidelines", "visual-guidelines.json", { items: [] }).items || [],
+    audienceProfiles: readKbJson(basePath, index, "audienceProfiles", "audience-profiles.json", { items: [] }).items || [],
+    personaOptions: [] as AnyRecord[],
+    offerPackFixedIncomePlus: readKbJson(
+      basePath,
+      index,
+      "offerPackFixedIncomePlus",
+      "layers/L2-product/offer-packs/fixed-income-plus.json",
+      { items: [] },
+    ).items || [],
+  };
+}
+
+function resolveBusinessLineKey(businessLine: string): KbBusinessLine {
+  return businessLine === "licaitong" ? "licaitong" : "weisec";
+}
+
+function getScopedKnowledge(kb: ReturnType<typeof loadKnowledgeBase>, businessLine: string) {
+  const lineKey = resolveBusinessLineKey(businessLine);
+  if (kb.isV5 && kb.lineBundles) {
+    const bundle = kb.lineBundles[lineKey];
+    const sharedRiskItems = toArray(kb.riskDisclaimersShared?.items) as AnyRecord[];
+    return {
+      brandVoiceItems: bundle.brandVoiceItems.length ? bundle.brandVoiceItems : kb.brandVoiceItems,
+      productFeatures: bundle.productFeatures,
+      contentTemplates: bundle.contentTemplates,
+      phraseLibrary: bundle.phraseLibrary,
+      visualGuidelines: bundle.visualGuidelines,
+      audienceProfiles: bundle.targetReaders,
+      personaOptions: bundle.personaOptions,
+      complianceRules: kb.complianceRules,
+      rewriteRules: kb.rewriteRules,
+      platformRules: kb.platformRules,
+      offerPackFixedIncomePlus: kb.offerPackFixedIncomePlus,
+      riskDisclaimers: {
+        globalRiskReminder: kb.riskDisclaimersShared?.globalRiskReminder || "市场有风险，投资需谨慎。",
+        items: [...sharedRiskItems, ...bundle.riskDisclaimersExtra],
+      },
+    };
+  }
+  return {
+    brandVoiceItems: kb.brandVoiceItems,
+    productFeatures: kb.productFeatures,
+    contentTemplates: kb.contentTemplates,
+    phraseLibrary: kb.phraseLibrary,
+    visualGuidelines: kb.visualGuidelines,
+    audienceProfiles: kb.audienceProfiles,
+    personaOptions: kb.personaOptions,
+    complianceRules: kb.complianceRules,
+    rewriteRules: kb.rewriteRules,
+    platformRules: kb.platformRules,
+    offerPackFixedIncomePlus: kb.offerPackFixedIncomePlus,
+    riskDisclaimers: kb.riskDisclaimers,
+  };
 }
 
 function resolveKbFile(basePath: string, index: AnyRecord, key: string, fallbackFile: string) {
@@ -127,46 +351,24 @@ function matchesBusinessLine(item: AnyRecord, businessLine: string) {
 export function loadKnowledgeBase(options: KnowledgeOptions = {}) {
   const basePath = resolveKnowledgeBasePath(options.knowledgeBasePath);
   const index = readJson(basePath, "index.json");
-  const brandVoiceRaw = readKbJson(basePath, index, "brandVoice", "brand-voice.json");
-  const brandVoiceItems = brandVoiceRaw.items
-    ? brandVoiceRaw.items
-    : [{ id: "brand_voice_legacy", businessLine: "weisec", ...brandVoiceRaw }];
-  return {
-    basePath,
-    index,
-    brandVoiceItems,
-    defaultBusinessLine: brandVoiceRaw.defaultBusinessLine || "weisec",
-    productFeatures: readKbJson(basePath, index, "productFeatures", "product-features.json", { items: [] }).items || [],
-    contentTemplates: readKbJson(basePath, index, "contentTemplates", "content-templates.json", { items: [] }).items || [],
-    phraseLibrary: readKbJson(basePath, index, "phraseLibrary", "phrase-library.json", { items: [] }).items || [],
-    complianceRules: readKbJson(basePath, index, "complianceRules", "compliance-rules.json", { items: [] }).items || [],
-    rewriteRules: readKbJson(basePath, index, "rewriteRules", "compliance-rewrite-rules.cleaned.json", { items: [] }).items || [],
-    riskDisclaimers: readKbJson(basePath, index, "riskDisclaimers", "risk-disclaimers.json", { items: [], globalRiskReminder: "" }),
-    platformRules: readKbJson(basePath, index, "platformRules", "platform-rules.json", { items: [] }).items || [],
-    visualGuidelines: readKbJson(basePath, index, "visualGuidelines", "visual-guidelines.json", { items: [] }).items || [],
-    audienceProfiles: readKbJson(basePath, index, "audienceProfiles", "audience-profiles.json", { items: [] }).items || [],
-    offerPackFixedIncomePlus: readKbJson(
-      basePath,
-      index,
-      "offerPackFixedIncomePlus",
-      "layers/L2-product/offer-packs/fixed-income-plus.json",
-      { items: [] },
-    ).items || [],
-  };
+  if (isV5KnowledgeBase(index)) {
+    return loadV5KnowledgeBase(basePath, index);
+  }
+  return loadV4KnowledgeBase(basePath, index);
 }
 
-function resolveRetrievalFeatures(kb: ReturnType<typeof loadKnowledgeBase>, input: KnowledgeInput) {
+function resolveRetrievalFeatures(scoped: ReturnType<typeof getScopedKnowledge>, input: KnowledgeInput) {
   const offerId = normalizeText(input.offerId || "");
   const useOfferPack = offerId === "fixed-income-plus" || offerId === "fixed_income_plus";
-  if (useOfferPack && kb.offerPackFixedIncomePlus.length) {
-    return kb.offerPackFixedIncomePlus;
+  if (useOfferPack && scoped.offerPackFixedIncomePlus.length) {
+    return scoped.offerPackFixedIncomePlus;
   }
   if (useOfferPack) {
-    return kb.productFeatures.filter((feature: AnyRecord) =>
+    return scoped.productFeatures.filter((feature: AnyRecord) =>
       toArray(feature.campaignTags).includes("fixed-income-plus"),
     );
   }
-  return kb.productFeatures;
+  return scoped.productFeatures;
 }
 
 function scoreTextMatches(fields: unknown, terms: unknown, weight: number) {
@@ -180,6 +382,7 @@ function scoreTextMatches(fields: unknown, terms: unknown, weight: number) {
 function scoreFeature(feature: AnyRecord, input: KnowledgeInput, contentTypeCandidates: string[], businessLine: string) {
   if (!matchesBusinessLine(feature, businessLine)) return 0;
   const targetUser = input.targetUser || input.targetUserSegment || "";
+  const materialTerms = collectMaterialRetrievalTerms(input.materials || input.topicMaterials);
   const requestedFeatureIds = unique([
     ...toArray(input.featureId),
     ...toArray(input.featureIds),
@@ -203,10 +406,18 @@ function scoreFeature(feature: AnyRecord, input: KnowledgeInput, contentTypeCand
   if (creationScene && toArray(feature.suitableCreationScenes).includes(creationScene)) score += 25;
   if (scoreTextMatches(feature.suitableUserSegments, [targetUser], 12)) score += 12;
   score += scoreTextMatches([feature.aliases, feature.userPainPoints, feature.useCases, feature.summary], [targetUser, input.topic, input.campaignGoal], 2);
+  if (materialTerms.length) {
+    score += scoreTextMatches(
+      [feature.aliases, feature.userPainPoints, feature.useCases, feature.summary, feature.softInsertPhrases],
+      materialTerms,
+      5,
+    );
+  }
   return score;
 }
 
 function pruneFeature(feature: AnyRecord, embedLevel: string) {
+  const includeStrong = shouldIncludeStrongInsertPhrases(embedLevel);
   return {
     id: feature.id,
     name: feature.name,
@@ -216,36 +427,59 @@ function pruneFeature(feature: AnyRecord, embedLevel: string) {
     suitableUserSegments: toArray(feature.suitableUserSegments),
     userPainPoints: toArray(feature.userPainPoints).slice(0, 4),
     useCases: toArray(feature.useCases).slice(0, 4),
-    productActions: toArray(feature.productActions).slice(0, 4),
+    productActions: includeStrong ? toArray(feature.productActions).slice(0, 3) : [],
     safeClaims: toArray(feature.safeClaims).slice(0, 4),
-    softInsertPhrases: toArray(feature.softInsertPhrases).slice(0, 4),
-    strongInsertPhrases: embedLevel === "high" ? toArray(feature.strongInsertPhrases).slice(0, 2) : [],
+    softInsertPhrases: normalizeEmbedLevel(embedLevel) === "none" ? [] : toArray(feature.softInsertPhrases).slice(0, 3),
+    strongInsertPhrases: includeStrong ? toArray(feature.strongInsertPhrases).slice(0, 2) : [],
     forbiddenClaims: toArray(feature.forbiddenClaims).slice(0, 4),
     riskNotes: toArray(feature.riskNotes).slice(0, 3),
   };
 }
 
 function selectFeatures(features: AnyRecord[], input: KnowledgeInput, contentTypeCandidates: string[], businessLine: string) {
-  const embedLevel = normalizeText(input.embedLevel || "medium");
-  const limit = EMBED_FEATURE_LIMITS[embedLevel] ?? EMBED_FEATURE_LIMITS.medium;
+  const embedLevel = normalizeEmbedLevel(input.embedLevel || "low");
+  const requestedFeatureIds = unique([
+    ...toArray(input.featureId),
+    ...toArray(input.featureIds),
+    ...toArray(input.selectedFeatureIds),
+    ...toArray(input.mainFeatureId),
+    ...toArray(input.productFeatureId),
+  ].map(String));
+  const limit = resolveFeatureInjectionLimit(embedLevel, requestedFeatureIds);
   if (limit === 0) return [];
 
-  return features
+  const scored = features
     .map((feature) => ({ feature, score: scoreFeature(feature, input, contentTypeCandidates, businessLine) }))
     .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map(({ feature }) => pruneFeature(feature, embedLevel));
+    .sort((a, b) => b.score - a.score);
+
+  const explicit = requestedFeatureIds.length
+    ? requestedFeatureIds
+        .map((id) => scored.find((item) => item.feature.id === id))
+        .filter(Boolean)
+        .map((item) => item!.feature)
+    : scored.slice(0, limit).map(({ feature }) => feature);
+
+  return explicit.slice(0, limit).map((feature) => pruneFeature(feature, embedLevel));
 }
 
 function scoreTemplate(template: AnyRecord, input: KnowledgeInput, contentTypeCandidates: string[], businessLine: string) {
   if (!matchesBusinessLine(template, businessLine)) return 0;
   const targetUser = input.targetUser || input.targetUserSegment || "";
+  const materialTerms = collectMaterialRetrievalTerms(input.materials || input.topicMaterials);
   let score = 0;
   if (input.templateId && input.templateId === template.id) score += 100;
   if (toArray(template.bestForContentTypes).some((type) => contentTypeCandidates.includes(String(type)))) score += 20;
   if (scoreTextMatches(template.suitableUserSegments, [targetUser], 10)) score += 10;
   score += scoreTextMatches([template.name, template.emotionalHook, template.titlePatterns, template.coverTextPatterns, template.bodyStructure], [input.topic, input.campaignGoal, targetUser], 2);
+  if (materialTerms.length) {
+    score += scoreTextMatches(
+      [template.name, template.emotionalHook, template.titlePatterns, template.coverTextPatterns, template.bodyStructure],
+      materialTerms,
+      6,
+    );
+    if (toArray(template.bestForContentTypes).includes("hotspot-analysis")) score += 18;
+  }
   return score;
 }
 
@@ -437,7 +671,7 @@ function selectVisualGuidelines(items: AnyRecord[], businessLine: string) {
     .map(pruneVisualGuideline);
 }
 
-function buildDebugKnowledgeUsed(basePath: string, knowledge: AnyRecord, version: string) {
+function buildDebugKnowledgeUsed(basePath: string, knowledge: AnyRecord, version: string, materialTerms: string[] = []) {
   return {
     knowledgeBaseVersion: version,
     knowledgeBasePath: basePath,
@@ -450,12 +684,14 @@ function buildDebugKnowledgeUsed(basePath: string, knowledge: AnyRecord, version
     riskDisclaimers: toArray(knowledge.riskDisclaimers?.requiredTexts).length,
     platformRules: knowledge.platformRules.map((item: AnyRecord) => item.id),
     visualGuidelines: knowledge.visualGuidelines.map((item: AnyRecord) => item.id),
+    topicMaterialCount: materialTerms.length,
   };
 }
 
 export function retrieveKnowledge(input: KnowledgeInput = {}, options: KnowledgeOptions = {}) {
   const kb = loadKnowledgeBase(options);
   const businessLine = resolveBusinessLine(input);
+  const scoped = getScopedKnowledge(kb, businessLine);
   const targetUserLabel = input.targetUser || input.targetUserSegment || "";
   const resolvedInput = {
     ...input,
@@ -465,16 +701,24 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
   };
   const contentTypeCandidates = getContentTypeCandidates(resolvedInput.contentType);
   const purpose = normalizeText(resolvedInput.task || resolvedInput.promptTask || "");
-  const featurePool = resolveRetrievalFeatures(kb, resolvedInput);
-  const selectedFeatures = selectFeatures(featurePool, resolvedInput, contentTypeCandidates, businessLine);
-  const selectedTemplates = selectTemplates(kb.contentTemplates, resolvedInput, contentTypeCandidates, businessLine);
-  const phraseGroup = selectPhraseGroup(kb.phraseLibrary, resolvedInput, contentTypeCandidates, businessLine);
-  const complianceRules = selectComplianceRules(kb.complianceRules, resolvedInput, contentTypeCandidates);
-  const rewriteRules = selectRewriteRules(kb.rewriteRules, complianceRules, options);
-  const brandVoice = pruneBrandVoice(kb.brandVoiceItems, resolvedInput, businessLine);
-  const riskDisclaimers = selectRiskDisclaimers(kb.riskDisclaimers, resolvedInput, contentTypeCandidates, businessLine);
-  const platformRules = selectPlatformRules(kb.platformRules, resolvedInput, contentTypeCandidates, purpose);
-  const visualGuidelines = purpose.includes("cover") ? selectVisualGuidelines(kb.visualGuidelines, businessLine) : [];
+  const materialTerms = collectMaterialRetrievalTerms(resolvedInput.materials || resolvedInput.topicMaterials);
+  const retrievalInput =
+    materialTerms.length > 0
+      ? {
+          ...resolvedInput,
+          topic: [resolvedInput.topic, ...materialTerms.slice(0, 3)].filter(Boolean).join(" "),
+        }
+      : resolvedInput;
+  const featurePool = resolveRetrievalFeatures(scoped, retrievalInput);
+  const selectedFeatures = selectFeatures(featurePool, retrievalInput, contentTypeCandidates, businessLine);
+  const selectedTemplates = selectTemplates(scoped.contentTemplates, retrievalInput, contentTypeCandidates, businessLine);
+  const phraseGroup = selectPhraseGroup(scoped.phraseLibrary, retrievalInput, contentTypeCandidates, businessLine);
+  const complianceRules = selectComplianceRules(scoped.complianceRules, resolvedInput, contentTypeCandidates);
+  const rewriteRules = selectRewriteRules(scoped.rewriteRules, complianceRules, options);
+  const brandVoice = pruneBrandVoice(scoped.brandVoiceItems, resolvedInput, businessLine);
+  const riskDisclaimers = selectRiskDisclaimers(scoped.riskDisclaimers, resolvedInput, contentTypeCandidates, businessLine);
+  const platformRules = selectPlatformRules(scoped.platformRules, resolvedInput, contentTypeCandidates, purpose);
+  const visualGuidelines = purpose.includes("cover") ? selectVisualGuidelines(scoped.visualGuidelines, businessLine) : [];
   const knowledge = {
     businessLine,
     brandVoice,
@@ -490,7 +734,7 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
 
   return {
     ...knowledge,
-    debugKnowledgeUsed: buildDebugKnowledgeUsed(kb.basePath, knowledge, kb.index.version || "4.0"),
+    debugKnowledgeUsed: buildDebugKnowledgeUsed(kb.basePath, knowledge, kb.index.version || "5.0", materialTerms),
   };
 }
 
@@ -540,11 +784,16 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
     ].filter(Boolean).join("\n"))
     .join("\n\n");
 
+  const licaitongWorkflow = kb.isV5
+    ? mergeLicaitongWorkflowConfig(buildLicaitongWorkflowConfig(kb), FALLBACK_LICAITONG_WORKFLOW)
+    : FALLBACK_LICAITONG_WORKFLOW;
+
   return {
     source: "ai-json",
-    knowledgeBaseVersion: kb.index.version || "4.0",
+    knowledgeBaseVersion: kb.index.version || "5.0",
     knowledgeBasePath: kb.basePath,
     legacyMarkdownMode: "compatibility-only",
+    licaitongWorkflow,
     features,
     complianceRules,
     scripts,
@@ -562,6 +811,7 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
       platformRules: kb.platformRules,
       visualGuidelines: kb.visualGuidelines,
       audienceProfiles: kb.audienceProfiles,
+      personaOptions: kb.personaOptions,
     },
     counts: {
       features: features.length,
@@ -570,10 +820,17 @@ export function buildKnowledgeBaseListView(options: KnowledgeOptions = {}) {
       phraseGroups: kb.phraseLibrary.length,
       complianceRules: kb.complianceRules.length,
       rewriteRules: kb.rewriteRules.length,
-      riskDisclaimers: toArray(kb.riskDisclaimers.items).length,
+      riskDisclaimers: kb.isV5
+        ? toArray(kb.riskDisclaimersShared?.items).length +
+          Object.values(kb.lineBundles || {}).reduce(
+            (sum, bundle) => sum + bundle.riskDisclaimersExtra.length,
+            0,
+          )
+        : toArray(kb.riskDisclaimers.items).length,
       platformRules: kb.platformRules.length,
       visualGuidelines: kb.visualGuidelines.length,
       audienceProfiles: kb.audienceProfiles.length,
+      personaOptions: kb.personaOptions.length,
     },
   };
 }

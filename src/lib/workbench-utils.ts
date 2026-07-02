@@ -1,3 +1,5 @@
+import { validateGeneratedBody } from "@/lib/business-line-prompt";
+import { getSelectedMaterials } from "@/lib/hotspot-workflow";
 import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent, Material } from "@/lib/types";
 
 type LooseRecord = Record<string, unknown>;
@@ -18,7 +20,9 @@ export function buildAnglesConfigFingerprint(brief: BriefInput, materials: Mater
     topic: brief.topic,
     targetUser: brief.targetUser,
     contentType: brief.contentType,
-    materialIds: materials.map((item) => item.id).sort(),
+    materialIds: getSelectedMaterials(materials)
+      .map((item) => item.id)
+      .sort(),
     generateCount: brief.generateCount,
     embedLevel: brief.embedLevel,
     customRequirement: brief.customRequirement || "",
@@ -36,12 +40,11 @@ function asString(value: unknown) {
 /** 将 personaContent 等人设专用 JSON 映射为 contentGeneration 标准字段 */
 export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedContent> & LooseRecord {
   const data = asRecord(value);
-  if (asString(data.content)) return data as Partial<GeneratedContent> & LooseRecord;
 
   const opening = asString(data.opening);
   const body = asString(data.body);
   const closing = asString(data.closing);
-  const content = [opening, body, closing].filter(Boolean).join("\n\n");
+  const content = asString(data.content) || [opening, body, closing].filter(Boolean).join("\n\n");
 
   const titleOptions = Array.isArray(data.titleOptions) ? data.titleOptions : [];
   const titleCandidates =
@@ -61,11 +64,12 @@ export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedCon
           .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const imageTextSuggestions = Array.isArray(data.imageTextSuggestions) ? data.imageTextSuggestions : [];
+  const coverSuggestions = Array.isArray(data.coverSuggestions) ? data.coverSuggestions : [];
   const imagePromptSuggestions =
     Array.isArray(data.imagePromptSuggestions) && data.imagePromptSuggestions.length > 0
       ? (data.imagePromptSuggestions as GeneratedContent["imagePromptSuggestions"])
-      : imageTextSuggestions
-          .map((item) => {
+      : [
+          ...imageTextSuggestions.map((item) => {
             const row = asRecord(item);
             const scene = asString(row.scene);
             const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String).join("；") : "";
@@ -77,7 +81,20 @@ export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedCon
               coverText: asString(row.coverText) || undefined,
               riskNotes: Array.isArray(row.riskNotes) ? row.riskNotes.map(String) : [],
             };
-          })
+          }),
+          ...coverSuggestions.map((item) => {
+            const row = asRecord(item);
+            const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String).join("；") : "";
+            const prompt = asString(row.prompt) || asString(row.imagePrompt) || [asString(row.style), visualNotes].filter(Boolean).join("。");
+            if (!prompt) return null;
+            return {
+              style: asString(row.style) || "cover",
+              prompt,
+              coverText: asString(row.coverText) || undefined,
+              riskNotes: Array.isArray(row.riskNotes) ? row.riskNotes.map(String) : [],
+            };
+          }),
+        ]
           .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const naturalInsertion = asRecord(data.naturalInsertion);
@@ -95,7 +112,8 @@ export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedCon
 
   const coverFromImage =
     imagePromptSuggestions[0]?.coverText ||
-    (imageTextSuggestions[0] ? asString(asRecord(imageTextSuggestions[0]).coverText) : "");
+    (imageTextSuggestions[0] ? asString(asRecord(imageTextSuggestions[0]).coverText) : "") ||
+    (coverSuggestions[0] ? asString(asRecord(coverSuggestions[0]).coverText) : "");
 
   const coverTextCandidates =
     Array.isArray(data.coverTextCandidates) && data.coverTextCandidates.length > 0
@@ -116,6 +134,38 @@ export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedCon
     interactionGuide: asString(data.interactionGuide) || asString(data.cta),
     tags: Array.isArray(data.tags) ? data.tags.map(String) : [],
   };
+}
+
+/** 模型未输出封面 prompt 时，用标题/封面字/角度信息拼一条可试用的生图 prompt */
+export function buildFallbackImagePromptSuggestions(
+  content: Pick<GeneratedContent, "selectedTitle" | "selectedCoverText" | "content">,
+  angle: CreativeAngle,
+): GeneratedContent["imagePromptSuggestions"] {
+  const coverText = content.selectedCoverText || angle.coverDirection || "";
+  const title = content.selectedTitle || angle.angleName || "";
+  const prompt = [
+    "小红书财经笔记封面，竖版 3:4",
+    coverText ? `封面大字：${coverText}` : "",
+    title ? `内容主题：${title}` : "",
+    angle.coreIdea ? `画面方向：${angle.coreIdea.slice(0, 100)}` : "",
+    "风格：清晰、生活化、偏干货笔记感",
+    "禁止：股票代码、收益数字、承诺性文案、二维码",
+  ]
+    .filter(Boolean)
+    .join("。");
+
+  return [
+    {
+      style: "fallback-cover",
+      prompt,
+      coverText: coverText || undefined,
+      riskNotes: ["由标题与封面字自动拼装，仅供试生成"],
+    },
+  ];
+}
+
+function hasUsableImagePrompts(items: GeneratedContent["imagePromptSuggestions"]) {
+  return items.some((item) => asString(item.prompt));
 }
 
 export function buildDefaultCompliance(content: GeneratedContent): ComplianceReport {
@@ -159,7 +209,7 @@ export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngl
 
 export function normalizeContent(value: unknown, angle: CreativeAngle): GeneratedContent {
   const data = adaptPersonaContentPayload(value) as Partial<GeneratedContent>;
-  return {
+  const base: GeneratedContent = {
     id: uid("content"),
     angleId: data.angleId || angle.angleId,
     angleName: data.angleName || angle.angleName,
@@ -177,6 +227,12 @@ export function normalizeContent(value: unknown, angle: CreativeAngle): Generate
     complianceReport: data.complianceReport,
     debugKnowledgeUsed: data.debugKnowledgeUsed,
   };
+
+  if (!hasUsableImagePrompts(base.imagePromptSuggestions)) {
+    base.imagePromptSuggestions = buildFallbackImagePromptSuggestions(base, angle);
+  }
+
+  return base;
 }
 
 export function normalizeCompliance(value: unknown, fallback: ComplianceReport): ComplianceReport {

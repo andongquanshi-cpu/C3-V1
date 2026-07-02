@@ -1,13 +1,21 @@
 {
-  "version": "4.0",
+  "version": "5.0",
   "language": "zh-CN",
   "purpose": "Layered Licaitong & WeSec Xiaohongshu knowledge base for scoped retrieval.",
+  "folderLayout": {
+    "businessLineFolders": {
+      "licaitong": "licaitong",
+      "weisec": "weizhengquan"
+    },
+    "sharedFolder": "a_shared",
+    "note": "v5.0 起，L0/L2/L3/L4 按业务线分子目录；L3 的 a_shared/ 存放 businessLine=all 基准，licaitong/weizhengquan bundle 已合并 shared 条目。"
+  },
   "knowledgeLayers": {
     "L0_shared": "合规、平台规则、全局免责 — businessLine 通常为 all，全业务线共用",
     "L1_brand": "品牌调性、视觉规范 — 按 businessLine 分叉",
     "L2_product": "产品功能与植入事实 — 必须按 businessLine 分叉",
     "L3_content_pattern": "内容模板与话术 — businessLine × contentType",
-    "L4_audience": "受众画像 — businessLine × audience，与人设库 personas 关联",
+    "L4_audience": "表达上下文 — target-readers（写给谁）+ persona-options（谁来说）；口吻在 personas/",
     "L5_persona": "表达层在 personas/ 目录，通过 applicablePersonaIds 关联",
     "L6_scenario": "预留：场景包、活动战役、账号层级表达策略"
   },
@@ -116,12 +124,71 @@
       ]
     },
     "audienceProfile": {
+      "deprecated": "v5.0 起拆分为 targetReader 与 personaOption",
       "required": [
         "id",
         "businessLine",
         "painPoints",
         "promptSummary"
       ]
-    }
+    },
+    "targetReader": {
+      "required": [
+        "id",
+        "businessLine",
+        "label",
+        "targetUserLabel",
+        "painPoints",
+        "safeExpressions",
+        "forbiddenExpressions",
+        "suitablePersonaIds"
+      ],
+      "optional": [
+        "audienceTag",
+        "audienceId",
+        "kbMatchName",
+        "kbProfileId",
+        "tone",
+        "infoHabits"
+      ]
+    },
+    "personaOption": {
+      "required": [
+        "id",
+        "personaId",
+        "businessLine",
+        "label",
+        "description",
+        "personaStandardFile",
+        "promptSummary"
+      ],
+      "optional": [
+        "shortLabel",
+        "contentArchetype",
+        "identity",
+        "style",
+        "differentiation",
+        "audienceTags",
+        "compatibleAudienceIds",
+        "readerPairing",
+        "suitableSceneIds",
+        "suitableScenes",
+        "personaVariantId",
+        "variants",
+        "whenToUse",
+        "whenNotToUse",
+        "exampleTopics",
+        "requiresHotspotMaterials",
+        "materialRequirements",
+        "defaultContentTypes",
+        "compatibleOfferIds",
+        "recommendedFeatureIds",
+        "embedGuidance",
+        "uiCard",
+        "priority",
+        "status"
+      ],
+      "note": "identity/style/differentiation 为业务线选型摘要；完整 prompt 仍以 personas/standards 为准。"
+    },
   }
 }

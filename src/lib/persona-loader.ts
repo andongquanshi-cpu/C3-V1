@@ -138,8 +138,16 @@ export function getPersonasDir() {
   return PERSONAS_DIR;
 }
 
+export function isPersonasLibraryAvailable() {
+  return fs.existsSync(path.join(PERSONAS_DIR, "registry.json"));
+}
+
 export function loadPersonaRegistry(): PersonaRegistry {
-  return readJson<PersonaRegistry>(path.join(PERSONAS_DIR, "registry.json"));
+  const registryPath = path.join(PERSONAS_DIR, "registry.json");
+  if (!fs.existsSync(registryPath)) {
+    throw new Error(`人设库未找到：${registryPath}。请执行 git restore personas/ 或检查仓库完整性。`);
+  }
+  return readJson<PersonaRegistry>(registryPath);
 }
 
 export function loadAudiences(): AudienceProfile[] {

@@ -54,6 +54,10 @@ export interface Material {
   source?: string;
   tags?: string[];
   createdAt: string;
+  /** 是否送给 LLM；粘贴素材默认 true，搜索结果默认 false 直至用户勾选 */
+  selected?: boolean;
+  /** 市场观察员模式下的主热点素材 */
+  isPrimary?: boolean;
 }
 
 export interface BriefInput {
@@ -177,6 +181,7 @@ export interface KnowledgeListView {
   knowledgeBaseVersion: string;
   knowledgeBasePath: string;
   legacyMarkdownMode: string;
+  licaitongWorkflow?: import("@/lib/licaitong-workflow").LicaitongWorkflowConfig;
   features: ProductFeatureView[];
   complianceRules: string[];
   scripts: Record<string, unknown>;

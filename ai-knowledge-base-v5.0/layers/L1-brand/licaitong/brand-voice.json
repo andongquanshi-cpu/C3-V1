@@ -1,6 +1,6 @@
 {
   "version": "4.0",
-  "defaultBusinessLine": "weisec",
+  "defaultBusinessLine": "licaitong",
   "items": [
     {
       "id": "brand_voice_licaitong",
@@ -57,70 +57,6 @@
         "titleDo": "问题导向、场景导向、具体但不夸张。\n- 示例：“微信里怎么找基金？新手先看这 4 项”“定投前，我会先检查这三件事”",
         "titleDont": "“闭眼抄作业”“稳赚秘籍”“年化 XX% 轻松拿”“再不买就晚了”",
         "bodyFlow": "采用“生活场景 → 用户困惑 → 判断框架 → 平台操作 → 风险提醒”的顺序。一个段落只解决一个问题，优先使用短句和真实场景。"
-      },
-      "lastVerified": "2026-06-22",
-      "knowledgeLayer": "L1_brand",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "brand_voice_weisec",
-      "businessLine": "weisec",
-      "brand": "腾讯微证券",
-      "positioning": "敏捷、清醒、懂市场但不带节奏的证券信息助手",
-      "brandRole": "敏捷、清醒、懂市场但不带节奏的证券信息助手",
-      "recommendedTone": [
-        "市场或生活场景 → 信息问题 → 工具用法 → 核验步骤 → 风险边界",
-        "把功能写成信息整理和学习辅助，不写成收益工具",
-        "榜单和 AI 不等于荐股或买卖信号"
-      ],
-      "standardConversionPaths": [
-        "微信搜索腾讯微证券进入官方小程序",
-        "具体功能、服务和活动规则以官方页面展示为准"
-      ],
-      "requiredRiskReminders": [
-        "市场有风险，投资需谨慎。",
-        "本文仅作学习和信息整理参考，不构成投资建议。"
-      ],
-      "preferredProductExpressions": [
-        "关注",
-        "核验",
-        "理解",
-        "公开信息",
-        "行情变化",
-        "辅助工具",
-        "独立判断",
-        "合作券商",
-        "以协议为准",
-        "信息时点",
-        "风险。"
-      ],
-      "avoidExpressions": [
-        "必涨",
-        "涨停密码",
-        "内幕",
-        "庄家",
-        "抄底",
-        "梭哈",
-        "闭眼买",
-        "稳赚",
-        "AI 预测",
-        "官方荐股",
-        "零延迟",
-        "全网最低佣金。"
-      ],
-      "imageAndCoverGuidelines": [
-        "封面突出轻量信息场景，避免荐股和暴涨暗示",
-        "使用办公桌、通勤、提醒卡片等元素",
-        "不得展示具体股票代码和收益截图"
-      ],
-      "xiaohongshuRules": {
-        "titleDo": "“一条公告看不懂？先拆这 3 层”“微信里怎么设置股价提醒”“开户前别漏看这 4 项费用”",
-        "titleDont": "“主力已经进场”“明天必涨”“AI 抓涨停”“内部低佣通道”“跟我买就对了”",
-        "bodyFlow": "采用“市场或生活场景 → 信息问题 → 工具用法 → 核验步骤 → 风险边界”的顺序。热点内容必须区分事实、市场观点和作者推测。"
       },
       "lastVerified": "2026-06-22",
       "knowledgeLayer": "L1_brand",

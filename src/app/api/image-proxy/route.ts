@@ -14,7 +14,13 @@ export async function POST(request: Request) {
 
     const requestBody =
       config.format === "volcengine"
-        ? { model: config.model, prompt, size: size || "1728x2304", response_format: "url" }
+        ? {
+            model: config.model,
+            prompt,
+            size: size || "2K",
+            response_format: "url",
+            watermark: false,
+          }
         : { model: config.model, prompt, size: size || "1024x1792", n: 1 };
 
     const response = await fetch(config.apiUrl, {
@@ -28,8 +34,13 @@ export async function POST(request: Request) {
 
     const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const message =
-        typeof data.error === "string" ? data.error : data.error?.message || `图片 API 请求失败：${response.status}`;
+      const upstreamMessage =
+        typeof data.error === "string"
+          ? data.error
+          : data.error?.message || data.message || data.error?.code;
+      const message = upstreamMessage
+        ? `${upstreamMessage}（HTTP ${response.status}）`
+        : `图片 API 请求失败：${response.status}，请检查 IMAGE_API_URL 是否含 /images/generations 及 IMAGE_MODEL 是否与方舟控制台一致`;
       return NextResponse.json({ error: message }, { status: response.status });
     }
     return NextResponse.json(data);

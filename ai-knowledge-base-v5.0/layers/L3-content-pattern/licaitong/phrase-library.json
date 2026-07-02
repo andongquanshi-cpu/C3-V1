@@ -3,6 +3,64 @@
   "source": "docs/knowledgebase/phrase_library",
   "items": [
     {
+      "id": "phrases-user-06",
+      "templateId": "USER-06",
+      "contentType": "personal-exp",
+      "userGroup": "家庭资产规划",
+      "businessLine": "all",
+      "safeOpeningHooks": [
+        "一个人的理财可以简单一点，但家庭理财必须先考虑安全垫。",
+        "家庭财务最怕的不是收益低，而是遇到突发情况没有现金流。",
+        "有房贷、孩子和老人支出后，理财顺序要重新调整。",
+        "家庭理财不是某一个人冲动决定，而是全家现金流的安排。"
+      ],
+      "painPointPhrases": [
+        "家庭收入和支出混乱",
+        "没有备用金",
+        "不知道孩子教育金怎么准备",
+        "夫妻理财观念不同",
+        "把所有钱放在一个地方",
+        "短期钱和长期钱混用"
+      ],
+      "solutionPhrases": [],
+      "conversionPhrases": [],
+      "riskReminderPhrases": [],
+      "titlePhrases": [
+        "家庭理财第一步：不是投资，而是先留备用金",
+        "有房贷和孩子后，钱要这样分层",
+        "夫妻一起管钱，建议先统一这 4 件事",
+        "家庭备用金到底要留多少？",
+        "教育金不是临时准备，而是长期规划",
+        "有家庭后，理财顺序真的要变",
+        "家庭资产规划，先别急着追收益",
+        "有娃家庭的钱，不能全部放在一个地方"
+      ],
+      "coverPhrases": [
+        "家庭理财先留备用金",
+        "有娃后理财顺序要变",
+        "家庭资金分 4 层",
+        "教育金提前规划",
+        "别用刚需钱冒险"
+      ],
+      "phrasesToAvoid": [
+        "股票短线交易",
+        "高波动行业基金",
+        "复杂投资策略",
+        "以收益为核心的家庭理财内容",
+        "稳赚",
+        "保本",
+        "必涨",
+        "闭眼买",
+        "私信领取"
+      ],
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
       "id": "phrases-user-01",
       "templateId": "USER-01",
       "contentType": "finance-tips",
@@ -229,159 +287,6 @@
         "必涨",
         "闭眼买",
         "私信领取"
-      ],
-      "knowledgeLayer": "L3_content_pattern",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "phrases-user-05",
-      "templateId": "USER-05",
-      "contentType": "stock-tutorial",
-      "userGroup": "股票新手",
-      "businessLine": "weisec",
-      "safeOpeningHooks": [
-        "股票新手最容易犯的错，就是把“看到信息”当成“应该交易”。",
-        "股价涨跌只是结果，原因才是分析的起点。",
-        "自选股不是购物车，不是放进去就等着买。",
-        "行情工具的价值，不是让你频繁交易，而是帮你整理公开信息。"
-      ],
-      "painPointPhrases": [
-        "信息太多，不知道看什么",
-        "分不清新闻、公告、情绪、基本面",
-        "容易被短期涨跌影响",
-        "不会整理自选股",
-        "不会控制交易冲动",
-        "把自选股当成买入清单"
-      ],
-      "solutionPhrases": [],
-      "conversionPhrases": [],
-      "riskReminderPhrases": [],
-      "titlePhrases": [
-        "股票新手第一步：不是买，而是建自选池",
-        "股价突然大跌，先别急着操作，先看这 3 点",
-        "新手看盘别只看涨跌幅",
-        "自选股不是越多越好，这样整理更清楚",
-        "5 分钟收盘复盘模板，建议股票新手收藏",
-        "开户前，新手要先知道这几件事",
-        "自选股不是买入清单，别搞反了",
-        "财经新闻太多，新手先看这 3 类"
-      ],
-      "coverPhrases": [
-        "股票新手先别急着买",
-        "自选股不是买入清单",
-        "看盘先看 3 类信息",
-        "股价波动先别慌",
-        "5 分钟收盘复盘",
-        "开户前先看懂"
-      ],
-      "phrasesToAvoid": [
-        "稳赚",
-        "保本",
-        "必涨",
-        "闭眼买",
-        "私信领取"
-      ],
-      "knowledgeLayer": "L3_content_pattern",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "phrases-user-06",
-      "templateId": "USER-06",
-      "contentType": "personal-exp",
-      "userGroup": "家庭资产规划",
-      "businessLine": "all",
-      "safeOpeningHooks": [
-        "一个人的理财可以简单一点，但家庭理财必须先考虑安全垫。",
-        "家庭财务最怕的不是收益低，而是遇到突发情况没有现金流。",
-        "有房贷、孩子和老人支出后，理财顺序要重新调整。",
-        "家庭理财不是某一个人冲动决定，而是全家现金流的安排。"
-      ],
-      "painPointPhrases": [
-        "家庭收入和支出混乱",
-        "没有备用金",
-        "不知道孩子教育金怎么准备",
-        "夫妻理财观念不同",
-        "把所有钱放在一个地方",
-        "短期钱和长期钱混用"
-      ],
-      "solutionPhrases": [],
-      "conversionPhrases": [],
-      "riskReminderPhrases": [],
-      "titlePhrases": [
-        "家庭理财第一步：不是投资，而是先留备用金",
-        "有房贷和孩子后，钱要这样分层",
-        "夫妻一起管钱，建议先统一这 4 件事",
-        "家庭备用金到底要留多少？",
-        "教育金不是临时准备，而是长期规划",
-        "有家庭后，理财顺序真的要变",
-        "家庭资产规划，先别急着追收益",
-        "有娃家庭的钱，不能全部放在一个地方"
-      ],
-      "coverPhrases": [
-        "家庭理财先留备用金",
-        "有娃后理财顺序要变",
-        "家庭资金分 4 层",
-        "教育金提前规划",
-        "别用刚需钱冒险"
-      ],
-      "phrasesToAvoid": [
-        "股票短线交易",
-        "高波动行业基金",
-        "复杂投资策略",
-        "以收益为核心的家庭理财内容",
-        "稳赚",
-        "保本",
-        "必涨",
-        "闭眼买",
-        "私信领取"
-      ],
-      "knowledgeLayer": "L3_content_pattern",
-      "applicablePersonaIds": [],
-      "applicableAudienceIds": [],
-      "scenarioTags": [],
-      "campaignTags": [],
-      "accountTierTags": []
-    },
-    {
-      "id": "phrases-product-07",
-      "templateId": "PRODUCT-07",
-      "contentType": "stock-tutorial",
-      "userGroup": "股票新手",
-      "businessLine": "weisec",
-      "safeOpeningHooks": [
-        "股票新手最容易犯的错，就是把“看到信息”当成“应该交易”。",
-        "股价涨跌只是结果，背后的原因才是分析起点。",
-        "自选股不是购物车，不是放进去就等着买。",
-        "行情工具的价值，不是让你频繁交易，而是帮你整理公开信息。"
-      ],
-      "painPointPhrases": [],
-      "solutionPhrases": [],
-      "conversionPhrases": [],
-      "riskReminderPhrases": [],
-      "titlePhrases": [
-        "股票新手别急着买，先学会看这 3 类信息",
-        "自选股不是买入清单，别搞反了",
-        "股价波动时，先看公告还是新闻？",
-        "开户前，新手要先知道这几件事",
-        "财经新闻太多，新手先看这 3 类",
-        "自选股太乱？这样整理更清楚"
-      ],
-      "coverPhrases": [],
-      "phrasesToAvoid": [
-        "必涨",
-        "荐股",
-        "内幕",
-        "跟买",
-        "私信领取",
-        "扣1私你"
       ],
       "knowledgeLayer": "L3_content_pattern",
       "applicablePersonaIds": [],

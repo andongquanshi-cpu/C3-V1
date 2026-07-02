@@ -19,14 +19,31 @@ export function getTextLlmConfig(): ServerTextLlmConfig {
   };
 }
 
+function normalizeImageApiUrl(apiUrl: string, format: "volcengine" | "openai") {
+  const trimmed = apiUrl.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    return format === "volcengine"
+      ? "https://ark.cn-beijing.volces.com/api/v3/images/generations"
+      : "https://api.openai.com/v1/images/generations";
+  }
+  if (trimmed.endsWith("/images/generations")) return trimmed;
+  if (format === "volcengine" && /\/api\/v3$/i.test(trimmed)) {
+    return `${trimmed}/images/generations`;
+  }
+  if (format === "openai" && /\/v1$/i.test(trimmed)) {
+    return `${trimmed}/images/generations`;
+  }
+  return trimmed;
+}
+
 export function getImageConfig(): ServerImageConfig {
   const format = (process.env.IMAGE_API_FORMAT || "volcengine") as "volcengine" | "openai";
+  const defaultUrl =
+    format === "volcengine"
+      ? "https://ark.cn-beijing.volces.com/api/v3/images/generations"
+      : "https://api.openai.com/v1/images/generations";
   return {
-    apiUrl:
-      process.env.IMAGE_API_URL ||
-      (format === "volcengine"
-        ? "https://ark.cn-beijing.volces.com/api/v3/images/generations"
-        : "https://api.openai.com/v1/images/generations"),
+    apiUrl: normalizeImageApiUrl(process.env.IMAGE_API_URL || defaultUrl, format),
     apiKey: process.env.IMAGE_API_KEY || "",
     model:
       process.env.IMAGE_MODEL ||
@@ -36,7 +53,7 @@ export function getImageConfig(): ServerImageConfig {
 }
 
 export function getHotspotApiKey() {
-  return process.env.TAVILY_API_KEY || "";
+  return (process.env.TAVILY_API_KEY || "").trim();
 }
 
 export function getServerApiStatus() {
@@ -46,6 +63,8 @@ export function getServerApiStatus() {
   return {
     text: Boolean(text.apiKey && text.apiUrl && text.model),
     image: Boolean(image.apiKey),
+    imageModel: image.model,
+    imageFormat: image.format,
     hotspot: Boolean(hotspot),
     ready: Boolean(text.apiKey && text.apiUrl && text.model),
     model: text.model,

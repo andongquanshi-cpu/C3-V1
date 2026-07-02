@@ -1,0 +1,131 @@
+{
+  "version": "5.0",
+  "knowledgeLayer": "L4_target_reader",
+  "businessLine": "licaitong",
+  "description": "内容目标读者：Brief 里「写给谁看」，对应 audienceTag / targetUser。",
+  "items": [
+    {
+      "id": "white-collar",
+      "audienceTag": "white-collar",
+      "businessLine": "licaitong",
+      "knowledgeType": "target_reader",
+      "label": "白领",
+      "targetUserLabel": "白领",
+      "kbMatchName": "职场储蓄入门者",
+      "kbProfileId": "KB_LCT_AUDIENCE_001",
+      "hint": "工资理财、职场节奏",
+      "priority": "High",
+      "ageStage": "22-30 岁，毕业 1-5 年",
+      "occupation": "普通白领、初级运营、设计、行政、互联网/服务业新人",
+      "painPoints": [
+        "工资到账后总是留不下钱",
+        "想开始理财，但不懂术语、怕踩坑",
+        "不想下载复杂理财 App，也不想天天盯"
+      ],
+      "infoHabits": [
+        "微信内完成大部分日常信息获取",
+        "在小红书、朋友圈、朋友聊天中接触理财概念",
+        "更信任「普通人经验分享」而非专业销售口吻"
+      ],
+      "tone": "真实、生活化、低焦虑",
+      "safeExpressions": [
+        "工资到账后先留一笔出来，剩下的再花，我反而更能存住钱。",
+        "我更在意省心，不想多装一个 App，也不想每天盯。",
+        "先把闲钱和备用金安排好，比一上来追热点更重要。",
+        "理财这件事对我来说，第一步不是赚多少，而是先建立习惯。"
+      ],
+      "forbiddenExpressions": [
+        "教你快速翻倍",
+        "工资太少也能靠这个逆袭",
+        "随便放进去都能赚",
+        "闭眼买就行"
+      ],
+      "suitablePersonaIds": ["concept_teacher", "family_planner", "hotspot_observer"],
+      "applicableContentTypes": ["finance-tips", "personal-exp", "hotspot-analysis"],
+      "promptSummary": "写给刚工作、想存住工资、怕踩坑的职场白领；强调省心、微信内完成、先建习惯。",
+      "source": "理财通 Brief UI + KB_LCT_AUDIENCE_001"
+    },
+    {
+      "id": "mama",
+      "audienceTag": "mama",
+      "businessLine": "licaitong",
+      "knowledgeType": "target_reader",
+      "label": "宝妈",
+      "targetUserLabel": "宝妈",
+      "kbMatchName": "家庭稳健规划者",
+      "kbProfileId": "KB_LCT_AUDIENCE_002",
+      "hint": "家庭备用金、育儿场景",
+      "priority": "High",
+      "ageStage": "28-40 岁，已婚或承担家庭责任",
+      "occupation": "有家庭责任的职场人、家长、家庭财务主理人",
+      "painPoints": [
+        "家庭预算、教育金、备用金缺少清晰规划",
+        "不想高频操作，但又不想让钱长期闲置",
+        "家庭资产安排容易被日常支出打乱"
+      ],
+      "infoHabits": [
+        "关注长期规划、稳健理财、家庭预算类内容",
+        "更容易被「比例框架、分阶段安排、真实家庭案例」打动",
+        "倾向接受低焦虑、秩序化、安心感强的表达"
+      ],
+      "tone": "稳重温暖、有框架、低焦虑",
+      "safeExpressions": [
+        "家里用钱的地方很多，我更想先把底盘打稳。",
+        "比起追涨跌，我更关心这笔钱能不能长期按计划放着。",
+        "家庭理财最怕的不是赚得少，而是没规划。",
+        "能把教育金、备用金、长期存钱计划分开想，会更安心。"
+      ],
+      "forbiddenExpressions": [
+        "高收益又无风险",
+        "家庭资产这样配最赚",
+        "一把梭哈更有效率",
+        "不如直接上高波动产品"
+      ],
+      "suitablePersonaIds": ["family_planner", "concept_teacher"],
+      "applicableContentTypes": ["finance-tips", "personal-exp"],
+      "promptSummary": "写给承担家庭责任的宝妈/家庭主理人；强调备用金、教育金、长期稳健安排。",
+      "source": "理财通 Brief UI + KB_LCT_AUDIENCE_002"
+    },
+    {
+      "id": "student",
+      "audienceTag": "student",
+      "businessLine": "licaitong",
+      "knowledgeType": "target_reader",
+      "label": "学生",
+      "targetUserLabel": "学生",
+      "kbMatchName": "职场储蓄入门者",
+      "kbProfileId": "KB_LCT_AUDIENCE_001",
+      "hint": "零花钱、入门、校园语境",
+      "priority": "High",
+      "ageStage": "18-24 岁，大学生、实习生",
+      "occupation": "校园用户、理财零基础、零花钱管理",
+      "painPoints": [
+        "零花钱不多，怕乱花也想试试理财",
+        "术语多、教程感太强容易劝退",
+        "更信任同学/同龄人口吻而非机构说教"
+      ],
+      "infoHabits": [
+        "小红书、短视频、同学聊天是主要信息入口",
+        "愿意从校园、实习、零花钱场景进入",
+        "偏好第一人称日记、清单式安利"
+      ],
+      "tone": "活泼、亲切、零基础友好",
+      "safeExpressions": [
+        "零花钱也能先建立一个小习惯，不用一上来就很复杂。",
+        "我更愿意听同龄人怎么开始，而不是被一堆术语吓到。",
+        "先把概念搞懂，比急着跟热点更重要。",
+        "微信里能完成的话，对我这种学生党更友好。"
+      ],
+      "forbiddenExpressions": [
+        "学生也能快速翻倍",
+        "零花钱随便投都能赚",
+        "闭眼买就行",
+        "错过就亏了"
+      ],
+      "suitablePersonaIds": ["peer_diary", "concept_teacher"],
+      "applicableContentTypes": ["personal-exp", "finance-tips"],
+      "promptSummary": "写给大学生/实习生；零花钱、校园语境、同龄人信任感。",
+      "source": "理财通 Brief UI + 校园场景梳理"
+    }
+  ]
+}

@@ -1,0 +1,524 @@
+{
+  "version": "4.0",
+  "source": "docs/knowledgebase/content_template",
+  "items": [
+    {
+      "id": "user-05",
+      "templateId": "USER-05",
+      "name": "股票新手第一步：先建一个不乱的自选池",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "stock-tutorial",
+        "hotspot-analysis",
+        "tool-review"
+      ],
+      "suitableUserSegments": [
+        "投资小白",
+        "股票新手",
+        "微信内轻量入门型新股民"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：自选股太乱？这样整理",
+        "P2: 误区：自选股不是买入清单",
+        "P3: 分类 1：长期关注标的",
+        "P4: 分类 2：短期事件观察",
+        "P5: 分类 3：已持仓标的",
+        "P6: 分类 4：学习研究标的",
+        "P7: 总结：每只股票都要有观察理由"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "股票新手第一步：先建一个不乱的自选池"
+      ],
+      "coverTextPatterns": [
+        "自选股太乱？这样整理"
+      ],
+      "interactionGuidePatterns": [
+        "收藏后可以整理一次自己的自选股。"
+      ],
+      "bodyCopy": [
+        "自选股的作用是观察，不是提醒你马上买。",
+        "加入自选前，最好写一句理由：为什么关注它？",
+        "看盘时要结合行情、公告、资讯和风险信息，不要只看涨跌幅。"
+      ],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 80,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-01",
+      "templateId": "PRODUCT-01",
+      "name": "短期闲钱怎么管理？先看这 4 点",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：短期闲钱先看流动性",
+        "P2: 适合什么钱：短期不用但可能随时要用的钱",
+        "P3: 看什么 1：风险等级",
+        "P4: 看什么 2：赎回到账时间",
+        "P5: 看什么 3：收益波动",
+        "P6: 看什么 4：单日限额和规则",
+        "P7: 风险提示：不等于保本，不承诺收益"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "短期闲钱怎么管理？先看这 4 点"
+      ],
+      "coverTextPatterns": [
+        "短期闲钱先看流动性"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，下次放备用金前先对照看。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-02",
+      "templateId": "PRODUCT-02",
+      "name": "债券基金也会跌？新手先看懂这 4 件事",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：债基不是完全没风险",
+        "P2: 债基是什么：主要投资债券相关资产",
+        "P3: 为什么会波动：利率、信用、市场情绪",
+        "P4: 短债 vs 中长债：期限不同，波动不同",
+        "P5: 买前看什么：风险等级、回撤、持有期、费率",
+        "P6: 适合谁：能接受小幅波动、追求相对稳健的人",
+        "P7: 风险提示：净值可能波动，历史表现不代表未来"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "债券基金也会跌？新手先看懂这 4 件事"
+      ],
+      "coverTextPatterns": [
+        "债基不是完全没风险"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，别再把债基当成存款看。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-03",
+      "templateId": "PRODUCT-03",
+      "name": "固收+ 到底“+”了什么？新手买前要看懂",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：固收+，重点看“+”",
+        "P2: 基础解释：固收部分通常偏债券资产",
+        "P3: “+”的来源：股票、转债、打新、衍生策略等",
+        "P4: 风险变化：“+”越多，波动可能越大",
+        "P5: 买前看：权益仓位、最大回撤、持有期",
+        "P6: 适合谁：能接受一定波动的稳健型用户",
+        "P7: 风险提示：不是保本产品"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "固收+ 到底“+”了什么？新手买前要看懂"
+      ],
+      "coverTextPatterns": [
+        "固收+，重点看“+”"
+      ],
+      "interactionGuidePatterns": [
+        "下次看到固收+，先问一句：“它到底加了什么？”"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-04",
+      "templateId": "PRODUCT-04",
+      "name": "指数基金入门：先分清宽基和行业",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：指数基金先看跟踪什么",
+        "P2: 什么是指数基金：跟踪一篮子股票指数",
+        "P3: 宽基指数：覆盖范围更广",
+        "P4: 行业指数：集中在某个行业，波动更明显",
+        "P5: 买前看：指数规则、行业集中度、估值、费率",
+        "P6: 定投提醒：定投不是保证盈利，需要长期纪律",
+        "P7: 风险提示：市场波动可能导致亏损"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "指数基金入门：先分清宽基和行业"
+      ],
+      "coverTextPatterns": [
+        "指数基金先看跟踪什么"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，买指数基金前先查它跟踪什么。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-05",
+      "templateId": "PRODUCT-05",
+      "name": "主动基金别只看排名，买前先看这 5 点",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：主动基金买前看 5 点",
+        "P2: 基金经理：任职时间和风格稳定性",
+        "P3: 持仓方向：重仓行业是否集中",
+        "P4: 历史回撤：跌的时候你能不能承受",
+        "P5: 业绩周期：短期排名不能代表长期能力",
+        "P6: 费用和持有期：不要频繁申赎",
+        "P7: 风险提示：权益基金波动较大"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "主动基金别只看排名，买前先看这 5 点"
+      ],
+      "coverTextPatterns": [
+        "主动基金买前看 5 点"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，下次别只按排行榜买基金。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-06",
+      "templateId": "PRODUCT-06",
+      "name": "基金定投不是无脑买，新手先看这 4 点",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：定投不是稳赚",
+        "P2: 定投是什么：固定时间投入固定金额",
+        "P3: 适合什么钱：长期不用的闲钱",
+        "P4: 适合什么产品：有波动、有长期逻辑的资产",
+        "P5: 常见误区：跌了停、涨了追、频繁换",
+        "P6: 定投纪律：周期、金额、止盈规则",
+        "P7: 风险提示：定投不保证盈利"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "基金定投不是无脑买，新手先看这 4 点"
+      ],
+      "coverTextPatterns": [
+        "定投不是稳赚"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，开始定投前先把这 4 点写下来。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-07",
+      "templateId": "PRODUCT-07",
+      "name": "股票新手别急着买，先学会看这 3 类信息",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：股票新手先看 3 类信息",
+        "P2: 第一类：公司公告，优先级最高",
+        "P3: 第二类：财报和经营数据",
+        "P4: 第三类：市场新闻和行业变化",
+        "P5: 工具使用：自选股、提醒、资讯、风险信息",
+        "P6: 行动建议：先观察、记录、复盘，不冲动交易",
+        "P7: 风险提示：不构成个股推荐"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "股票新手别急着买，先学会看这 3 类信息"
+      ],
+      "coverTextPatterns": [
+        "股票新手先看 3 类信息"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，新手看盘时先按这 3 类信息查。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-08",
+      "templateId": "PRODUCT-08",
+      "name": "保险不是理财，新手先搞懂这 4 类",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：保险先看保障，不是收益",
+        "P2: 医疗险：解决医疗费用报销问题",
+        "P3: 重疾险：应对重大疾病后的收入损失",
+        "P4: 意外险：应对意外伤害风险",
+        "P5: 寿险：承担家庭责任的人优先考虑",
+        "P6: 买前看：保障责任、免责条款、等待期、续保",
+        "P7: 风险提示：具体责任以保险合同为准"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "保险不是理财，新手先搞懂这 4 类"
+      ],
+      "coverTextPatterns": [
+        "保险先看保障，不是收益"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，买保险前先看保障责任，不要只看宣传语。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    },
+    {
+      "id": "product-09",
+      "templateId": "PRODUCT-09",
+      "name": "年轻人要不要考虑养老规划？先看这 4 点",
+      "businessLine": "all",
+      "bestForContentTypes": [
+        "finance-tips",
+        "stock-tutorial",
+        "hotspot-analysis"
+      ],
+      "suitableUserSegments": [
+        "投资小白"
+      ],
+      "emotionalHook": [],
+      "bodyStructure": [
+        "P1: 封面：养老规划不是老了才开始",
+        "P2: 为什么要提前规划：时间越长，压力越分散",
+        "P3: 看期限：这笔钱多久不能动",
+        "P4: 看风险：能不能承受长期波动",
+        "P5: 看规则：税优、领取、赎回限制",
+        "P6: 适合谁：有长期闲钱和稳定收入的人",
+        "P7: 风险提示：不适合短期资金"
+      ],
+      "recommendedInsertPosition": [
+        "方案段落",
+        "工具承接页",
+        "结尾风险提示前"
+      ],
+      "titlePatterns": [
+        "年轻人要不要考虑养老规划？先看这 4 点"
+      ],
+      "coverTextPatterns": [
+        "养老规划不是老了才开始"
+      ],
+      "interactionGuidePatterns": [
+        "收藏，先判断这笔钱是不是真的长期不用。"
+      ],
+      "bodyCopy": [],
+      "riskNotes": [
+        "不得出现收益承诺",
+        "不得诱导具体买卖",
+        "必须包含风险提示"
+      ],
+      "priority": 70,
+      "knowledgeLayer": "L3_content_pattern",
+      "applicablePersonaIds": [],
+      "applicableAudienceIds": [],
+      "scenarioTags": [],
+      "campaignTags": [],
+      "accountTierTags": []
+    }
+  ],
+  "knowledgeLayer": "L3_content_pattern",
+  "migratedFrom": "ai-knowledge-base-v3.3"
+}

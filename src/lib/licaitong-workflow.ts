@@ -33,134 +33,178 @@ export interface LicaitongPersonaOption {
   audienceTags: LicaitongAudienceTag[];
   audienceLabel: string;
   suitableScenes: LicaitongCreationScene[];
+  requiresHotspotMaterials?: boolean;
+  uiBadge?: string;
 }
 
-export const LICAITONG_OFFERS: LicaitongOfferOption[] = [
-  {
-    id: "fixed-income-plus",
-    label: "固收+",
-    description: "本期主推。严选专区、体验金、长期专区、灵活申赎、AI 辅助等卖点。",
-    enabled: true,
-    badge: "本期主推",
-  },
-  {
-    id: "lingqiantong",
-    label: "零钱通",
-    description: "入口预留，知识库建设中。",
-    enabled: false,
-    badge: "敬请期待",
-  },
-  {
-    id: "weizhitou",
-    label: "微智投",
-    description: "入口预留，知识库建设中。",
-    enabled: false,
-    badge: "敬请期待",
-  },
-];
+export interface LicaitongAudienceOption {
+  id: LicaitongAudienceTag;
+  label: string;
+  hint: string;
+  targetUserLabel: string;
+}
 
-export const LICAITONG_CREATION_SCENES: LicaitongCreationSceneOption[] = [
-  {
-    id: "newcomer-guide",
-    label: "新人操作指引",
-    description: "第一步点哪里、先看什么、怎么不踩坑。",
-    contentType: "finance-tips",
-  },
-  {
-    id: "review-diary",
-    label: "真实复盘日记",
-    description: "第一人称记录实际操作与感受，强调人感。",
-    contentType: "personal-exp",
-  },
-  {
-    id: "pain-story",
-    label: "痛点共鸣故事",
-    description: "选择困难、怕锁死、不敢试等痛点切入。",
-    contentType: "personal-exp",
-  },
-  {
-    id: "dry-goods-list",
-    label: "干货组合推荐",
-    description: "清单/框架/几步走，信息密度高但克制。",
-    contentType: "finance-tips",
-  },
-];
+export interface LicaitongWorkflowConfig {
+  offers: LicaitongOfferOption[];
+  creationScenes: LicaitongCreationSceneOption[];
+  audiences: LicaitongAudienceOption[];
+  personas: LicaitongPersonaOption[];
+  fplusDefaultFeatures: Record<LicaitongCreationScene, string[]>;
+  fplusFeatureLimit: number;
+  fplusFeatureUiSummaries: Record<string, string>;
+  defaultBrief: {
+    offerId: LicaitongOfferId;
+    creationScene: LicaitongCreationScene;
+    audienceTag: LicaitongAudienceTag;
+    topic: string;
+    campaignGoal: string;
+  };
+}
 
-/** 固收+ 主推功能默认勾选（按创作场景） */
-export const FPLUS_DEFAULT_FEATURES: Record<LicaitongCreationScene, string[]> = {
-  "newcomer-guide": ["fplus_virtual_trial", "fplus_curated_zone"],
-  "review-diary": ["fplus_virtual_trial"],
-  "pain-story": ["fplus_curated_zone", "fplus_flexible_redeem"],
-  "dry-goods-list": ["fplus_long_term_zone", "fplus_ai_assist"],
+/** KB 未加载时的兜底配置（与 v5 workflow-config + L4 对齐） */
+export const FALLBACK_LICAITONG_WORKFLOW: LicaitongWorkflowConfig = {
+  offers: [
+    {
+      id: "fixed-income-plus",
+      label: "固收+",
+      description: "本期主推。严选专区、体验金、长期专区、灵活申赎、AI 辅助等卖点。",
+      enabled: true,
+      badge: "本期主推",
+    },
+    {
+      id: "lingqiantong",
+      label: "零钱通",
+      description: "入口预留，知识库建设中。",
+      enabled: false,
+      badge: "敬请期待",
+    },
+    {
+      id: "weizhitou",
+      label: "微智投",
+      description: "入口预留，知识库建设中。",
+      enabled: false,
+      badge: "敬请期待",
+    },
+  ],
+  creationScenes: [
+    {
+      id: "newcomer-guide",
+      label: "新人操作指引",
+      description: "第一步点哪里、先看什么、怎么不踩坑。",
+      contentType: "finance-tips",
+    },
+    {
+      id: "review-diary",
+      label: "真实复盘日记",
+      description: "第一人称记录实际操作与感受，强调人感。",
+      contentType: "personal-exp",
+    },
+    {
+      id: "pain-story",
+      label: "痛点共鸣故事",
+      description: "选择困难、怕锁死、不敢试等痛点切入。",
+      contentType: "personal-exp",
+    },
+    {
+      id: "dry-goods-list",
+      label: "干货组合推荐",
+      description: "清单/框架/几步走，信息密度高但克制。",
+      contentType: "finance-tips",
+    },
+  ],
+  audiences: [
+    { id: "student", label: "学生", hint: "零花钱、入门、校园语境", targetUserLabel: "学生" },
+    { id: "mama", label: "宝妈", hint: "家庭备用金、育儿场景", targetUserLabel: "宝妈" },
+    { id: "white-collar", label: "白领", hint: "工资理财、职场节奏", targetUserLabel: "白领" },
+  ],
+  personas: [
+    {
+      id: "concept_teacher",
+      label: "理财教学博主",
+      description: "概念讲清楚，先风险后收益，教程感适中。",
+      audienceTags: ["white-collar", "student"],
+      audienceLabel: "常写给白领 / 新手",
+      suitableScenes: ["newcomer-guide", "pain-story", "dry-goods-list"],
+    },
+    {
+      id: "family_planner",
+      label: "家庭 CFO",
+      description: "家庭账本、备用金、长期安排视角。",
+      audienceTags: ["mama", "white-collar"],
+      audienceLabel: "常写给宝妈 / 家庭",
+      suitableScenes: ["review-diary", "pain-story", "dry-goods-list"],
+    },
+    {
+      id: "peer_diary",
+      label: "校园探索达人",
+      description: "学生/年轻人第一人称日记，生活化、低教程感。",
+      variant: "campus",
+      audienceTags: ["student"],
+      audienceLabel: "常写给学生",
+      suitableScenes: ["review-diary", "pain-story"],
+    },
+    {
+      id: "hotspot_observer",
+      label: "市场观察员",
+      description: "有热点素材时，公开信息整理与降维解读。",
+      audienceTags: ["white-collar"],
+      audienceLabel: "常写给白领（需热点素材）",
+      suitableScenes: ["dry-goods-list"],
+      requiresHotspotMaterials: true,
+    },
+  ],
+  fplusDefaultFeatures: {
+    "newcomer-guide": ["fplus_virtual_trial", "fplus_curated_zone"],
+    "review-diary": ["fplus_virtual_trial"],
+    "pain-story": ["fplus_curated_zone", "fplus_flexible_redeem"],
+    "dry-goods-list": ["fplus_long_term_zone", "fplus_ai_assist"],
+  },
+  fplusFeatureLimit: 2,
+  fplusFeatureUiSummaries: {
+    fplus_curated_zone: "严选专区，缩小固收+比较范围，不构成荐基。",
+    fplus_virtual_trial: "虚拟理财金体验，熟悉流程；规则以活动页为准。",
+    fplus_long_term_zone: "长期理财专区，看公开运作信息，不代表未来表现。",
+    fplus_flexible_redeem: "部分产品申赎更灵活，买前先看清持有期限。",
+    fplus_ai_assist: "AI 帮整理公开产品信息，不构成投资建议。",
+  },
+  defaultBrief: {
+    offerId: "fixed-income-plus",
+    creationScene: "pain-story",
+    audienceTag: "white-collar",
+    topic: "选固收+产品太纠结？我先在理财通里把比较范围缩小",
+    campaignGoal: "内容营销：固收+认知与申购引导",
+  },
 };
 
-export const FPLUS_FEATURE_LIMIT = 2;
-
-/** 左栏展示用短简介（1–2 行），完整文案仍在 KB 供生成注入 */
-export const FPLUS_FEATURE_UI_SUMMARIES: Record<string, string> = {
-  fplus_curated_zone: "严选专区，缩小固收+比较范围，不构成荐基。",
-  fplus_virtual_trial: "虚拟理财金体验，熟悉流程；规则以活动页为准。",
-  fplus_long_term_zone: "长期理财专区，看公开运作信息，不代表未来表现。",
-  fplus_flexible_redeem: "部分产品申赎更灵活，买前先看清持有期限。",
-  fplus_ai_assist: "AI 帮整理公开产品信息，不构成投资建议。",
-};
-
-export const LICAITONG_PERSONAS: LicaitongPersonaOption[] = [
-  {
-    id: "concept_teacher",
-    label: "理财教学博主",
-    description: "概念讲清楚，先风险后收益，教程感适中。",
-    audienceTags: ["white-collar", "student"],
-    audienceLabel: "常写给白领 / 新手",
-    suitableScenes: ["newcomer-guide", "pain-story", "dry-goods-list"],
-  },
-  {
-    id: "family_planner",
-    label: "家庭 CFO",
-    description: "家庭账本、备用金、长期安排视角。",
-    audienceTags: ["mama", "white-collar"],
-    audienceLabel: "常写给宝妈 / 家庭",
-    suitableScenes: ["review-diary", "pain-story", "dry-goods-list"],
-  },
-  {
-    id: "peer_diary",
-    label: "校园探索达人",
-    description: "学生/年轻人第一人称日记，生活化、低教程感。",
-    variant: "campus",
-    audienceTags: ["student"],
-    audienceLabel: "常写给学生",
-    suitableScenes: ["review-diary", "pain-story"],
-  },
-  {
-    id: "hotspot_observer",
-    label: "市场观察员",
-    description: "有热点素材时，公开信息整理与降维解读。",
-    audienceTags: ["white-collar"],
-    audienceLabel: "常写给白领（需热点素材）",
-    suitableScenes: ["dry-goods-list"],
-  },
-];
-
-const AUDIENCE_LABELS: Record<LicaitongAudienceTag, string> = {
-  student: "学生",
-  mama: "宝妈",
-  "white-collar": "白领",
-};
-
-export const LICAITONG_AUDIENCES: Array<{ id: LicaitongAudienceTag; label: string; hint: string }> = [
-  { id: "student", label: "学生", hint: "零花钱、入门、校园语境" },
-  { id: "mama", label: "宝妈", hint: "家庭备用金、育儿场景" },
-  { id: "white-collar", label: "白领", hint: "工资理财、职场节奏" },
-];
+/** @deprecated 请使用 workflowConfig.offers */
+export const LICAITONG_OFFERS = FALLBACK_LICAITONG_WORKFLOW.offers;
+/** @deprecated 请使用 workflowConfig.creationScenes */
+export const LICAITONG_CREATION_SCENES = FALLBACK_LICAITONG_WORKFLOW.creationScenes;
+/** @deprecated 请使用 workflowConfig.personas */
+export const LICAITONG_PERSONAS = FALLBACK_LICAITONG_WORKFLOW.personas;
+/** @deprecated 请使用 workflowConfig.audiences */
+export const LICAITONG_AUDIENCES = FALLBACK_LICAITONG_WORKFLOW.audiences;
+/** @deprecated 请使用 workflowConfig.fplusDefaultFeatures */
+export const FPLUS_DEFAULT_FEATURES = FALLBACK_LICAITONG_WORKFLOW.fplusDefaultFeatures;
+/** @deprecated 请使用 workflowConfig.fplusFeatureLimit */
+export const FPLUS_FEATURE_LIMIT = FALLBACK_LICAITONG_WORKFLOW.fplusFeatureLimit;
+/** @deprecated 请使用 workflowConfig.fplusFeatureUiSummaries */
+export const FPLUS_FEATURE_UI_SUMMARIES = FALLBACK_LICAITONG_WORKFLOW.fplusFeatureUiSummaries;
 
 export type PersonaRecommendation = "both" | "scene" | "audience" | null;
+
+function resolveConfig(config?: LicaitongWorkflowConfig) {
+  return config || FALLBACK_LICAITONG_WORKFLOW;
+}
 
 export function getPersonaRecommendation(
   personaId: string,
   scene: LicaitongCreationScene,
   audience: LicaitongAudienceTag,
+  config?: LicaitongWorkflowConfig,
 ): PersonaRecommendation {
-  const persona = LICAITONG_PERSONAS.find((item) => item.id === personaId);
+  const cfg = resolveConfig(config);
+  const persona = cfg.personas.find((item) => item.id === personaId);
   if (!persona) return null;
   const sceneMatch = persona.suitableScenes.includes(scene);
   const audienceMatch = persona.audienceTags.includes(audience);
@@ -188,56 +232,78 @@ function scorePersonaForUI(
 export function getPersonasForSceneAndAudience(
   scene: LicaitongCreationScene,
   audience?: LicaitongAudienceTag,
+  config?: LicaitongWorkflowConfig,
 ): LicaitongPersonaOption[] {
-  return getPersonasForLicaitongUI(scene, audience);
+  return getPersonasForLicaitongUI(scene, audience, config);
 }
 
-/** 展示全部人设；按场景+读者匹配度排序，不隐藏任何选项 */
 export function getPersonasForLicaitongUI(
   scene?: LicaitongCreationScene,
   audience?: LicaitongAudienceTag,
+  config?: LicaitongWorkflowConfig,
 ): LicaitongPersonaOption[] {
-  if (!scene || !audience) return [...LICAITONG_PERSONAS];
-  return [...LICAITONG_PERSONAS].sort(
+  const cfg = resolveConfig(config);
+  if (!scene || !audience) return [...cfg.personas];
+  return [...cfg.personas].sort(
     (a, b) => scorePersonaForUI(b, scene, audience) - scorePersonaForUI(a, scene, audience),
   );
 }
 
-export function getLicaitongOffer(id?: LicaitongOfferId) {
-  return LICAITONG_OFFERS.find((item) => item.id === id) || LICAITONG_OFFERS[0];
+export function getLicaitongOffer(id?: LicaitongOfferId, config?: LicaitongWorkflowConfig) {
+  const cfg = resolveConfig(config);
+  return cfg.offers.find((item) => item.id === id) || cfg.offers[0];
 }
 
-export function getLicaitongScene(id?: LicaitongCreationScene) {
-  return LICAITONG_CREATION_SCENES.find((item) => item.id === id) || LICAITONG_CREATION_SCENES[2];
+export function getLicaitongScene(id?: LicaitongCreationScene, config?: LicaitongWorkflowConfig) {
+  const cfg = resolveConfig(config);
+  return cfg.creationScenes.find((item) => item.id === id) || cfg.creationScenes[2] || cfg.creationScenes[0];
 }
 
-export function creationSceneToContentType(scene?: LicaitongCreationScene): ContentType {
-  return getLicaitongScene(scene).contentType;
+export function creationSceneToContentType(
+  scene?: LicaitongCreationScene,
+  config?: LicaitongWorkflowConfig,
+): ContentType {
+  return getLicaitongScene(scene, config).contentType;
 }
 
-export function getDefaultFeatureIdsForScene(scene: LicaitongCreationScene): string[] {
-  return (FPLUS_DEFAULT_FEATURES[scene] || []).slice(0, FPLUS_FEATURE_LIMIT);
+export function getDefaultFeatureIdsForScene(
+  scene: LicaitongCreationScene,
+  config?: LicaitongWorkflowConfig,
+): string[] {
+  const cfg = resolveConfig(config);
+  return (cfg.fplusDefaultFeatures[scene] || []).slice(0, cfg.fplusFeatureLimit);
 }
 
-export function getPersonasForScene(scene: LicaitongCreationScene): LicaitongPersonaOption[] {
-  return LICAITONG_PERSONAS.filter((item) => item.suitableScenes.includes(scene));
+export function getPersonasForScene(
+  scene: LicaitongCreationScene,
+  config?: LicaitongWorkflowConfig,
+): LicaitongPersonaOption[] {
+  const cfg = resolveConfig(config);
+  return cfg.personas.filter((item) => item.suitableScenes.includes(scene));
 }
 
-export function getDefaultPersonaForScene(scene: LicaitongCreationScene): LicaitongPersonaOption {
-  const list = getPersonasForScene(scene);
-  return list[0] || LICAITONG_PERSONAS[0];
+export function getDefaultPersonaForScene(
+  scene: LicaitongCreationScene,
+  config?: LicaitongWorkflowConfig,
+): LicaitongPersonaOption {
+  const cfg = resolveConfig(config);
+  const list = getPersonasForScene(scene, cfg);
+  return list[0] || cfg.personas[0];
 }
 
-export function audienceTagToTargetUser(tag: LicaitongAudienceTag): string {
-  return AUDIENCE_LABELS[tag];
+export function audienceTagToTargetUser(tag: LicaitongAudienceTag, config?: LicaitongWorkflowConfig): string {
+  const cfg = resolveConfig(config);
+  const hit = cfg.audiences.find((item) => item.id === tag);
+  return hit?.targetUserLabel || hit?.label || tag;
 }
 
-export function inferAudienceFromPersona(personaId?: string): LicaitongAudienceTag {
-  const persona = LICAITONG_PERSONAS.find((item) => item.id === personaId);
+export function inferAudienceFromPersona(personaId?: string, config?: LicaitongWorkflowConfig): LicaitongAudienceTag {
+  const cfg = resolveConfig(config);
+  const persona = cfg.personas.find((item) => item.id === personaId);
   return persona?.audienceTags[0] || "white-collar";
 }
 
-export function buildLicaitongDefaults(): Pick<
+export function buildLicaitongDefaults(config?: LicaitongWorkflowConfig): Pick<
   BriefInput,
   | "offerId"
   | "creationScene"
@@ -251,21 +317,23 @@ export function buildLicaitongDefaults(): Pick<
   | "topic"
   | "campaignGoal"
 > {
-  const scene: LicaitongCreationScene = "pain-story";
-  const persona = getDefaultPersonaForScene(scene);
-  const featureIds = getDefaultFeatureIdsForScene(scene);
+  const cfg = resolveConfig(config);
+  const scene = cfg.defaultBrief.creationScene;
+  const persona = getDefaultPersonaForScene(scene, cfg);
+  const featureIds = getDefaultFeatureIdsForScene(scene, cfg);
+  const audienceTag = cfg.defaultBrief.audienceTag;
   return {
-    offerId: "fixed-income-plus",
+    offerId: cfg.defaultBrief.offerId,
     creationScene: scene,
-    audienceTag: "white-collar",
-    contentType: creationSceneToContentType(scene),
-    targetUser: audienceTagToTargetUser("white-collar"),
+    audienceTag,
+    contentType: creationSceneToContentType(scene, cfg),
+    targetUser: audienceTagToTargetUser(audienceTag, cfg),
     personaId: persona.id,
     personaVariant: persona.variant,
     selectedFeatureIds: featureIds,
     selectedFeatureNames: [],
-    topic: "选固收+产品太纠结？我先在理财通里把比较范围缩小",
-    campaignGoal: "内容营销：固收+认知与申购引导",
+    topic: cfg.defaultBrief.topic,
+    campaignGoal: cfg.defaultBrief.campaignGoal,
   };
 }
 
@@ -273,22 +341,23 @@ export function applyLicaitongSceneChange(
   brief: BriefInput,
   scene: LicaitongCreationScene,
   _featureNameById: Record<string, string>,
+  config?: LicaitongWorkflowConfig,
 ): BriefInput {
   return {
     ...brief,
     creationScene: scene,
-    contentType: creationSceneToContentType(scene),
-    // Offer / 主推功能 / 读者 / 人设：均不因换场景被动改写
+    contentType: creationSceneToContentType(scene, config),
   };
 }
 
-/** 仅用户点击 Offer 时调用；可带入该场景下的默认主推功能 */
 export function applyLicaitongOfferChange(
   brief: BriefInput,
   offerId: LicaitongOfferId,
   featureNameById: Record<string, string>,
+  config?: LicaitongWorkflowConfig,
 ): BriefInput {
-  const scene = brief.creationScene || "pain-story";
+  const cfg = resolveConfig(config);
+  const scene = brief.creationScene || cfg.defaultBrief.creationScene;
   if (offerId !== "fixed-income-plus") {
     return {
       ...brief,
@@ -297,7 +366,7 @@ export function applyLicaitongOfferChange(
       selectedFeatureNames: [],
     };
   }
-  const featureIds = getDefaultFeatureIdsForScene(scene);
+  const featureIds = getDefaultFeatureIdsForScene(scene, cfg);
   return {
     ...brief,
     offerId,
@@ -306,22 +375,34 @@ export function applyLicaitongOfferChange(
   };
 }
 
-export function applyLicaitongAudienceChange(brief: BriefInput, audienceTag: LicaitongAudienceTag): BriefInput {
+export function applyLicaitongAudienceChange(
+  brief: BriefInput,
+  audienceTag: LicaitongAudienceTag,
+  config?: LicaitongWorkflowConfig,
+): BriefInput {
   return {
     ...brief,
     audienceTag,
-    targetUser: audienceTagToTargetUser(audienceTag),
-    // 读者与人设弱关联：不联动修改 personaId
+    targetUser: audienceTagToTargetUser(audienceTag, config),
   };
 }
 
-export function applyLicaitongPersonaChange(brief: BriefInput, personaId: string): BriefInput {
-  const persona = LICAITONG_PERSONAS.find((item) => item.id === personaId);
+export function applyLicaitongPersonaChange(
+  brief: BriefInput,
+  personaId: string,
+  config?: LicaitongWorkflowConfig,
+): BriefInput {
+  const cfg = resolveConfig(config);
+  const persona = cfg.personas.find((item) => item.id === personaId);
   if (!persona) return brief;
   return {
     ...brief,
     personaId: persona.id,
     personaVariant: persona.variant,
+    contentType:
+      persona.id === "hotspot_observer" || persona.requiresHotspotMaterials
+        ? "hotspot-analysis"
+        : creationSceneToContentType(brief.creationScene, cfg),
   };
 }
 
@@ -330,11 +411,13 @@ export function toggleLicaitongFeature(
   featureId: string,
   featureName: string,
   checked: boolean,
+  config?: LicaitongWorkflowConfig,
 ): BriefInput {
+  const limit = resolveConfig(config).fplusFeatureLimit;
   const ids = new Set(brief.selectedFeatureIds);
   const names = new Set(brief.selectedFeatureNames);
   if (checked) {
-    if (ids.size >= FPLUS_FEATURE_LIMIT && !ids.has(featureId)) {
+    if (ids.size >= limit && !ids.has(featureId)) {
       return brief;
     }
     ids.add(featureId);
@@ -432,23 +515,22 @@ export function applyGenerationModeChange(brief: BriefInput, mode: GenerationMod
   };
 }
 
-const EMBED_LEVEL_LABELS: Record<string, string> = {
-  none: "无",
-  low: "低",
-  medium: "中",
-  high: "高",
-};
+import { getEmbedLevelLabel } from "@/lib/embed-level";
 
 export interface DraftArchiveField {
   label: string;
   value: string;
 }
 
-/** 草稿归档用 Brief 摘要（保存时快照，与第二步实时 Brief 侧栏不同） */
-export function buildDraftArchiveFields(snapshot: BriefInput, angleName: string): DraftArchiveField[] {
-  const offer = getLicaitongOffer(snapshot.offerId);
-  const scene = getLicaitongScene(snapshot.creationScene);
-  const persona = LICAITONG_PERSONAS.find((item) => item.id === snapshot.personaId);
+export function buildDraftArchiveFields(
+  snapshot: BriefInput,
+  angleName: string,
+  config?: LicaitongWorkflowConfig,
+): DraftArchiveField[] {
+  const cfg = resolveConfig(config);
+  const offer = getLicaitongOffer(snapshot.offerId, cfg);
+  const scene = getLicaitongScene(snapshot.creationScene, cfg);
+  const persona = cfg.personas.find((item) => item.id === snapshot.personaId);
   const lengthLabel =
     getContentLengthOptions(snapshot.generationMode).find((item) => item.value === snapshot.contentLength)?.label || "-";
   const materialCount = snapshot.materials?.length ?? 0;
@@ -465,7 +547,7 @@ export function buildDraftArchiveFields(snapshot: BriefInput, angleName: string)
     },
     { label: "内容形式", value: snapshot.generationMode === "video-script" ? "视频脚本" : "图文内容" },
     { label: getContentLengthFieldLabel(snapshot.generationMode), value: lengthLabel },
-    { label: "植入强度", value: EMBED_LEVEL_LABELS[snapshot.embedLevel] || snapshot.embedLevel },
+    { label: "产品出现方式", value: getEmbedLevelLabel(snapshot.embedLevel) },
     { label: "素材", value: `${materialCount} 条` },
     ...(snapshot.topic ? [{ label: "主题", value: snapshot.topic }] : []),
   ];

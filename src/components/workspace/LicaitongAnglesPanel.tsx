@@ -12,6 +12,7 @@ import {
   getContentLengthFieldLabel,
   getContentLengthOptions,
 } from "@/lib/licaitong-workflow";
+import { EMBED_LEVEL_OPTIONS } from "@/lib/embed-level";
 import { cn } from "@/lib/utils";
 import type { BriefInput, CreativeAngle } from "@/lib/types";
 
@@ -127,35 +128,41 @@ export function LicaitongAnglesPanel({
       <div className="space-y-5 p-5 sm:p-6">
         <section className="rounded-xl border border-border/70 bg-muted/15 p-4">
           <SectionTitle step={1} title="生成参数" />
-          <div className="grid gap-4 sm:grid-cols-[120px_140px_minmax(0,1fr)] sm:items-end">
+          <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs">角度数量</Label>
-              <Input
-                type="number"
-                min={1}
-                max={5}
-                value={brief.generateCount}
-                onChange={(e) => onBriefChange({ generateCount: Number(e.target.value) || 1 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">植入强度</Label>
+              <Label className="text-xs">产品出现方式</Label>
               <Select
                 value={brief.embedLevel}
                 onChange={(e) => onBriefChange({ embedLevel: e.target.value as BriefInput["embedLevel"] })}
+                className="w-full"
               >
-                <option value="low">低</option>
-                <option value="medium">中</option>
-                <option value="high">高</option>
+                {EMBED_LEVEL_OPTIONS.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label} — {item.hint}
+                  </option>
+                ))}
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs">额外要求（选填）</Label>
-              <Input
-                value={brief.customRequirement || ""}
-                onChange={(e) => onBriefChange({ customRequirement: e.target.value })}
-                placeholder="例如：更像小红书日记，少教程感"
-              />
+            <div className="grid gap-4 sm:grid-cols-[minmax(120px,0.35fr)_minmax(0,1fr)] sm:items-end">
+              <div className="space-y-2">
+                <Label className="text-xs">角度数量</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={brief.generateCount}
+                  onChange={(e) => onBriefChange({ generateCount: Number(e.target.value) || 1 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs">额外要求（选填）</Label>
+                <Input
+                  value={brief.customRequirement || ""}
+                  onChange={(e) => onBriefChange({ customRequirement: e.target.value })}
+                  placeholder="例如：更像小红书日记，少教程感"
+                  className="w-full"
+                />
+              </div>
             </div>
           </div>
           <div className="mt-4 flex justify-end">

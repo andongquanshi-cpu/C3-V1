@@ -1,15 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Archive, CheckCircle2, ImageIcon, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Archive, CheckCircle2, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LicaitongBriefPanel } from "@/components/workspace/LicaitongBriefPanel";
 import { LicaitongAnglesPanel } from "@/components/workspace/LicaitongAnglesPanel";
 import { BriefSummaryCard } from "@/components/workspace/BriefSummaryCard";
 import { DraftBoxPanel } from "@/components/workspace/DraftBoxPanel";
+import { ImagePromptLab } from "@/components/workspace/ImagePromptLab";
 import { WorkflowStepper } from "@/components/workspace/WorkflowStepper";
-import { buildLicaitongDefaults, normalizeContentLength } from "@/lib/licaitong-workflow";
+import { buildLicaitongDefaults, FALLBACK_LICAITONG_WORKFLOW, normalizeContentLength } from "@/lib/licaitong-workflow";
+import { validateGeneratedBody } from "@/lib/business-line-prompt";
+import {
+  buildHotspotSearchQuery,
+  canProceedFromBrief,
+  getSelectedMaterials,
+  type HotspotTabId,
+} from "@/lib/hotspot-workflow";
+import { HOTSPOT_TAB_DOMAINS, normalizeHotspotFromTavily, buildHotspotSearchFallbackQuery } from "@/lib/hotspot-display";
 import { parseLLMJson, safeJsonParse, cn } from "@/lib/utils";
 import {
   buildAnglesConfigFingerprint,
@@ -51,7 +60,7 @@ const DEFAULT_BRIEF: BriefInput = {
   ...buildLicaitongDefaults(),
   generationMode: "image-text",
   bloggerLevel: "middle",
-  embedLevel: "medium",
+  embedLevel: "low",
   contentLength: "200-500",
   generateCount: 2,
   customRequirement: "",
@@ -62,6 +71,7 @@ interface ApiStatus {
   ready: boolean;
   text: boolean;
   image: boolean;
+  imageModel?: string;
   hotspot: boolean;
   model?: string;
 }
@@ -74,6 +84,10 @@ export function LicaitongWorkbench() {
   const [apiStatus, setApiStatus] = useState<ApiStatus>({ ready: false, text: false, image: false, hotspot: false });
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialDraft, setMaterialDraft] = useState("");
+  const [hotspotPanelOpen, setHotspotPanelOpen] = useState(false);
+  const [activeHotspotTab, setActiveHotspotTab] = useState<HotspotTabId>("finance");
+  const [customHotspotQuery, setCustomHotspotQuery] = useState("");
+  const [hotspotCandidates, setHotspotCandidates] = useState<Material[]>([]);
   const [angles, setAngles] = useState<CreativeAngle[]>([]);
   const [selectedAngleIds, setSelectedAngleIds] = useState<string[]>([]);
   const [results, setResults] = useState<GeneratedContent[]>([]);
@@ -83,9 +97,7 @@ export function LicaitongWorkbench() {
   const [isSearchingHotspot, setIsSearchingHotspot] = useState(false);
   const [isGeneratingAngles, setIsGeneratingAngles] = useState(false);
   const [isGeneratingContent, setIsGeneratingContent] = useState(false);
-  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   const [anglesGeneratedForKey, setAnglesGeneratedForKey] = useState<string | null>(null);
-  const [imageResult, setImageResult] = useState("");
 
   useEffect(() => {
     const stored = safeJsonParse<Partial<BriefInput>>(localStorage.getItem(STORAGE_KEYS.brief) || "", {});
@@ -138,6 +150,10 @@ export function LicaitongWorkbench() {
     () => (knowledge?.features || []).filter((f) => f.offerId === "fixed-income-plus"),
     [knowledge],
   );
+  const workflowConfig = useMemo(
+    () => knowledge?.licaitongWorkflow ?? FALLBACK_LICAITONG_WORKFLOW,
+    [knowledge],
+  );
   const selectedAngles = useMemo(
     () => angles.filter((a) => selectedAngleIds.includes(a.angleId)),
     [angles, selectedAngleIds],
@@ -150,6 +166,11 @@ export function LicaitongWorkbench() {
     () => buildAnglesConfigFingerprint(brief, materials),
     [brief, materials],
   );
+  const selectedMaterials = useMemo(() => getSelectedMaterials(materials), [materials]);
+  const canContinueFromBrief = useMemo(
+    () => canProceedFromBrief(brief.personaId, materials),
+    [brief.personaId, materials],
+  );
   const anglesUpToDate = anglesGeneratedForKey === anglesConfigKey && angles.length > 0;
 
   useEffect(() => {
@@ -161,11 +182,27 @@ export function LicaitongWorkbench() {
     }
   }, [anglesConfigKey, anglesGeneratedForKey, isGeneratingAngles]);
 
+  async function refreshApiStatus() {
+    try {
+      const response = await fetch("/api/config/status");
+      const data = (await response.json()) as ApiStatus;
+      setApiStatus(data);
+      return data;
+    } catch {
+      return apiStatus;
+    }
+  }
+
+  useEffect(() => {
+    if (step !== 1 || view !== "workflow") return;
+    void refreshApiStatus();
+  }, [step, view]);
+
   function updateBrief(patch: Partial<BriefInput>) {
     setBrief((current) => ({ ...current, ...patch }));
   }
 
-  function addManualMaterial() {
+  function commitMaterialDraft() {
     const text = materialDraft.trim();
     if (!text) return;
     const material: Material = {
@@ -173,44 +210,147 @@ export function LicaitongWorkbench() {
       title: text.split("\n")[0].slice(0, 48) || "手动素材",
       body: text,
       source: "手动输入",
+      tags: ["粘贴"],
+      selected: true,
+      isPrimary: getSelectedMaterials(materials).length === 0,
       createdAt: new Date().toISOString(),
     };
     setMaterials((current) => [material, ...current].slice(0, 12));
     setMaterialDraft("");
-    setStatus("素材已加入");
+    setStatus("素材已加入已选列表");
   }
 
-  async function searchHotspot() {
+  async function fetchHotspotResults(
+    query: string,
+    options: { includeDomains?: string[]; timeRange?: "day" | "week" | "month" } = {},
+  ) {
+    const response = await fetch("/api/tavily-proxy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query,
+        maxResults: 8,
+        topic: "news",
+        timeRange: options.timeRange || "week",
+        searchDepth: "basic",
+        ...(options.includeDomains?.length ? { includeDomains: options.includeDomains } : {}),
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Tavily API Key 无效，请到 tavily.com Dashboard 重新复制 Key 并更新 .env");
+      }
+      throw new Error(data.error || "热点搜索失败");
+    }
+    return (data.results || []) as Array<{ title?: string; content?: string; snippet?: string; url?: string }>;
+  }
+
+  async function searchHotspot(tab: HotspotTabId = activeHotspotTab) {
     setIsSearchingHotspot(true);
     setStatus("正在搜索热点...");
     try {
-      const response = await fetch("/api/tavily-proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: `${brief.topic || "理财"} 基金 固收 政策 小红书`,
-          maxResults: 5,
-          topic: "news",
-          timeRange: "day",
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "热点搜索失败");
-      const next: Material[] = (data.results || []).slice(0, 5).map((item: { title?: string; content?: string; snippet?: string; url?: string }) => ({
-        id: uid("hotspot"),
-        title: item.title || "财经热点",
-        body: item.content || item.snippet || "",
-        source: item.url || "Tavily",
-        tags: ["热点"],
-        createdAt: new Date().toISOString(),
-      }));
-      setMaterials((current) => [...next, ...current].slice(0, 12));
-      setStatus(`已加入 ${next.length} 条热点素材`);
+      const query = buildHotspotSearchQuery(tab, brief.topic, customHotspotQuery);
+      const includeDomains = HOTSPOT_TAB_DOMAINS[tab];
+
+      let rawResults = await fetchHotspotResults(query, { includeDomains, timeRange: "week" });
+      if (rawResults.length === 0 && includeDomains?.length) {
+        rawResults = await fetchHotspotResults(query, { timeRange: "week" });
+      }
+      if (rawResults.length === 0) {
+        const fallbackQuery = buildHotspotSearchFallbackQuery(tab, customHotspotQuery);
+        rawResults = await fetchHotspotResults(fallbackQuery, { timeRange: "week" });
+      }
+
+      const next: Material[] = rawResults
+        .slice(0, 8)
+        .map((item) => {
+          const normalized = normalizeHotspotFromTavily(item);
+          return {
+            id: uid("hotspot"),
+            title: normalized.title,
+            body: normalized.body,
+            source: normalized.source,
+            tags: ["热点"],
+            selected: false,
+            createdAt: new Date().toISOString(),
+          };
+        })
+        .filter((item) => item.title);
+
+      setHotspotCandidates(next);
+      setStatus(next.length > 0 ? `找到 ${next.length} 条热点，请勾选要使用的素材` : "暂无匹配热点，可换分类或自定义搜索词");
     } catch (error) {
+      setHotspotCandidates([]);
       setStatus(error instanceof Error ? error.message : "热点搜索失败，可手动粘贴素材");
     } finally {
       setIsSearchingHotspot(false);
     }
+  }
+
+  async function openHotspotPanel() {
+    const status = await refreshApiStatus();
+    if (!status.hotspot) {
+      setStatus("未检测到 TAVILY_API_KEY，请保存 .env 后重启 npm run dev");
+      return;
+    }
+    setHotspotPanelOpen(true);
+    void searchHotspot(activeHotspotTab);
+  }
+
+  function changeHotspotTab(tab: HotspotTabId) {
+    setHotspotPanelOpen(true);
+    setActiveHotspotTab(tab);
+    if (tab === "custom") {
+      setHotspotCandidates([]);
+      return;
+    }
+    void searchHotspot(tab);
+  }
+
+  function searchCustomHotspot() {
+    const query = customHotspotQuery.trim();
+    if (!query) {
+      setStatus("请输入搜索词");
+      return;
+    }
+    setHotspotPanelOpen(true);
+    setActiveHotspotTab("custom");
+    void searchHotspot("custom");
+  }
+
+  function toggleHotspotCandidate(candidate: Material, selected: boolean) {
+    if (selected) {
+      setMaterials((current) => {
+        const exists = current.find((item) => item.id === candidate.id);
+        const selectedCount = getSelectedMaterials(current).length;
+        const nextItem: Material = {
+          ...candidate,
+          selected: true,
+          isPrimary: selectedCount === 0 ? true : exists?.isPrimary,
+        };
+        if (exists) {
+          return current.map((item) => (item.id === candidate.id ? { ...item, selected: true } : item));
+        }
+        return [nextItem, ...current].slice(0, 12);
+      });
+      setStatus(`已选用：${candidate.title.slice(0, 24)}…`);
+      return;
+    }
+    setMaterials((current) => current.filter((item) => item.id !== candidate.id));
+  }
+
+  function setPrimaryMaterial(id: string) {
+    setMaterials((current) =>
+      current.map((item) => ({
+        ...item,
+        isPrimary: item.id === id,
+      })),
+    );
+  }
+
+  function removeMaterial(id: string) {
+    setMaterials((current) => current.filter((item) => item.id !== id));
   }
 
   async function buildPrompt(action: string, input: Record<string, unknown>) {
@@ -251,7 +391,7 @@ export function LicaitongWorkbench() {
     setAnglesGeneratedForKey(null);
     try {
       if (!apiStatus.ready) throw new Error(LLM_NOT_CONFIGURED);
-      const input = { ...brief, materials };
+      const input = { ...brief, materials: selectedMaterials };
       const prompt = await buildPrompt("creativeAngles", input);
       const raw = await callTextModel(prompt, { temperature: 0.35, maxTokens: 8192 });
       const normalized = normalizeAngles(parseLLMJson(raw), brief);
@@ -277,20 +417,23 @@ export function LicaitongWorkbench() {
     }
     setIsGeneratingContent(true);
     setStatus("正在生成正文并完成合规审查...");
-    setImageResult("");
     try {
       const nextResults: GeneratedContent[] = [];
       for (const angle of selectedAngles) {
         const contentAction = brief.personaId ? "personaContent" : "contentGeneration";
         const contentPrompt = await buildPrompt(contentAction, {
           ...brief,
-          materials,
+          materials: selectedMaterials,
           selectedAngle: angle,
           templateId: angle.recommendedTemplateId,
           selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
         });
         const rawContent = await callTextModel(contentPrompt, { maxTokens: 8192 });
         const content = normalizeContent(parseLLMJson(rawContent), angle);
+        const bodyCheck = validateGeneratedBody(content.content, brief.businessLine);
+        if (!bodyCheck.ok) {
+          throw new Error(`正文质检未通过：${bodyCheck.reason}。请调整「产品出现方式」或换角度后重试。`);
+        }
         if (!content.content.trim()) {
           throw new Error("模型返回的正文为空，请重试或检查人设 Prompt 输出格式");
         }
@@ -315,35 +458,13 @@ export function LicaitongWorkbench() {
     }
   }
 
-  async function generateImage() {
-    const prompt = activeResult?.imagePromptSuggestions?.[0]?.prompt;
-    if (!prompt) return setStatus("当前内容没有图片 Prompt");
-    if (!apiStatus.image) return setStatus("服务端未配置 IMAGE_API_KEY");
-    setIsGeneratingImage(true);
-    try {
-      const response = await fetch("/api/image-proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "图片生成失败");
-      setImageResult(data.data?.[0]?.url || "");
-      setStatus("图片生成完成");
-    } catch (error) {
-      setStatus(error instanceof Error ? error.message : "图片生成失败");
-    } finally {
-      setIsGeneratingImage(false);
-    }
-  }
-
   function saveActiveDraft() {
     if (!activeResult) return;
     const draft: Draft = {
       ...activeResult,
       savedAt: new Date().toISOString(),
       draftEntryId: uid("draft"),
-      generationSnapshot: { ...brief, materials },
+      generationSnapshot: { ...brief, materials: selectedMaterials },
     };
     setDrafts((current) => [draft, ...current].slice(0, 30));
     setView("drafts");
@@ -421,15 +542,31 @@ export function LicaitongWorkbench() {
               materials={materials}
               materialDraft={materialDraft}
               offerFeatures={offerFeatures}
-              isBusy={isSearchingHotspot}
+              workflowConfig={workflowConfig}
+              hotspotPanelOpen={hotspotPanelOpen}
+              activeHotspotTab={activeHotspotTab}
+              customHotspotQuery={customHotspotQuery}
+              hotspotCandidates={hotspotCandidates}
+              isSearchingHotspot={isSearchingHotspot}
+              canContinue={canContinueFromBrief}
               onBriefChange={(patch) => {
                 if (typeof patch === "function") setBrief((c) => patch(c));
                 else updateBrief(patch);
               }}
               onMaterialDraftChange={setMaterialDraft}
-              onAddMaterial={addManualMaterial}
-              onSearchHotspot={searchHotspot}
+              onMaterialDraftCommit={commitMaterialDraft}
+              onCustomHotspotQueryChange={setCustomHotspotQuery}
+              onCustomHotspotSearch={searchCustomHotspot}
+              onSearchHotspot={openHotspotPanel}
+              onHotspotTabChange={changeHotspotTab}
+              onToggleCandidate={toggleHotspotCandidate}
+              onSetPrimaryMaterial={setPrimaryMaterial}
+              onRemoveMaterial={removeMaterial}
               onContinue={() => {
+                if (!canContinueFromBrief) {
+                  setStatus("市场观察员需先选择至少 1 条热点素材");
+                  return;
+                }
                 setView("workflow");
                 setStep(2);
               }}
@@ -445,6 +582,7 @@ export function LicaitongWorkbench() {
                   anglesSelected={selectedAngleIds.length}
                   anglesTotal={angles.length}
                   kbVersion={knowledge?.knowledgeBaseVersion}
+                  workflowConfig={workflowConfig}
                 />
               </aside>
               <LicaitongAnglesPanel
@@ -502,15 +640,12 @@ export function LicaitongWorkbench() {
                             </Badge>
                           </div>
                         </section>
-                        <section className="rounded-xl border border-border p-4">
-                          <div className="mb-2 flex items-center gap-2 font-medium text-sm"><ImageIcon className="h-4 w-4" /> 封面 Prompt</div>
-                          <p className="max-h-40 overflow-auto text-xs leading-5 text-muted-foreground">{activeResult.imagePromptSuggestions[0]?.prompt}</p>
-                          {apiStatus.image ? (
-                            <Button className="mt-3 w-full" variant="secondary" size="sm" onClick={generateImage} disabled={isGeneratingImage}>
-                              {isGeneratingImage ? "生成中…" : "生成封面图"}
-                            </Button>
-                          ) : null}
-                        </section>
+                        <ImagePromptLab
+                          contentId={activeResult.id}
+                          prompts={activeResult.imagePromptSuggestions}
+                          imageApiReady={apiStatus.image}
+                          imageModel={apiStatus.imageModel}
+                        />
                         <Button className="w-full" onClick={saveActiveDraft}><CheckCircle2 className="h-4 w-4" /> 保存草稿</Button>
                       </div>
                     </div>

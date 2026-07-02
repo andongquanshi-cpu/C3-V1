@@ -3,11 +3,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  FALLBACK_LICAITONG_WORKFLOW,
   getContentLengthOptions,
   getLicaitongOffer,
   getLicaitongScene,
-  LICAITONG_PERSONAS,
+  type LicaitongWorkflowConfig,
 } from "@/lib/licaitong-workflow";
+import { getPrimaryMaterial, getSelectedMaterials } from "@/lib/hotspot-workflow";
 import type { BriefInput, Material } from "@/lib/types";
 
 interface BriefSummaryCardProps {
@@ -16,14 +18,24 @@ interface BriefSummaryCardProps {
   anglesSelected: number;
   anglesTotal: number;
   kbVersion?: string;
+  workflowConfig?: LicaitongWorkflowConfig;
 }
 
-export function BriefSummaryCard({ brief, materials, anglesSelected, anglesTotal, kbVersion }: BriefSummaryCardProps) {
-  const offer = getLicaitongOffer(brief.offerId);
-  const scene = getLicaitongScene(brief.creationScene);
-  const persona = LICAITONG_PERSONAS.find((item) => item.id === brief.personaId);
+export function BriefSummaryCard({
+  brief,
+  materials,
+  anglesSelected,
+  anglesTotal,
+  kbVersion,
+  workflowConfig = FALLBACK_LICAITONG_WORKFLOW,
+}: BriefSummaryCardProps) {
+  const offer = getLicaitongOffer(brief.offerId, workflowConfig);
+  const scene = getLicaitongScene(brief.creationScene, workflowConfig);
+  const persona = workflowConfig.personas.find((item) => item.id === brief.personaId);
   const lengthLabel =
     getContentLengthOptions(brief.generationMode).find((item) => item.value === brief.contentLength)?.label || "-";
+  const selectedMaterials = getSelectedMaterials(materials);
+  const primaryMaterial = getPrimaryMaterial(materials);
 
   return (
     <Card className="border-border/80 bg-card/80 backdrop-blur-sm">
@@ -71,8 +83,8 @@ export function BriefSummaryCard({ brief, materials, anglesSelected, anglesTotal
             <dd className="font-medium">{lengthLabel}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">素材</dt>
-            <dd className="font-medium">{materials.length} 条</dd>
+            <dt className="shrink-0 text-muted-foreground">已选素材</dt>
+            <dd className="text-right font-medium">{selectedMaterials.length} 条</dd>
           </div>
           <div className="flex justify-between gap-3">
             <dt className="shrink-0 text-muted-foreground">创意角度</dt>
@@ -81,6 +93,13 @@ export function BriefSummaryCard({ brief, materials, anglesSelected, anglesTotal
             </dd>
           </div>
         </dl>
+
+        {primaryMaterial ? (
+          <div className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
+            <p className="mb-1 font-medium text-foreground/80">主热点</p>
+            {primaryMaterial.title}
+          </div>
+        ) : null}
 
         <div className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
           <p className="mb-1 font-medium text-foreground/80">主题</p>

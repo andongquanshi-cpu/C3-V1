@@ -1,0 +1,80 @@
+{
+  "version": "5.0",
+  "businessLine": "licaitong",
+  "knowledgeLayer": "L6_scenario",
+  "description": "理财通创作工作台 UI 配置：Offer、创作场景、固收+默认主推功能。",
+  "offers": [
+    {
+      "id": "fixed-income-plus",
+      "label": "固收+",
+      "description": "本期主推。严选专区、体验金、长期专区、灵活申赎、AI 辅助等卖点。",
+      "enabled": true,
+      "badge": "本期主推"
+    },
+    {
+      "id": "lingqiantong",
+      "label": "零钱通",
+      "description": "入口预留，知识库建设中。",
+      "enabled": false,
+      "badge": "敬请期待"
+    },
+    {
+      "id": "weizhitou",
+      "label": "微智投",
+      "description": "入口预留，知识库建设中。",
+      "enabled": false,
+      "badge": "敬请期待"
+    }
+  ],
+  "creationScenes": [
+    {
+      "id": "newcomer-guide",
+      "label": "新人操作指引",
+      "description": "第一步点哪里、先看什么、怎么不踩坑。",
+      "contentType": "finance-tips"
+    },
+    {
+      "id": "review-diary",
+      "label": "真实复盘日记",
+      "description": "第一人称记录实际操作与感受，强调人感。",
+      "contentType": "personal-exp"
+    },
+    {
+      "id": "pain-story",
+      "label": "痛点共鸣故事",
+      "description": "选择困难、怕锁死、不敢试等痛点切入。",
+      "contentType": "personal-exp"
+    },
+    {
+      "id": "dry-goods-list",
+      "label": "干货组合推荐",
+      "description": "清单/框架/几步走，信息密度高但克制。",
+      "contentType": "finance-tips"
+    }
+  ],
+  "offerDefaults": {
+    "fixed-income-plus": {
+      "featureLimit": 2,
+      "defaultFeaturesByScene": {
+        "newcomer-guide": ["fplus_virtual_trial", "fplus_curated_zone"],
+        "review-diary": ["fplus_virtual_trial"],
+        "pain-story": ["fplus_curated_zone", "fplus_flexible_redeem"],
+        "dry-goods-list": ["fplus_long_term_zone", "fplus_ai_assist"]
+      },
+      "featureUiSummaries": {
+        "fplus_curated_zone": "严选专区，缩小固收+比较范围，不构成荐基。",
+        "fplus_virtual_trial": "虚拟理财金体验，熟悉流程；规则以活动页为准。",
+        "fplus_long_term_zone": "长期理财专区，看公开运作信息，不代表未来表现。",
+        "fplus_flexible_redeem": "部分产品申赎更灵活，买前先看清持有期限。",
+        "fplus_ai_assist": "AI 帮整理公开产品信息，不构成投资建议。"
+      }
+    }
+  },
+  "defaultBrief": {
+    "offerId": "fixed-income-plus",
+    "creationScene": "pain-story",
+    "audienceTag": "white-collar",
+    "topic": "选固收+产品太纠结？我先在理财通里把比较范围缩小",
+    "campaignGoal": "内容营销：固收+认知与申购引导"
+  }
+}
