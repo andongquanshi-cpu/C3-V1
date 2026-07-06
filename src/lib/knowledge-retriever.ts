@@ -11,7 +11,11 @@ import {
   resolveFeatureInjectionLimit,
   shouldIncludeStrongInsertPhrases,
 } from "@/lib/embed-level";
-import { collectMaterialRetrievalTerms } from "@/lib/topic-materials";
+import {
+  buildHotspotCoveragePlan,
+  collectAngleGenerationRetrievalTerms,
+  collectMaterialRetrievalTerms,
+} from "@/lib/topic-materials";
 import { toArray } from "@/lib/utils";
 
 const CORE_HIGH_RISK_RULE_IDS = new Set([
@@ -704,12 +708,15 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
   };
   const contentTypeCandidates = getContentTypeCandidates(resolvedInput.contentType);
   const purpose = normalizeText(resolvedInput.task || resolvedInput.promptTask || "");
-  const materialTerms = collectMaterialRetrievalTerms(resolvedInput.materials || resolvedInput.topicMaterials);
+  const materialTerms =
+    purpose === "creative-angles"
+      ? collectAngleGenerationRetrievalTerms(resolvedInput.materials || resolvedInput.topicMaterials)
+      : collectMaterialRetrievalTerms(resolvedInput.materials || resolvedInput.topicMaterials);
   const retrievalInput =
     materialTerms.length > 0
       ? {
           ...resolvedInput,
-          topic: [resolvedInput.topic, ...materialTerms.slice(0, 3)].filter(Boolean).join(" "),
+          topic: [resolvedInput.topic, ...materialTerms.slice(0, 2)].filter(Boolean).join(" "),
         }
       : resolvedInput;
   const featurePool = resolveRetrievalFeatures(scoped, retrievalInput);
@@ -721,7 +728,8 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
   const brandVoice = pruneBrandVoice(scoped.brandVoiceItems, resolvedInput, businessLine);
   const riskDisclaimers = selectRiskDisclaimers(scoped.riskDisclaimers, resolvedInput, contentTypeCandidates, businessLine);
   const platformRules = selectPlatformRules(scoped.platformRules, resolvedInput, contentTypeCandidates, purpose);
-  const visualGuidelines = purpose.includes("cover") ? selectVisualGuidelines(scoped.visualGuidelines, businessLine) : [];
+  const visualGuidelines =
+    /cover|content-generation|persona/.test(purpose) ? selectVisualGuidelines(scoped.visualGuidelines, businessLine) : [];
   const knowledge = {
     businessLine,
     brandVoice,

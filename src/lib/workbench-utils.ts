@@ -1,4 +1,5 @@
 import { validateGeneratedBody } from "@/lib/business-line-prompt";
+import { buildImagePromptFromScene } from "@/lib/image-prompt-utils";
 import { getSelectedMaterials } from "@/lib/hotspot-workflow";
 import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent, Material } from "@/lib/types";
 
@@ -99,25 +100,39 @@ export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedCon
           ...imageTextSuggestions.map((item) => {
             const row = asRecord(item);
             const scene = asString(row.scene);
-            const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String).join("；") : "";
-            const prompt = asString(row.prompt) || [scene, visualNotes].filter(Boolean).join("。");
+            const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String) : [];
+            const coverText = asString(row.coverText) || undefined;
+            const style = asString(row.style) || "default";
+            const prompt =
+              asString(row.prompt) ||
+              buildImagePromptFromScene({ scene, visualNotes, coverText, style });
             if (!prompt) return null;
             return {
-              style: asString(row.style) || "default",
+              style,
               prompt,
-              coverText: asString(row.coverText) || undefined,
+              coverText,
               riskNotes: Array.isArray(row.riskNotes) ? row.riskNotes.map(String) : [],
             };
           }),
           ...coverSuggestions.map((item) => {
             const row = asRecord(item);
-            const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String).join("；") : "";
-            const prompt = asString(row.prompt) || asString(row.imagePrompt) || [asString(row.style), visualNotes].filter(Boolean).join("。");
+            const visualNotes = Array.isArray(row.visualNotes) ? row.visualNotes.map(String) : [];
+            const coverText = asString(row.coverText) || undefined;
+            const style = asString(row.style) || "cover";
+            const prompt =
+              asString(row.prompt) ||
+              asString(row.imagePrompt) ||
+              buildImagePromptFromScene({
+                scene: asString(row.scene),
+                visualNotes,
+                coverText,
+                style,
+              });
             if (!prompt) return null;
             return {
-              style: asString(row.style) || "cover",
+              style,
               prompt,
-              coverText: asString(row.coverText) || undefined,
+              coverText,
               riskNotes: Array.isArray(row.riskNotes) ? row.riskNotes.map(String) : [],
             };
           }),
@@ -163,23 +178,23 @@ export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedCon
   };
 }
 
-/** 模型未输出封面 prompt 时，用标题/封面字/角度信息拼一条可试用的生图 prompt */
+/** @deprecated 请使用 image-prompt-utils.finalizeImagePromptSuggestions */
 export function buildFallbackImagePromptSuggestions(
   content: Pick<GeneratedContent, "selectedTitle" | "selectedCoverText" | "content">,
   angle: CreativeAngle,
 ): GeneratedContent["imagePromptSuggestions"] {
   const coverText = content.selectedCoverText || angle.coverDirection || "";
   const title = content.selectedTitle || angle.angleName || "";
-  const prompt = [
-    "小红书财经笔记封面，竖版 3:4",
-    coverText ? `封面大字：${coverText}` : "",
-    title ? `内容主题：${title}` : "",
-    angle.coreIdea ? `画面方向：${angle.coreIdea.slice(0, 100)}` : "",
-    "风格：清晰、生活化、偏干货笔记感",
-    "禁止：股票代码、收益数字、承诺性文案、二维码",
-  ]
-    .filter(Boolean)
-    .join("。");
+  const prompt = buildImagePromptFromScene({
+    scene: [
+      title ? `主题：${title}` : "",
+      angle.coreIdea ? angle.coreIdea.slice(0, 100) : "",
+    ]
+      .filter(Boolean)
+      .join("，"),
+    coverText: coverText || undefined,
+    style: "fallback-cover",
+  });
 
   return [
     {

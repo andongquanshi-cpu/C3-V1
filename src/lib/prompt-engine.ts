@@ -11,6 +11,10 @@ import {
   loadPersonaStandard,
 } from "@/lib/persona-loader";
 import {
+  formatVisualGuidelinesForPrompt,
+} from "@/lib/image-prompt-utils";
+import {
+  buildHotspotCoveragePlan,
   formatTopicMaterialsForPrompt,
   getPrimaryMaterialTitle,
   resolvePromptMaterials,
@@ -158,15 +162,18 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
   const materials = resolvePromptMaterials(input);
   const topicMaterialsText = formatTopicMaterialsForPrompt(materials);
   const primaryHotspot = getPrimaryMaterialTitle(materials);
+  const hotspotCoveragePlan = buildHotspotCoveragePlan(materials, generateCount);
   return buildPrompt("creative-angles.md", input, "creative-angles", (data, knowledge) => ({
     contentType: data.contentType || "brand-seed",
-    topic: primaryHotspot || data.topic || data.hotspot || "未提供",
+    topic: data.topic || data.hotspot || "未提供",
+    primaryHotspotReference: primaryHotspot || "无",
     targetUser: data.targetUser || "投资小白",
     campaignGoal: data.campaignGoal || "内容种草和功能认知",
     embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
     bloggerLevel: data.bloggerLevel || "middle",
     customRequirement: data.customRequirement || data.customPrompt || "无",
     topicMaterials: topicMaterialsText,
+    hotspotCoveragePlan,
     personaContext: buildCreativeAngleL4Context(data, knowledge.businessLine || data.businessLine || "weisec"),
     avoidRecentAngles: data.avoidRecentAngles || [],
     diversitySeed: data.diversitySeed || "default",
@@ -254,6 +261,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       complianceRules: knowledge.complianceRules,
       riskDisclaimers: knowledge.riskDisclaimers,
       platformRules: knowledge.platformRules,
+      visualGuidelines: formatVisualGuidelinesForPrompt(knowledge.visualGuidelines),
       debugKnowledgeUsed: knowledge.debugKnowledgeUsed,
     },
     input.personaVariant,

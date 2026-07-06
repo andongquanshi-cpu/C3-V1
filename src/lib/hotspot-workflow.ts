@@ -1,4 +1,5 @@
 import type { BriefInput, Material, BusinessLine } from "@/lib/types";
+import { buildHotspotMaterialId, isSameHotspotMaterial } from "@/lib/hotspot-display";
 import {
   getWorkflowFallback,
   isFeatureSelectionActive,
@@ -121,4 +122,42 @@ export function normalizeMaterialSelection(material: Material): Material {
     ...material,
     selected: material.selected !== false,
   };
+}
+
+export function findStoredHotspotMaterial(materials: Material[], candidate: Pick<Material, "id" | "source" | "title">) {
+  return materials.find((item) => isSameHotspotMaterial(item, candidate));
+}
+
+/** 搜索候选与已选库合并：保留 id、勾选态、主素材标记 */
+export function mergeHotspotSearchCandidates(
+  rawResults: Array<Pick<Material, "title" | "body" | "source">>,
+  materials: Material[],
+): Material[] {
+  return rawResults
+    .map((item) => {
+      const id = buildHotspotMaterialId(item.source, item.title);
+      const candidate: Material = {
+        id,
+        title: item.title,
+        body: item.body,
+        source: item.source,
+        tags: ["热点"],
+        selected: false,
+        createdAt: new Date().toISOString(),
+      };
+      const stored = findStoredHotspotMaterial(materials, candidate);
+      if (!stored) return candidate;
+      return {
+        ...candidate,
+        id: stored.id,
+        selected: stored.selected !== false,
+        isPrimary: stored.isPrimary,
+        createdAt: stored.createdAt,
+      };
+    })
+    .filter((item) => item.title);
+}
+
+export function listSelectedHotspotMaterials(materials: Material[]) {
+  return getSelectedMaterials(materials).filter((item) => item.source !== "手动输入");
 }

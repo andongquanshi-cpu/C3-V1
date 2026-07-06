@@ -7,8 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
+  findStoredHotspotMaterial,
   getHotspotTabs,
   getSelectedMaterials,
+  listSelectedHotspotMaterials,
   requiresHotspotMaterials,
   sceneRequiresHotspotMaterials,
   type HotspotTabId,
@@ -60,6 +62,8 @@ interface BriefPanelProps {
   onToggleCandidate: (candidate: Material, selected: boolean) => void;
   onSetPrimaryMaterial: (id: string) => void;
   onRemoveMaterial: (id: string) => void;
+  onEditHotspotMaterials?: () => void;
+  onCloseHotspotPanel?: () => void;
   onContinue: () => void;
 }
 
@@ -213,6 +217,8 @@ export function BriefPanel({
   onToggleCandidate,
   onSetPrimaryMaterial,
   onRemoveMaterial,
+  onEditHotspotMaterials,
+  onCloseHotspotPanel,
   onContinue,
 }: BriefPanelProps) {
   const businessLine: BusinessLine = brief.businessLine;
@@ -238,9 +244,15 @@ export function BriefPanel({
         ? "市场观察员需选热点"
         : "需至少 1 条热点素材";
   const selectedMaterials = getSelectedMaterials(materials);
+  const selectedHotspotMaterials = listSelectedHotspotMaterials(materials);
   const pastedMaterials = selectedMaterials.filter((item) => item.source === "手动输入");
   const candidateSelectedIds = new Set(
-    hotspotCandidates.filter((item) => materials.some((m) => m.id === item.id && m.selected !== false)).map((item) => item.id),
+    hotspotCandidates
+      .filter((item) => {
+        const stored = findStoredHotspotMaterial(materials, item);
+        return stored && stored.selected !== false;
+      })
+      .map((item) => item.id),
   );
 
   function selectOffer(offerId: string) {
@@ -530,9 +542,20 @@ export function BriefPanel({
                       </button>
                     ))}
                   </div>
-                  {selectedMaterials.length > 0 ? (
-                    <span className="shrink-0 text-[10px] text-muted-foreground">已选 {selectedMaterials.length}</span>
-                  ) : null}
+                  <div className="flex shrink-0 items-center gap-2">
+                    {selectedMaterials.length > 0 ? (
+                      <span className="text-[10px] text-muted-foreground">已选 {selectedMaterials.length}</span>
+                    ) : null}
+                    {onCloseHotspotPanel ? (
+                      <button
+                        type="button"
+                        onClick={onCloseHotspotPanel}
+                        className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+                      >
+                        收起
+                      </button>
+                    ) : null}
+                  </div>
                 </div>
 
                 {pastedMaterials.length > 0 ? (
@@ -587,8 +610,8 @@ export function BriefPanel({
                 ) : (
                   <div className="max-h-[280px] divide-y divide-border/50 overflow-y-auto rounded-md bg-card/40">
                     {hotspotCandidates.map((candidate, index) => {
+                      const stored = findStoredHotspotMaterial(materials, candidate);
                       const selected = candidateSelectedIds.has(candidate.id);
-                      const stored = materials.find((item) => item.id === candidate.id);
                       return (
                         <HotspotFeedItem
                           key={candidate.id}
@@ -598,12 +621,70 @@ export function BriefPanel({
                           onToggle={(next) => onToggleCandidate(candidate, next)}
                           showPrimary={hotspotRequired && selectedMaterials.length > 1}
                           isPrimary={stored?.isPrimary}
-                          onSetPrimary={() => onSetPrimaryMaterial(candidate.id)}
+                          onSetPrimary={() => onSetPrimaryMaterial(stored?.id || candidate.id)}
                         />
                       );
                     })}
                   </div>
                 )}
+              </div>
+            ) : selectedMaterials.length > 0 ? (
+              <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-medium text-foreground/90">
+                    已选素材 · {selectedMaterials.length} 条
+                  </span>
+                  {onEditHotspotMaterials ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={onEditHotspotMaterials}
+                      className="h-7 px-2 text-xs text-primary hover:text-primary"
+                    >
+                      修改热点
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="space-y-1">
+                  {pastedMaterials.map((item) => (
+                    <HotspotFeedItem
+                      key={item.id}
+                      material={item}
+                      selected
+                      pasted
+                      onRemove={() => onRemoveMaterial(item.id)}
+                    />
+                  ))}
+                  {selectedHotspotMaterials.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-start gap-2 rounded-md border border-border/60 bg-card/50 px-2 py-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-medium leading-snug line-clamp-2">{item.title}</p>
+                        {item.body ? (
+                          <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground line-clamp-1">
+                            {item.body}
+                          </p>
+                        ) : null}
+                        <div className="mt-1 flex flex-wrap items-center gap-2">
+                          {formatMaterialSource(item.source) ? (
+                            <span className="text-[10px] text-muted-foreground/75">
+                              来源 · {formatMaterialSource(item.source)}
+                            </span>
+                          ) : null}
+                          {item.isPrimary ? (
+                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+                              <Star className="h-3 w-3 fill-current" />
+                              主素材
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
           </div>

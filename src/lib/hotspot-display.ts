@@ -91,6 +91,33 @@ export function normalizeHotspotFromTavily(item: {
   };
 }
 
+/** 同一 URL/标题在多次搜索间保持稳定，避免勾选状态丢失 */
+export function buildHotspotMaterialId(source: string | undefined, title: string): string {
+  if (source?.startsWith("http")) {
+    try {
+      const url = new URL(source);
+      const slug = `${url.hostname}${url.pathname}`
+        .replace(/[^a-zA-Z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "")
+        .slice(0, 56);
+      if (slug) return `hotspot_${slug}`;
+    } catch {
+      // fall through
+    }
+  }
+  const titleSlug = title
+    .replace(/\s+/g, "_")
+    .replace(/[^a-zA-Z0-9\u4e00-\u9fff_-]/g, "")
+    .slice(0, 48);
+  return `hotspot_${titleSlug || "item"}`;
+}
+
+export function isSameHotspotMaterial(a: Pick<Material, "id" | "source" | "title">, b: Pick<Material, "id" | "source" | "title">) {
+  if (a.id && b.id && a.id === b.id) return true;
+  if (a.source && b.source && a.source.startsWith("http") && a.source === b.source) return true;
+  return a.title.trim() === b.title.trim() && Boolean(a.title.trim());
+}
+
 export function buildHotspotSearchQuery(tab: string, _topic?: string, customQuery?: string, businessLine?: string) {
   // 热点搜索用短 query，不用 Step1 整段主题（太长会导致 0 结果）
   switch (tab) {

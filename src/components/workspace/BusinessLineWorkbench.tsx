@@ -23,13 +23,19 @@ import { validateGeneratedBody } from "@/lib/business-line-prompt";
 import {
   buildHotspotSearchQuery,
   canProceedFromBrief,
+  findStoredHotspotMaterial,
   getSelectedMaterials,
   isHotspotTabValidForLine,
+  mergeHotspotSearchCandidates,
   normalizeHotspotTabForLine,
   sceneRequiresHotspotMaterials,
   type HotspotTabId,
 } from "@/lib/hotspot-workflow";
 import { HOTSPOT_TAB_DOMAINS, normalizeHotspotFromTavily, buildHotspotSearchFallbackQuery } from "@/lib/hotspot-display";
+import {
+  finalizeImagePromptSuggestions,
+  shouldRequestCoverSuggestions,
+} from "@/lib/image-prompt-utils";
 import { parseLLMJson, safeJsonParse, cn } from "@/lib/utils";
 import {
   buildAnglesConfigFingerprint,
@@ -352,21 +358,12 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
         rawResults = await fetchHotspotResults(fallbackQuery, { timeRange: "week" });
       }
 
-      const next: Material[] = rawResults
+      const normalizedResults = rawResults
         .slice(0, 8)
-        .map((item) => {
-          const normalized = normalizeHotspotFromTavily(item);
-          return {
-            id: uid("hotspot"),
-            title: normalized.title,
-            body: normalized.body,
-            source: normalized.source,
-            tags: ["热点"],
-            selected: false,
-            createdAt: new Date().toISOString(),
-          };
-        })
+        .map((item) => normalizeHotspotFromTavily(item))
         .filter((item) => item.title);
+
+      const next = mergeHotspotSearchCandidates(normalizedResults, materials);
 
       setHotspotCandidates(next);
       setStatus(next.length > 0 ? `找到 ${next.length} 条热点，请勾选要使用的素材` : "暂无匹配热点，可换分类或自定义搜索词");
@@ -409,25 +406,59 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     void searchHotspot("custom");
   }
 
+  function editHotspotMaterials() {
+    setHotspotPanelOpen(true);
+    setView("workflow");
+    setStep(1);
+    if (hotspotCandidates.length === 0 && !isSearchingHotspot) {
+      void searchHotspot(activeHotspotTab);
+    }
+  }
+
+  function closeHotspotPanel() {
+    setHotspotPanelOpen(false);
+  }
+
   function toggleHotspotCandidate(candidate: Material, selected: boolean) {
     if (selected) {
       setMaterials((current) => {
-        const exists = current.find((item) => item.id === candidate.id);
+        const stored = findStoredHotspotMaterial(current, candidate);
         const selectedCount = getSelectedMaterials(current).length;
         const nextItem: Material = {
           ...candidate,
+          id: stored?.id || candidate.id,
           selected: true,
-          isPrimary: selectedCount === 0 ? true : exists?.isPrimary,
+          isPrimary: selectedCount === 0 ? true : stored?.isPrimary,
+          createdAt: stored?.createdAt || candidate.createdAt || new Date().toISOString(),
         };
-        if (exists) {
-          return current.map((item) => (item.id === candidate.id ? { ...item, selected: true } : item));
+        if (stored) {
+          return current.map((item) => (item.id === stored.id ? nextItem : item));
         }
         return [nextItem, ...current].slice(0, 12);
       });
+      setHotspotCandidates((current) =>
+        current.map((item) => (item.id === candidate.id ? { ...item, selected: true } : item)),
+      );
       setStatus(`已选用：${candidate.title.slice(0, 24)}…`);
       return;
     }
-    setMaterials((current) => current.filter((item) => item.id !== candidate.id));
+
+    setMaterials((current) => {
+      const stored = findStoredHotspotMaterial(current, candidate);
+      if (!stored) return current;
+      const remaining = current.filter((item) => item.id !== stored.id);
+      const stillSelected = getSelectedMaterials(remaining);
+      if (stillSelected.length === 1 && !stillSelected[0]?.isPrimary) {
+        return remaining.map((item) =>
+          item.id === stillSelected[0].id ? { ...item, isPrimary: true } : item,
+        );
+      }
+      return remaining;
+    });
+    setHotspotCandidates((current) =>
+      current.map((item) => (item.id === candidate.id ? { ...item, selected: false } : item)),
+    );
+    setStatus("已取消选用该热点");
   }
 
   function setPrimaryMaterial(id: string) {
@@ -488,8 +519,9 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       if (!apiStatus.ready) throw new Error(LLM_NOT_CONFIGURED);
       const input = { ...brief, materials: selectedMaterials, avoidRecentAngles, diversitySeed: uid("angle_batch") };
       const prompt = await buildPrompt("creativeAngles", input);
+      const hasHotspotMaterials = selectedMaterials.some((item) => item.source !== "手动输入");
       const raw = await callTextModel(prompt, {
-        temperature: avoidRecentAngles.length > 0 ? 0.75 : 0.45,
+        temperature: avoidRecentAngles.length > 0 ? 0.75 : hasHotspotMaterials ? 0.58 : 0.45,
         maxTokens: 8192,
       });
       const normalized = normalizeAngles(parseLLMJson(raw), brief);
@@ -528,7 +560,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
           selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
         });
         const rawContent = await callTextModel(contentPrompt, { maxTokens: 8192 });
-        const content = normalizeContent(parseLLMJson(rawContent), angle);
+        let content = normalizeContent(parseLLMJson(rawContent), angle);
         const bodyCheck = validateGeneratedBody(content.content, brief.businessLine);
         if (!bodyCheck.ok) {
           throw new Error(`正文质检未通过：${bodyCheck.reason}。请调整「产品出现方式」或换角度后重试。`);
@@ -536,6 +568,31 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
         if (!content.content.trim()) {
           throw new Error("模型返回的正文为空，请重试或检查人设 Prompt 输出格式");
         }
+
+        let coverPayload: unknown;
+        const isImageText = (brief.generationMode || "image-text") !== "video-script";
+        if (isImageText && shouldRequestCoverSuggestions(content.imagePromptSuggestions)) {
+          setStatus(`正在为「${angle.angleName}」生成封面 Prompt…`);
+          const coverPrompt = await buildPrompt("coverSuggestions", {
+            ...brief,
+            materials: selectedMaterials,
+            selectedAngle: angle,
+            generatedContent: content,
+            templateId: angle.recommendedTemplateId,
+            selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
+          });
+          const rawCover = await callTextModel(coverPrompt, { temperature: 0.45, maxTokens: 4096 });
+          coverPayload = parseLLMJson(rawCover);
+        }
+
+        if (isImageText) {
+          content = {
+            ...content,
+            imagePromptSuggestions: finalizeImagePromptSuggestions(content, angle, coverPayload),
+          };
+        }
+
+        setStatus("正在完成合规审查...");
         const compliancePrompt = await buildPrompt("complianceReview", {
           ...brief,
           generatedContent: content,
@@ -587,8 +644,11 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
 
   function goToWorkflowStep(nextStep: number) {
     setView("workflow");
-    if (nextStep <= step || (nextStep === 2 && angles.length > 0) || (nextStep === 3 && results.length > 0)) {
+    if (nextStep === 1 || nextStep <= step || (nextStep === 2 && angles.length > 0) || (nextStep === 3 && results.length > 0)) {
       setStep(nextStep);
+      if (nextStep === 1 && getSelectedMaterials(materials).length > 0) {
+        setHotspotPanelOpen(true);
+      }
     }
   }
 
@@ -601,7 +661,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
             current={step}
             onStepClick={goToWorkflowStep}
             canClickStep={(targetStep) =>
-              (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
+              targetStep === 1 || (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
             }
             isStepComplete={(targetStep) =>
               (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
@@ -680,6 +740,8 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
             onToggleCandidate={toggleHotspotCandidate}
             onSetPrimaryMaterial={setPrimaryMaterial}
             onRemoveMaterial={removeMaterial}
+            onEditHotspotMaterials={editHotspotMaterials}
+            onCloseHotspotPanel={closeHotspotPanel}
             onContinue={() => {
               if (!canContinueFromBrief) {
                 const needsSceneHotspot = sceneRequiresHotspotMaterials(brief.creationScene, workflowConfig);
@@ -724,7 +786,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
               onSelectedAngleIdsChange={setSelectedAngleIds}
               onGenerateAngles={generateAngles}
               onGenerateContent={generateContent}
-              onBackToConfig={() => setStep(1)}
+              onBackToConfig={editHotspotMaterials}
             />
           </div>
         )}

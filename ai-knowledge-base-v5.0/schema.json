@@ -189,6 +189,6 @@
         "status"
       ],
       "note": "identity/style/differentiation 为 Brief 选型摘要；完整 prompt 在同目录 persona-standards/{personaId}.json。"
-    },
+    }
   }
 }

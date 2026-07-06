@@ -33,6 +33,9 @@ Brief 已勾选的产品功能（仅写这些，勿额外编造；可为空则�
 平台规则：
 {{platformRules}}
 
+品牌视觉规范（封面 prompt 须参考）：
+{{visualGuidelines}}
+
 必选风险提示：
 {{riskDisclaimers}}
 
@@ -50,7 +53,8 @@ Brief 已勾选的产品功能（仅写这些，勿额外编造；可为空则�
 11. qualityScore 中 productIntegration 低分不应拉低 overallScore——真诚可读、合规安全权重更高。
 12. 如果批量生成，每条内容必须绑定不同 angleId，且不得复用相同开头句、正文结构或互动引导。
 13. 正文可有适量 emoji（按人设密度，通常 3-7 个），点缀在句中或偶发段首；禁止每篇按固定 emoji 顺序当分段标题。禁止「首先/其次/第一/第二」等可见结构标记；产品提及嵌在叙事中段，禁止文末单独 👉 硬推导流。
-14. 输出必须是合法 JSON，不要输出 Markdown、解释文字或代码块。
+14. imagePromptSuggestions 必填 1-3 条，每条 prompt 必须是可直接用于文生图的完整画面描述：竖版 3:4 小红书封面、主体场景、光线色调、构图；若有 selectedCoverText 须在 prompt 中写明「画面内封面大字：xxx」。禁止只写抽象概念或产品功能名。
+15. 输出必须是合法 JSON，不要输出 Markdown、解释文字或代码块。
 
 输出 JSON 结构必须严格包含：
 {
@@ -92,8 +96,8 @@ Brief 已勾选的产品功能（仅写这些，勿额外编造；可为空则�
   "riskReminder": "市场有风险，投资需谨慎。",
   "imagePromptSuggestions": [
     {
-      "style": "dry-goods",
-      "prompt": "",
+      "style": "dry-goods | emotion | lifestyle",
+      "prompt": "完整文生图画面描述（3:4竖版、场景、光线、主体、封面压字位置）",
       "coverText": "",
       "riskNotes": []
     }
