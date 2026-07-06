@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
-import { ArrowLeft, ChevronRight, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, ChevronRight, Copy, ShieldCheck, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { buildDraftArchiveFields, getOffer, getWorkflowFallback } from "@/lib/business-line-workflow";
+import { buildContentCopyText, copyTextToClipboard } from "@/lib/clipboard-utils";
 import { cn } from "@/lib/utils";
 import type { Draft } from "@/lib/types";
 
@@ -24,9 +25,38 @@ function publishReadinessLabel(readiness?: string) {
   return "待修订";
 }
 
+function formatTag(tag: string) {
+  const text = tag.trim();
+  if (!text) return "";
+  return text.startsWith("#") ? text : `#${text}`;
+}
+
+function TagLine({ tags, className }: { tags: string[]; className?: string }) {
+  if (!tags.length) return null;
+  return (
+    <p className={cn("flex flex-wrap gap-x-2.5 gap-y-1 text-xs text-primary/75", className)}>
+      {tags.map((tag) => (
+        <span key={tag}>{formatTag(tag)}</span>
+      ))}
+    </p>
+  );
+}
+
 export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: DraftBoxPanelProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [copyHint, setCopyHint] = useState("");
   const selectedDraft = drafts.find((item) => draftKey(item) === selectedId);
+
+  useEffect(() => {
+    if (!copyHint) return;
+    const timer = window.setTimeout(() => setCopyHint(""), 2000);
+    return () => window.clearTimeout(timer);
+  }, [copyHint]);
+
+  async function handleCopy(label: string, text: string) {
+    const ok = await copyTextToClipboard(text);
+    setCopyHint(ok ? `已复制${label}` : "复制失败，请手动选择文本");
+  }
 
   if (selectedDraft) {
     const archiveFields = buildDraftArchiveFields(
@@ -58,20 +88,77 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
           </Button>
         </div>
 
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{selectedDraft.angleName}</Badge>
-            <Badge
-              variant={selectedDraft.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}
-            >
-              {publishReadinessLabel(selectedDraft.complianceReport?.publishReadiness)}
-            </Badge>
+        <article className="rounded-xl border border-border bg-card">
+          <div className="border-b border-border/60 p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 flex-1 space-y-2">
+                <h2 className="text-xl font-semibold leading-snug">{selectedDraft.selectedTitle}</h2>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                  <span>封面：{selectedDraft.selectedCoverText}</span>
+                  <span className="text-border">|</span>
+                  <Badge
+                    variant={selectedDraft.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}
+                    className="text-[10px]"
+                  >
+                    {publishReadinessLabel(selectedDraft.complianceReport?.publishReadiness)}
+                  </Badge>
+                  <span className="text-border">|</span>
+                  <span className="text-xs">保存于 {new Date(selectedDraft.savedAt).toLocaleString()}</span>
+                </div>
+                <TagLine tags={selectedDraft.tags} />
+              </div>
+
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                <div className="inline-flex rounded-lg border border-border/70 bg-muted/20 p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => void handleCopy("标题", selectedDraft.selectedTitle)}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                  >
+                    标题
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopy("正文", selectedDraft.content)}
+                    className="rounded-md px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                  >
+                    正文
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleCopy(
+                        "全文",
+                        buildContentCopyText({
+                          selectedTitle: selectedDraft.selectedTitle,
+                          selectedCoverText: selectedDraft.selectedCoverText,
+                          content: selectedDraft.content,
+                          tags: selectedDraft.tags,
+                          riskReminder: selectedDraft.riskReminder,
+                          interactionGuide: selectedDraft.interactionGuide,
+                        }),
+                      )
+                    }
+                    className="inline-flex items-center gap-1 rounded-md bg-background px-2.5 py-1.5 text-xs font-medium text-foreground shadow-sm"
+                  >
+                    <Copy className="h-3 w-3" />
+                    全文
+                  </button>
+                </div>
+                {copyHint ? <span className="text-[11px] text-primary">{copyHint}</span> : null}
+              </div>
+            </div>
           </div>
-          <h2 className="text-xl font-semibold leading-snug">{selectedDraft.selectedTitle}</h2>
-          <p className="text-xs text-muted-foreground">
-            保存于 {new Date(selectedDraft.savedAt).toLocaleString()}
-          </p>
-        </div>
+
+          <div className="p-5">
+            <pre className="whitespace-pre-wrap font-sans text-sm leading-7">{selectedDraft.content}</pre>
+            {selectedDraft.riskReminder ? (
+              <p className="mt-5 border-t border-border/60 pt-4 text-xs leading-5 text-muted-foreground">
+                {selectedDraft.riskReminder}
+              </p>
+            ) : null}
+          </div>
+        </article>
 
         <section className="rounded-xl border border-border/70 bg-muted/15 p-4">
           <h3 className="text-sm font-semibold">创作快照</h3>
@@ -86,22 +173,26 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
           </dl>
         </section>
 
-        <article className="rounded-xl border border-border bg-card p-5">
-          <p className="text-sm text-muted-foreground">封面文案：{selectedDraft.selectedCoverText}</p>
-          <pre className="mt-4 whitespace-pre-wrap font-sans text-sm leading-7">{selectedDraft.content}</pre>
-          {selectedDraft.tags.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {selectedDraft.tags.map((tag) => (
-                <Badge key={tag} variant="outline">
-                  #{tag}
-                </Badge>
+        {selectedDraft.generatedImages && selectedDraft.generatedImages.length > 0 ? (
+          <section className="rounded-xl border border-border bg-card p-4">
+            <h3 className="text-sm font-semibold">已生成封面图</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              {selectedDraft.generatedImages.map((image) => (
+                <div key={`${image.promptIndex}-${image.url}`} className="space-y-2">
+                  {image.coverText ? (
+                    <p className="text-xs text-muted-foreground">封面字：{image.coverText}</p>
+                  ) : null}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={image.url}
+                    alt={`封面图 ${image.promptIndex + 1}`}
+                    className="max-h-56 w-full rounded-md border border-border/60 object-contain bg-background"
+                  />
+                </div>
               ))}
             </div>
-          ) : null}
-          {selectedDraft.riskReminder ? (
-            <p className="mt-4 text-xs leading-5 text-muted-foreground">{selectedDraft.riskReminder}</p>
-          ) : null}
-        </article>
+          </section>
+        ) : null}
 
         {selectedDraft.complianceReport ? (
           <section className="rounded-xl border border-border p-4">
@@ -141,7 +232,7 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
         </div>
       ) : (
         <ul className="space-y-2">
-          {drafts.map((draft) => {
+          {drafts.map((draft, index) => {
             const key = draftKey(draft);
             return (
               <li key={key}>
@@ -153,6 +244,9 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
                     "hover:border-primary/30 hover:bg-accent/20",
                   )}
                 >
+                  <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-bold text-muted-foreground">
+                    {index + 1}
+                  </span>
                   <div className="min-w-0 flex-1 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium leading-snug">{draft.selectedTitle}</span>
@@ -162,6 +256,11 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
                       >
                         {publishReadinessLabel(draft.complianceReport?.publishReadiness)}
                       </Badge>
+                      {draft.generatedImages && draft.generatedImages.length > 0 ? (
+                        <Badge variant="outline" className="text-[10px] font-normal">
+                          含封面图
+                        </Badge>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       <Badge variant="outline" className="text-[10px] font-normal">

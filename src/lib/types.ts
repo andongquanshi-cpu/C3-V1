@@ -94,9 +94,11 @@ export interface CreativeAngle {
   emotionalHook: string[];
   userPainPoint?: string;
   contentStructure?: string;
+  differentiationAxis?: string;
   recommendedTemplateId?: string;
   recommendedFeatureIds: string[];
   productBridge?: Record<string, string>;
+  displayTags?: string[];
   titleDirections: string[];
   coverDirection?: string;
   riskLevel: RiskLevel;
@@ -108,6 +110,13 @@ export interface QualityScore {
   scores?: Record<string, number>;
   weaknesses?: string[];
   suggestions?: string[];
+}
+
+export interface GeneratedImage {
+  promptIndex: number;
+  url: string;
+  style?: string;
+  coverText?: string;
 }
 
 export interface GeneratedContent {
@@ -129,6 +138,7 @@ export interface GeneratedContent {
     coverText?: string;
     riskNotes?: string[];
   }>;
+  generatedImages?: GeneratedImage[];
   qualityScore?: QualityScore;
   complianceReport?: ComplianceReport;
   debugKnowledgeUsed?: unknown;

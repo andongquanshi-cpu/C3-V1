@@ -1,5 +1,9 @@
-import type { Material, BusinessLine } from "@/lib/types";
-import type { BusinessLineWorkflowConfig } from "@/lib/business-line-workflow";
+import type { BriefInput, Material, BusinessLine } from "@/lib/types";
+import {
+  getWorkflowFallback,
+  isFeatureSelectionActive,
+  type BusinessLineWorkflowConfig,
+} from "@/lib/business-line-workflow";
 import { buildHotspotSearchQuery as buildHotspotSearchQueryFromDisplay } from "@/lib/hotspot-display";
 
 export type HotspotTabId = "finance" | "policy" | "fund" | "equity" | "custom";
@@ -89,12 +93,24 @@ export function getPrimaryMaterial(materials: Material[]) {
 }
 
 export function canProceedFromBrief(
-  personaId: string | undefined,
+  brief: Pick<
+    BriefInput,
+    "businessLine" | "offerId" | "creationScene" | "audienceTag" | "personaId" | "selectedFeatureIds"
+  >,
   materials: Material[],
-  creationScene?: string,
   config?: BusinessLineWorkflowConfig,
 ) {
-  if (requiresHotspotMaterials({ personaId, creationScene, config })) {
+  const businessLine = brief.businessLine;
+  const cfg = config || getWorkflowFallback(businessLine);
+
+  if (!cfg.hideOfferSelection && !brief.offerId) return false;
+  if (!brief.creationScene) return false;
+  if (!brief.audienceTag) return false;
+  if (!brief.personaId) return false;
+  if (isFeatureSelectionActive(brief, cfg, businessLine) && brief.selectedFeatureIds.length < 1) {
+    return false;
+  }
+  if (requiresHotspotMaterials({ personaId: brief.personaId, creationScene: brief.creationScene, config: cfg })) {
     return getSelectedMaterials(materials).length >= 1;
   }
   return true;

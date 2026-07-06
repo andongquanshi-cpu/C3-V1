@@ -20,12 +20,25 @@ export function getTextLlmConfig(): ServerTextLlmConfig {
 }
 
 function normalizeImageApiUrl(apiUrl: string, format: "volcengine" | "openai") {
-  const trimmed = apiUrl.trim().replace(/\/+$/, "");
+  let trimmed = apiUrl.trim().replace(/\/+$/, "");
   if (!trimmed) {
     return format === "volcengine"
       ? "https://ark.cn-beijing.volces.com/api/v3/images/generations"
       : "https://api.openai.com/v1/images/generations";
   }
+
+  if (format === "volcengine") {
+    // 常见误配：/v1/images/generations（OpenAI 风格）→ 方舟应为 /api/v3/images/generations
+    trimmed = trimmed.replace(
+      /^(https?:\/\/ark\.cn-beijing\.volces\.com)\/v1\/images\/generations$/i,
+      "$1/api/v3/images/generations",
+    );
+    trimmed = trimmed.replace(
+      /^(https?:\/\/ark\.cn-beijing\.volces\.com)\/v1$/i,
+      "$1/api/v3",
+    );
+  }
+
   if (trimmed.endsWith("/images/generations")) return trimmed;
   if (format === "volcengine" && /\/api\/v3$/i.test(trimmed)) {
     return `${trimmed}/images/generations`;
@@ -47,7 +60,7 @@ export function getImageConfig(): ServerImageConfig {
     apiKey: process.env.IMAGE_API_KEY || "",
     model:
       process.env.IMAGE_MODEL ||
-      (format === "volcengine" ? "doubao-seedream-3.0-t2i" : "dall-e-3"),
+      (format === "volcengine" ? "doubao-seedream-4-5-251128" : "dall-e-3"),
     format,
   };
 }
@@ -65,6 +78,7 @@ export function getServerApiStatus() {
     image: Boolean(image.apiKey),
     imageModel: image.model,
     imageFormat: image.format,
+    imageApiUrl: image.apiUrl,
     hotspot: Boolean(hotspot),
     ready: Boolean(text.apiKey && text.apiUrl && text.model),
     model: text.model,

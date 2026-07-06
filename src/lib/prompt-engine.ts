@@ -4,7 +4,12 @@ import { retrieveKnowledge } from "@/lib/knowledge-retriever";
 import { formatEmbedLevelForPrompt } from "@/lib/embed-level";
 import { buildBusinessLineRuntimeLock, resolveBrandName } from "@/lib/business-line-prompt";
 import { formatContentLengthForPrompt, normalizeContentLength } from "@/lib/licaitong-workflow";
-import { buildPersonaContentPrompt, isPersonasLibraryAvailable } from "@/lib/persona-loader";
+import {
+  buildPersonaContentPrompt,
+  isPersonasLibraryAvailable,
+  loadAudiences,
+  loadPersonaStandard,
+} from "@/lib/persona-loader";
 import {
   formatTopicMaterialsForPrompt,
   getPrimaryMaterialTitle,
@@ -41,6 +46,72 @@ function buildSystemPrompt(knowledge: AnyRecord) {
 
 function normalizeText(value: unknown) {
   return String(value || "").trim().toLowerCase();
+}
+
+function buildCreativeAngleL4Context(input: AnyRecord, businessLine: string) {
+  const line = businessLine === "licaitong" ? "licaitong" : "weisec";
+  const audienceTag = String(input.audienceTag || "").trim();
+  const targetUser = String(input.targetUser || "").trim();
+  const personaId = String(input.personaId || "").trim();
+  const creationScene = String(input.creationScene || "").trim();
+
+  const audiences = loadAudiences();
+  const audience = audiences.find(
+    (item) =>
+      item.businessLine === line &&
+      (item.id === audienceTag || item.name === targetUser || item.kbMatchName === targetUser),
+  );
+
+  let persona: AnyRecord | null = null;
+  if (personaId && isPersonasLibraryAvailable(line)) {
+    try {
+      const standard = loadPersonaStandard(personaId, line);
+      const sceneAdaptation = creationScene ? standard.sceneAdaptation?.[creationScene] : undefined;
+      persona = {
+        id: standard.id,
+        label: standard.label,
+        summary: standard.summary,
+        contentArchetype: standard.contentArchetypeLabel || standard.contentArchetype,
+        identityTags: standard.identity?.tags,
+        targetAudience: standard.identity?.targetAudience,
+        tone: standard.style?.tone,
+        perspective: standard.style?.perspective,
+        titleStyle: standard.style?.titleStyle,
+        coreAngle: standard.differentiation?.coreAngle,
+        openingHookPatterns: standard.differentiation?.openingHookPatterns?.slice(0, 3),
+        productImplantStyle: standard.differentiation?.productImplantStyle,
+        forbiddenVoice: standard.differentiation?.forbiddenVoice,
+        antiHomogeneity: standard.antiHomogeneity
+          ? {
+              neverUse: standard.antiHomogeneity.neverUse?.slice(0, 6),
+              neverSoundLike: standard.antiHomogeneity.neverSoundLike?.slice(0, 4),
+              mandatoryMarkers: standard.antiHomogeneity.mandatoryMarkers?.slice(0, 4),
+            }
+          : undefined,
+        sceneAdaptation,
+      };
+    } catch {
+      persona = null;
+    }
+  }
+
+  return {
+    targetReader: audience
+      ? {
+          id: audience.id,
+          name: audience.name,
+          promptSummary: audience.promptSummary,
+          painPoints: audience.painPoints?.slice(0, 4),
+          infoHabits: audience.infoHabits?.slice(0, 3),
+          tone: audience.tone,
+          safeExpressions: audience.safeExpressions?.slice(0, 3),
+          forbiddenExpressions: audience.forbiddenExpressions?.slice(0, 4),
+        }
+      : targetUser
+        ? { name: targetUser }
+        : null,
+    persona,
+  };
 }
 
 function buildPrompt(templateName: string, input: AnyRecord, taskName: string, variablesBuilder: (input: AnyRecord, knowledge: AnyRecord) => AnyRecord) {
@@ -87,7 +158,7 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
   const materials = resolvePromptMaterials(input);
   const topicMaterialsText = formatTopicMaterialsForPrompt(materials);
   const primaryHotspot = getPrimaryMaterialTitle(materials);
-  return buildPrompt("creative-angles.md", input, "creative-angles", (data) => ({
+  return buildPrompt("creative-angles.md", input, "creative-angles", (data, knowledge) => ({
     contentType: data.contentType || "brand-seed",
     topic: primaryHotspot || data.topic || data.hotspot || "未提供",
     targetUser: data.targetUser || "投资小白",
@@ -96,6 +167,9 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
     bloggerLevel: data.bloggerLevel || "middle",
     customRequirement: data.customRequirement || data.customPrompt || "无",
     topicMaterials: topicMaterialsText,
+    personaContext: buildCreativeAngleL4Context(data, knowledge.businessLine || data.businessLine || "weisec"),
+    avoidRecentAngles: data.avoidRecentAngles || [],
+    diversitySeed: data.diversitySeed || "default",
     generateCount,
   }));
 }

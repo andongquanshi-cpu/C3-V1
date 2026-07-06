@@ -49,6 +49,7 @@ interface BriefPanelProps {
   hotspotCandidates: Material[];
   isSearchingHotspot: boolean;
   canContinue: boolean;
+  topicExample?: string;
   onBriefChange: (patch: Partial<BriefInput> | ((current: BriefInput) => BriefInput)) => void;
   onMaterialDraftChange: (value: string) => void;
   onMaterialDraftCommit: () => void;
@@ -201,6 +202,7 @@ export function BriefPanel({
   hotspotCandidates,
   isSearchingHotspot,
   canContinue,
+  topicExample,
   onBriefChange,
   onMaterialDraftChange,
   onMaterialDraftCommit,
@@ -215,23 +217,22 @@ export function BriefPanel({
 }: BriefPanelProps) {
   const businessLine: BusinessLine = brief.businessLine;
   const cfg = workflowConfig || getWorkflowFallback(businessLine);
-  const scene = brief.creationScene || cfg.defaultBrief.creationScene;
-  const audienceTag = brief.audienceTag || cfg.defaultBrief.audienceTag;
+  const scene = brief.creationScene;
+  const audienceTag = brief.audienceTag;
   const licaitongPersonas = getPersonasForUI(scene, audienceTag, cfg, businessLine);
   const weisecPersonaGroups =
     businessLine === "weisec" ? expandPersonasForBriefUI(cfg.personas, scene, audienceTag, businessLine) : null;
   const featureNameById = Object.fromEntries(offerFeatures.map((item) => [item.id, item.name]));
-  const atFeatureLimit = brief.selectedFeatureIds.length >= cfg.featureLimit;
   const showFeatureSelection = isFeatureSelectionActive(brief, cfg, businessLine);
   const hotspotTabs = getHotspotTabs(businessLine);
   const hotspotRequired = requiresHotspotMaterials({
     personaId: brief.personaId,
-    creationScene: scene,
+    creationScene: brief.creationScene,
     config: cfg,
   });
   const hotspotRequirementLabel = !hotspotRequired
     ? null
-    : sceneRequiresHotspotMaterials(scene, cfg)
+    : sceneRequiresHotspotMaterials(brief.creationScene, cfg)
       ? "市场热点解读需选热点"
       : brief.personaId === "hotspot_observer"
         ? "市场观察员需选热点"
@@ -300,7 +301,7 @@ export function BriefPanel({
         <Column
           index={1}
           title={cfg.hideOfferSelection ? "主推功能" : "选定 Offer"}
-          hint={cfg.hideOfferSelection ? "本篇重点介绍的能力（最多选 " + cfg.featureLimit + " 个）" : "主推产品 + 功能卖点"}
+          hint={cfg.hideOfferSelection ? "本篇重点介绍的能力，可多选" : "主推产品 + 功能卖点"}
         >
           {!cfg.hideOfferSelection ? (
             <div className="grid grid-cols-3 gap-1.5">
@@ -335,35 +336,33 @@ export function BriefPanel({
               {!cfg.hideOfferSelection ? (
                 <div className="flex items-center justify-between px-0.5 pt-0.5">
                   <span className="text-xs font-medium text-muted-foreground">主推功能</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {brief.selectedFeatureIds.length}/{cfg.featureLimit}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground">已选 {brief.selectedFeatureIds.length}</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-between px-0.5 pb-0.5">
                   <span className="text-[10px] text-muted-foreground">已选</span>
-                  <span className="text-[10px] text-muted-foreground">
-                    {brief.selectedFeatureIds.length}/{cfg.featureLimit}
-                  </span>
+                  <span className="text-[10px] text-muted-foreground">{brief.selectedFeatureIds.length}</span>
                 </div>
               )}
-              {offerFeatures.map((feature) => {
+              {offerFeatures.length === 0 ? (
+                <p className="px-1 py-6 text-center text-xs text-muted-foreground">
+                  {cfg.hideOfferSelection ? "加载功能列表中…" : "请先选择 Offer"}
+                </p>
+              ) : (
+                offerFeatures.map((feature) => {
                 const checked = brief.selectedFeatureIds.includes(feature.id);
-                const disabled = !checked && atFeatureLimit;
                 return (
                   <label
                     key={feature.id}
                     className={cn(
-                      "flex gap-2 rounded-lg border px-2.5 py-2 transition-colors",
+                      "flex gap-2 rounded-lg border px-2.5 py-2 transition-colors cursor-pointer hover:bg-accent/20",
                       checked ? "border-primary/50 bg-primary/5" : "border-border/70",
-                      disabled ? "cursor-not-allowed opacity-40" : "cursor-pointer hover:bg-accent/20",
                     )}
                   >
                     <input
                       type="checkbox"
                       className="mt-0.5 shrink-0"
                       checked={checked}
-                      disabled={disabled}
                       onChange={(event) =>
                         onBriefChange((current) =>
                           toggleFeature(current, feature.id, feature.name, event.target.checked, cfg),
@@ -378,8 +377,11 @@ export function BriefPanel({
                     </span>
                   </label>
                 );
-              })}
+                })
+              )}
             </>
+          ) : !cfg.hideOfferSelection ? (
+            <p className="px-1 py-8 text-center text-xs text-muted-foreground">请先选择 Offer，再勾选主推功能</p>
           ) : null}
         </Column>
 
@@ -391,7 +393,7 @@ export function BriefPanel({
               onClick={() => selectScene(item.id)}
               className={cn(
                 "w-full rounded-lg border px-3 py-2.5 text-left transition-all",
-                scene === item.id
+                brief.creationScene === item.id
                   ? "border-primary bg-primary/10"
                   : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
               )}
@@ -412,7 +414,7 @@ export function BriefPanel({
                 onClick={() => selectAudience(item.id)}
                 className={cn(
                   "rounded-lg border px-2 py-2 text-center transition-all",
-                  audienceTag === item.id
+                  brief.audienceTag === item.id
                     ? "border-primary bg-primary/10"
                     : "border-border/80 hover:border-primary/30 hover:bg-accent/20",
                 )}
@@ -464,7 +466,7 @@ export function BriefPanel({
             <Textarea
               value={brief.topic}
               onChange={(event) => onBriefChange({ topic: event.target.value })}
-              placeholder="这篇笔记讲什么事？例如：发工资后我会先看这三项"
+              placeholder={`这篇笔记讲什么事？例如：${topicExample || "发工资后我会先看这三项"}`}
               className="min-h-[72px] resize-none text-sm"
             />
           </div>

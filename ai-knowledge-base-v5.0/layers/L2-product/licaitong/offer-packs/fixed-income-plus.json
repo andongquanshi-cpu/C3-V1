@@ -9,9 +9,9 @@
       "id": "fplus_curated_zone",
       "businessLine": "licaitong",
       "offerId": "fixed-income-plus",
-      "name": "大家盈 · 严选专区",
+      "name": "严选专区",
       "summary": "理财通在固收+方向提供严选专区，帮助用户缩小比较范围，减少自己逐一研究产品信息的负担。具体产品以页面展示为准。",
-      "aliases": ["大家盈", "严选专区", "固收+严选"],
+      "aliases": ["严选专区", "固收+严选"],
       "suitableContentTypes": ["finance-tips", "personal-exp", "brand-seed", "scenario-seeding"],
       "suitableCreationScenes": ["pain-story", "dry-goods-list", "newcomer-guide"],
       "suitableUserSegments": ["宝妈", "白领", "学生", "理财新手"],
@@ -26,7 +26,7 @@
         "把专区当作缩小选择范围的入口，而非唯一答案"
       ],
       "productActions": [
-        "微信 → 我 → 服务 → 理财通 → 进入固收+ / 大家盈相关专区",
+        "微信 → 我 → 服务 → 理财通 → 固收+ → 严选专区",
         "查看产品详情、风险揭示和法律文件"
       ],
       "safeClaims": [

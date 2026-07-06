@@ -94,8 +94,8 @@ function scoreWeisecPersonaEntry(entry: PersonaUiEntry, scene: string, audience:
 
 export function expandPersonasForBriefUI(
   personas: PersonaSource[],
-  scene: string,
-  audienceTag: string,
+  scene: string | undefined,
+  audienceTag: string | undefined,
   businessLine: BusinessLine,
 ): { primary: PersonaUiEntry[]; optional: PersonaUiEntry[] } {
   if (businessLine !== "weisec") {
@@ -103,10 +103,15 @@ export function expandPersonasForBriefUI(
     return { primary: entries, optional: [] };
   }
 
-  const normalizedAudience = normalizeWeisecAudience(audienceTag) || audienceTag;
   const primaryEntries = personas
     .filter((persona) => !WEISEC_HIDDEN_PERSONA_IDS.has(persona.id))
     .map((persona) => buildPersonaEntry(persona));
+
+  if (!scene || !audienceTag) {
+    return { primary: primaryEntries, optional: [] };
+  }
+
+  const normalizedAudience = normalizeWeisecAudience(audienceTag) || audienceTag;
 
   primaryEntries.sort(
     (a, b) => scoreWeisecPersonaEntry(b, scene, normalizedAudience) - scoreWeisecPersonaEntry(a, scene, normalizedAudience),
@@ -117,11 +122,11 @@ export function expandPersonasForBriefUI(
 
 export function getPersonaUiRecommendation(
   entry: PersonaUiEntry,
-  scene: string,
-  audienceTag: string,
+  scene: string | undefined,
+  audienceTag: string | undefined,
   businessLine: BusinessLine,
 ): PersonaRecommendation {
-  if (businessLine !== "weisec") return null;
+  if (businessLine !== "weisec" || !scene || !audienceTag) return null;
 
   const normalizedAudience = normalizeWeisecAudience(audienceTag) || audienceTag;
   const primaryId = WEISEC_PRIMARY_PERSONA_BY_SCENE[scene];
@@ -149,9 +154,12 @@ export function resolveWeisecPrimaryPersonaId(scene: string): string | undefined
 export function getWeisecPersonaDisplayLabel(
   brief: BriefInput,
   personas: PersonaSource[],
-  scene: string,
-  audienceTag: string,
+  scene: string | undefined,
+  audienceTag: string | undefined,
 ): string | undefined {
+  if (!scene || !audienceTag) {
+    return personas.find((item) => item.id === brief.personaId)?.label;
+  }
   const groups = expandPersonasForBriefUI(personas, scene, audienceTag, "weisec");
   const hit = groups.primary.find((entry) => isPersonaUiSelected(brief, entry));
   return hit?.label;

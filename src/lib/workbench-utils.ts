@@ -37,14 +37,41 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+/** LLM 常在 JSON 字符串里输出字面量 \\n，解析后不会变成真实换行 */
+export function normalizeMultilineText(value: unknown): string {
+  if (typeof value !== "string" || !value) return "";
+  return value
+    .replace(/\r\n/g, "\n")
+    .replace(/\r/g, "\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function assembleGeneratedContentText(data: LooseRecord): string {
+  const opening = normalizeMultilineText(data.opening);
+  const body = normalizeMultilineText(data.body);
+  const closing = normalizeMultilineText(data.closing);
+  const explicit = normalizeMultilineText(data.content);
+  const fromParts = [opening, body, closing].filter(Boolean).join("\n\n");
+
+  if (!explicit) return fromParts;
+  if (!fromParts) return explicit;
+
+  const explicitHasBreaks = explicit.includes("\n");
+  const partsHasBreaks = fromParts.includes("\n");
+
+  if (partsHasBreaks && !explicitHasBreaks) return fromParts;
+  if (explicitHasBreaks && !partsHasBreaks) return explicit;
+
+  return explicit.length >= fromParts.length ? explicit : fromParts;
+}
+
 /** 将 personaContent 等人设专用 JSON 映射为 contentGeneration 标准字段 */
 export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedContent> & LooseRecord {
   const data = asRecord(value);
 
-  const opening = asString(data.opening);
-  const body = asString(data.body);
-  const closing = asString(data.closing);
-  const content = asString(data.content) || [opening, body, closing].filter(Boolean).join("\n\n");
+  const content = assembleGeneratedContentText(data);
 
   const titleOptions = Array.isArray(data.titleOptions) ? data.titleOptions : [];
   const titleCandidates =
@@ -184,27 +211,69 @@ export function buildDefaultCompliance(content: GeneratedContent): ComplianceRep
   };
 }
 
+function normalizeDisplayTag(value: unknown) {
+  const text = asString(value).replace(/^#+/, "").trim();
+  if (!text || text.length > 12) return "";
+  return text.startsWith("#") ? text : `#${text}`;
+}
+
+function buildFallbackContentTags(angle: CreativeAngle): string[] {
+  const fromAngle = (angle.displayTags || [])
+    .map((tag) => tag.replace(/^#+/, "").trim())
+    .filter(Boolean);
+  if (fromAngle.length) return fromAngle.slice(0, 6);
+  const candidates = [
+    angle.angleType,
+    angle.targetUser,
+    ...angle.emotionalHook,
+    angle.userPainPoint?.slice(0, 12),
+  ]
+    .map((item) => asString(item))
+    .filter(Boolean);
+  return [...new Set(candidates)].slice(0, 5);
+}
+
+function buildFallbackDisplayTags(angle: CreativeAngle, brief: BriefInput) {
+  const candidates = [
+    angle.angleType,
+    angle.targetUser || brief.targetUser,
+    ...angle.emotionalHook,
+    angle.userPainPoint,
+  ];
+  return [...new Set(candidates.map(normalizeDisplayTag).filter(Boolean))].slice(0, 4);
+}
+
 export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngle[] {
   const parsed = value as { angles?: CreativeAngle[] } | CreativeAngle[];
   const angles = Array.isArray(parsed) ? parsed : Array.isArray(parsed.angles) ? parsed.angles : [];
   const limit = Math.min(5, Math.max(1, Math.round(Number(brief.generateCount) || 3)));
-  return angles.slice(0, limit).map((angle, index) => ({
-    angleId: angle.angleId || `angle_${String(index + 1).padStart(3, "0")}`,
-    angleName: angle.angleName || `创意角度 ${index + 1}`,
-    angleType: angle.angleType || "内容角度",
-    coreIdea: angle.coreIdea || "",
-    targetUser: angle.targetUser || brief.targetUser,
-    emotionalHook: Array.isArray(angle.emotionalHook) ? angle.emotionalHook : [],
-    userPainPoint: angle.userPainPoint || "",
-    contentStructure: angle.contentStructure || "",
-    recommendedTemplateId: angle.recommendedTemplateId || "",
-    recommendedFeatureIds: Array.isArray(angle.recommendedFeatureIds) ? angle.recommendedFeatureIds : [],
-    productBridge: angle.productBridge || {},
-    titleDirections: Array.isArray(angle.titleDirections) ? angle.titleDirections : [],
-    coverDirection: angle.coverDirection || "",
-    riskLevel: angle.riskLevel || "low",
-    riskNotes: Array.isArray(angle.riskNotes) ? angle.riskNotes : [],
-  }));
+  return angles.slice(0, limit).map((angle, index) => {
+    const normalized: CreativeAngle = {
+      angleId: angle.angleId || `angle_${String(index + 1).padStart(3, "0")}`,
+      angleName: angle.angleName || `创意角度 ${index + 1}`,
+      angleType: angle.angleType || "内容角度",
+      coreIdea: angle.coreIdea || "",
+      targetUser: angle.targetUser || brief.targetUser,
+      emotionalHook: Array.isArray(angle.emotionalHook) ? angle.emotionalHook : [],
+      userPainPoint: angle.userPainPoint || "",
+      contentStructure: angle.contentStructure || "",
+      differentiationAxis: angle.differentiationAxis || "",
+      recommendedTemplateId: angle.recommendedTemplateId || "",
+      recommendedFeatureIds: Array.isArray(angle.recommendedFeatureIds) ? angle.recommendedFeatureIds : [],
+      productBridge: angle.productBridge || {},
+      displayTags: Array.isArray(angle.displayTags)
+        ? angle.displayTags.map(normalizeDisplayTag).filter(Boolean).slice(0, 5)
+        : [],
+      titleDirections: Array.isArray(angle.titleDirections) ? angle.titleDirections : [],
+      coverDirection: angle.coverDirection || "",
+      riskLevel: angle.riskLevel || "low",
+      riskNotes: Array.isArray(angle.riskNotes) ? angle.riskNotes : [],
+    };
+    if (!normalized.displayTags?.length) {
+      normalized.displayTags = buildFallbackDisplayTags(normalized, brief);
+    }
+    return normalized;
+  });
 }
 
 export function normalizeContent(value: unknown, angle: CreativeAngle): GeneratedContent {
@@ -219,7 +288,7 @@ export function normalizeContent(value: unknown, angle: CreativeAngle): Generate
     selectedCoverText: data.selectedCoverText || data.coverTextCandidates?.[0]?.text || "财经干货",
     content: data.content || "",
     insertStrategy: data.insertStrategy || {},
-    tags: Array.isArray(data.tags) ? data.tags : [],
+    tags: Array.isArray(data.tags) && data.tags.length ? data.tags : buildFallbackContentTags(angle),
     interactionGuide: data.interactionGuide || "",
     riskReminder: data.riskReminder || "市场有风险，投资需谨慎。",
     imagePromptSuggestions: Array.isArray(data.imagePromptSuggestions) ? data.imagePromptSuggestions : [],

@@ -382,6 +382,9 @@ export function buildPersonaContentUserPrompt(
       `\n\n【防同质化】archetype=${archetype || ""}\n禁止：${anti.neverUse.join("；")}\n勿模仿：${anti.neverSoundLike.join("；")}\n必须有：${anti.mandatoryMarkers.join("；")}`,
     );
   }
+  parts.push(
+    `\n\n【输出要求 · 通用】\n- tags 字段必填：5-8 个小红书话题词（不带 #），与主题、标题、人设相关；不得省略或留空数组\n- emoji 按人设 emojiDensity 适量使用（多数人设全文 3-7 个）：点缀在句中、段尾或偶发段首，有小红书氛围；禁止每篇按固定 emoji 顺序当分段小标题\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一/第二」等可见结构标记\n- interactionGuide 最多一句轻互动，不得替代正文`,
+  );
   return parts.join("");
 }
 

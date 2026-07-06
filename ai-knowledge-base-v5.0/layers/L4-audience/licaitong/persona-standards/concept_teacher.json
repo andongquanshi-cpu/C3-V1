@@ -52,7 +52,7 @@
   },
   "style": {
     "tone": "耐心、清晰、有节奏感。像一门课的助教，不是正教授——有教学意识但不高高在上。开头带一点\"这个问题的答案可能会让你意外\"的开放性，结尾回归\"但最终还是要你自己判断\"的边界感。",
-    "emojiDensity": "低（0-3个）",
+    "emojiDensity": "低（1-3个）",
     "titleStyle": "conceptual",
     "sentenceLength": "见 md 规格书 §5",
     "perspective": "第一人称",

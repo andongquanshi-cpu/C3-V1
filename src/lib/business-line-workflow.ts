@@ -317,7 +317,7 @@ export function resolveWorkflowForLine(
 }
 
 export function getBriefStorageKey(businessLine: BusinessLine): string {
-  return `c3-v0-brief-${businessLine}`;
+  return `c3-v1-brief-${businessLine}`;
 }
 
 export function getAnglesStatusMessage(businessLine: BusinessLine): string {
@@ -333,21 +333,23 @@ function resolveConfig(config: BusinessLineWorkflowConfig | undefined, businessL
 }
 
 export function isFeatureSelectionActive(
-  brief: Pick<BriefInput, "offerId">,
+  brief: Pick<BriefInput, "offerId" | "businessLine">,
   config?: BusinessLineWorkflowConfig,
   businessLine: BusinessLine = "licaitong",
 ): boolean {
   const cfg = resolveConfig(config, businessLine);
-  return Boolean(cfg.hideOfferSelection || brief.offerId === cfg.primaryOfferId);
+  if (cfg.hideOfferSelection) return true;
+  return Boolean(brief.offerId);
 }
 
 export function getPersonaRecommendation(
   personaId: string,
-  scene: string,
-  audience: string,
+  scene: string | undefined,
+  audience: string | undefined,
   config?: BusinessLineWorkflowConfig,
   businessLine: BusinessLine = "licaitong",
 ): PersonaRecommendation {
+  if (!scene || !audience) return null;
   const cfg = resolveConfig(config, businessLine);
   const persona = cfg.personas.find((item) => item.id === personaId);
   if (!persona) return null;
@@ -540,26 +542,18 @@ export function buildWorkflowDefaults(
   | "campaignGoal"
 > {
   const cfg = resolveConfig(config, businessLine);
-  const scene = cfg.defaultBrief.creationScene;
-  const audienceTag = cfg.defaultBrief.audienceTag;
-  const persona = getDefaultPersonaForScene(scene, cfg, businessLine, audienceTag);
-  const featureIds = getDefaultFeatureIdsForScene(scene, cfg, businessLine);
   const preset = getBusinessLinePreset(businessLine);
-  const personaVariant =
-    businessLine === "weisec" && persona.id === "peer_diary"
-      ? resolvePeerDiaryVariantForAudience(audienceTag, businessLine)
-      : persona.variant;
   return {
-    offerId: cfg.defaultBrief.offerId,
-    creationScene: scene,
-    audienceTag,
-    contentType: creationSceneToContentType(scene, cfg, businessLine),
-    targetUser: audienceTagToTargetUser(audienceTag, cfg, businessLine),
-    personaId: persona.id,
-    personaVariant,
-    selectedFeatureIds: featureIds,
+    offerId: undefined,
+    creationScene: undefined,
+    audienceTag: undefined,
+    contentType: preset.defaultContentType,
+    targetUser: "",
+    personaId: undefined,
+    personaVariant: undefined,
+    selectedFeatureIds: [],
     selectedFeatureNames: [],
-    topic: cfg.defaultBrief.topic || preset.defaultTopic,
+    topic: "",
     campaignGoal: cfg.defaultBrief.campaignGoal || preset.campaignGoal,
   };
 }
@@ -567,69 +561,30 @@ export function buildWorkflowDefaults(
 export function applySceneChange(
   brief: BriefInput,
   scene: string,
-  featureNameById: Record<string, string>,
+  _featureNameById: Record<string, string>,
   config?: BusinessLineWorkflowConfig,
 ): BriefInput {
   const businessLine = brief.businessLine;
   const cfg = resolveConfig(config, businessLine);
-  const next: BriefInput = {
+  return {
     ...brief,
     creationScene: scene,
     contentType: creationSceneToContentType(scene, cfg, businessLine),
   };
-  const currentPersona = cfg.personas.find((item) => item.id === brief.personaId);
-  let updated: BriefInput = next;
-  if (!personaFitsScene(currentPersona, scene)) {
-    const briefAudience = normalizeAudienceTag(brief.audienceTag, businessLine) || brief.audienceTag;
-    const defaultPersona = getDefaultPersonaForScene(scene, cfg, businessLine, briefAudience);
-    const nextAudience = defaultPersona.audienceTags.includes(briefAudience || "")
-      ? briefAudience
-      : defaultPersona.audienceTags[0] || briefAudience;
-    updated = {
-      ...updated,
-      personaId: defaultPersona.id,
-      personaVariant:
-        businessLine === "weisec" && defaultPersona.id === "peer_diary"
-          ? resolvePeerDiaryVariantForAudience(nextAudience, businessLine)
-          : defaultPersona.variant,
-      audienceTag: nextAudience,
-      targetUser: audienceTagToTargetUser(nextAudience || cfg.defaultBrief.audienceTag, cfg, businessLine),
-    };
-  }
-  if (isFeatureSelectionActive(brief, cfg, businessLine)) {
-    const featureIds = getDefaultFeatureIdsForScene(scene, cfg, businessLine);
-    return {
-      ...updated,
-      selectedFeatureIds: featureIds,
-      selectedFeatureNames: featureIds.map((id) => featureNameById[id]).filter(Boolean),
-    };
-  }
-  return updated;
 }
 
 export function applyOfferChange(
   brief: BriefInput,
   offerId: string,
-  featureNameById: Record<string, string>,
-  config?: BusinessLineWorkflowConfig,
+  _featureNameById: Record<string, string>,
+  _config?: BusinessLineWorkflowConfig,
 ): BriefInput {
-  const businessLine = brief.businessLine;
-  const cfg = resolveConfig(config, businessLine);
-  const scene = brief.creationScene || cfg.defaultBrief.creationScene;
-  if (offerId !== cfg.primaryOfferId) {
-    return {
-      ...brief,
-      offerId,
-      selectedFeatureIds: [],
-      selectedFeatureNames: [],
-    };
-  }
-  const featureIds = getDefaultFeatureIdsForScene(scene, cfg, businessLine);
+  if (brief.offerId === offerId) return brief;
   return {
     ...brief,
     offerId,
-    selectedFeatureIds: featureIds,
-    selectedFeatureNames: featureIds.map((id) => featureNameById[id]).filter(Boolean),
+    selectedFeatureIds: [],
+    selectedFeatureNames: [],
   };
 }
 
@@ -663,7 +618,9 @@ export function applyPersonaChange(
   const cfg = resolveConfig(config, businessLine);
   const persona = cfg.personas.find((item) => item.id === personaId);
   if (!persona) return brief;
-  const sceneContentType = creationSceneToContentType(brief.creationScene, cfg, businessLine);
+  const sceneContentType = brief.creationScene
+    ? creationSceneToContentType(brief.creationScene, cfg, businessLine)
+    : brief.contentType;
   const variant = resolvePersonaVariant(personaId, brief, persona, personaVariant);
   return {
     ...brief,
@@ -681,15 +638,11 @@ export function toggleFeature(
   featureId: string,
   featureName: string,
   checked: boolean,
-  config?: BusinessLineWorkflowConfig,
+  _config?: BusinessLineWorkflowConfig,
 ): BriefInput {
-  const limit = resolveConfig(config, brief.businessLine).featureLimit;
   const ids = new Set(brief.selectedFeatureIds);
   const names = new Set(brief.selectedFeatureNames);
   if (checked) {
-    if (ids.size >= limit && !ids.has(featureId)) {
-      return brief;
-    }
     ids.add(featureId);
     names.add(featureName);
   } else {
@@ -703,6 +656,67 @@ export function toggleFeature(
   };
 }
 
+function getAudienceTopicLabel(businessLine: BusinessLine, audienceTag?: string) {
+  if (businessLine === "weisec") {
+    if (audienceTag === "student") return "大学生";
+    if (audienceTag === "white-collar") return "上班族";
+    return "普通新手";
+  }
+  if (audienceTag === "student") return "学生党";
+  if (audienceTag === "mama") return "宝妈";
+  if (audienceTag === "white-collar") return "职场人";
+  return "普通人";
+}
+
+function getFeatureTopicLabel(brief: Pick<BriefInput, "selectedFeatureNames">, fallback: string) {
+  const names = brief.selectedFeatureNames.filter(Boolean).slice(0, 2);
+  if (names.length === 0) return fallback;
+  return names.join("和");
+}
+
+function softenTopicByPersona(topic: string, personaId?: string) {
+  if (personaId === "peer_diary") return topic.replace("怎么", "我会怎么");
+  if (personaId === "sober_guard") return topic.replace("怎么", "先想清楚什么再");
+  if (personaId === "family_planner" && !topic.includes("家庭")) return `家庭备用金视角：${topic}`;
+  return topic;
+}
+
+export function buildSuggestedTopic(brief: BriefInput, config?: BusinessLineWorkflowConfig): string {
+  const businessLine = brief.businessLine;
+  const cfg = resolveConfig(config, businessLine);
+  if (!brief.creationScene || !brief.audienceTag || !brief.personaId) return "";
+  if (!cfg.hideOfferSelection && !brief.offerId) return "";
+
+  const audience = getAudienceTopicLabel(businessLine, brief.audienceTag);
+  const offer = getOffer(brief.offerId, cfg, businessLine);
+  const offerLabel = offer?.label || (businessLine === "weisec" ? "微证券" : "理财通");
+  const featureLabel = getFeatureTopicLabel(
+    brief,
+    businessLine === "weisec" ? "微信里的行情工具" : `${offerLabel}产品`,
+  );
+
+  let topic = "";
+  if (businessLine === "weisec") {
+    const templates: Record<string, string> = {
+      "newcomer-guide": `${audience}第一次看行情工具，可以先了解哪些基础信息`,
+      "tool-review": `${audience}选微信里的炒股工具，哪些体验最影响使用感`,
+      "life-story-seed": `${audience}在通勤/午休这种碎片时间，会怎么轻量看行情`,
+      "market-hotspot": `热点刷屏时，${audience}可以先从哪些公开信息看起`,
+    };
+    topic = templates[brief.creationScene] || `${audience}怎么理解${offerLabel}里的信息工具`;
+  } else {
+    const templates: Record<string, string> = {
+      "newcomer-guide": `${audience}第一次看${offerLabel}，可以先确认哪些基础信息`,
+      "review-diary": `${audience}复盘一次理财选择，会重新看哪些信息`,
+      "pain-story": `${audience}选理财产品纠结时，可以先比较哪些维度`,
+      "dry-goods-list": `${audience}看${offerLabel}前，可以准备一份哪些信息清单`,
+    };
+    topic = templates[brief.creationScene] || `${audience}怎么理解${offerLabel}里的理财信息`;
+  }
+
+  return softenTopicByPersona(topic, brief.personaId);
+}
+
 export function filterOfferFeatures<T extends { id: string; businessLine?: string; offerId?: string }>(
   features: T[],
   businessLine: BusinessLine,
@@ -710,15 +724,28 @@ export function filterOfferFeatures<T extends { id: string; businessLine?: strin
   config?: BusinessLineWorkflowConfig,
 ): T[] {
   const cfg = resolveConfig(config, businessLine);
-  if (cfg.featureSource === "offer-pack" && offerId) {
+  if (cfg.featureSource === "offer-pack") {
+    if (!offerId) return [];
     return features.filter((feature) => feature.offerId === offerId);
   }
-  return features.filter(
-    (feature) =>
-      feature.businessLine === businessLine ||
-      feature.businessLine === "all" ||
-      !feature.businessLine ||
-      feature.offerId === offerId,
+
+  const lineMatched = features.filter(
+    (feature) => feature.businessLine === businessLine || feature.businessLine === "all",
+  );
+
+  if (cfg.hideOfferSelection) {
+    const allowed = new Set(Object.keys(cfg.featureUiSummaries || {}));
+    if (allowed.size > 0) {
+      return lineMatched.filter((feature) => allowed.has(feature.id));
+    }
+  }
+
+  if (!offerId) {
+    return lineMatched.filter((feature) => feature.businessLine === businessLine);
+  }
+
+  return lineMatched.filter(
+    (feature) => feature.businessLine === businessLine || feature.offerId === offerId,
   );
 }
 

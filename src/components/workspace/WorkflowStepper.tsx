@@ -11,16 +11,18 @@ interface WorkflowStepperProps {
   steps: WorkflowStep[];
   current: number;
   onStepClick?: (step: number) => void;
+  canClickStep?: (step: number) => boolean;
+  isStepComplete?: (step: number) => boolean;
 }
 
-export function WorkflowStepper({ steps, current, onStepClick }: WorkflowStepperProps) {
+export function WorkflowStepper({ steps, current, onStepClick, canClickStep, isStepComplete }: WorkflowStepperProps) {
   return (
     <nav aria-label="创作流程" className="w-full">
       <ol className="flex items-start justify-center gap-0">
         {steps.map((step, index) => {
-          const done = current > step.id;
+          const done = current > step.id || Boolean(isStepComplete?.(step.id));
           const active = current === step.id;
-          const clickable = onStepClick && (done || active);
+          const clickable = onStepClick && (done || active || canClickStep?.(step.id));
           const isLast = index === steps.length - 1;
 
           return (

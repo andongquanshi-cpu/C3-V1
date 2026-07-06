@@ -1,18 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ExternalLink, ImageIcon, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import type { GeneratedContent } from "@/lib/types";
+import type { GeneratedContent, GeneratedImage } from "@/lib/types";
 
 type PromptItem = GeneratedContent["imagePromptSuggestions"][number];
 
 interface ImagePromptLabProps {
   contentId: string;
   prompts: PromptItem[];
+  generatedImages?: GeneratedImage[];
   imageApiReady: boolean;
   imageModel?: string;
+  onImageGenerated?: (image: GeneratedImage) => void;
 }
 
 type SlotState = {
@@ -20,6 +22,8 @@ type SlotState = {
   url?: string;
   error?: string;
 };
+
+const EMPTY_GENERATED_IMAGES: GeneratedImage[] = [];
 
 function slotKey(contentId: string, index: number) {
   return `${contentId}:${index}`;
@@ -32,11 +36,34 @@ function formatImageModelLabel(model?: string) {
   return `${model} 生图`;
 }
 
-export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }: ImagePromptLabProps) {
+function resolveSlotUrl(
+  slot: SlotState | undefined,
+  generatedImages: GeneratedImage[],
+  index: number,
+) {
+  if (slot?.loading) return undefined;
+  if (slot?.url) return slot.url;
+  return generatedImages.find((image) => image.promptIndex === index)?.url;
+}
+
+export function ImagePromptLab({
+  contentId,
+  prompts,
+  generatedImages,
+  imageApiReady,
+  imageModel,
+  onImageGenerated,
+}: ImagePromptLabProps) {
+  const savedImages = generatedImages ?? EMPTY_GENERATED_IMAGES;
   const [slots, setSlots] = useState<Record<string, SlotState>>({});
+
+  useEffect(() => {
+    setSlots({});
+  }, [contentId]);
+
   const generateLabel = formatImageModelLabel(imageModel);
 
-  async function generate(index: number, prompt: string) {
+  async function generate(index: number, prompt: string, item: PromptItem) {
     const key = slotKey(contentId, index);
     if (!prompt.trim()) return;
     setSlots((current) => ({ ...current, [key]: { loading: true } }));
@@ -51,6 +78,12 @@ export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }
       const url = data.data?.[0]?.url || data.url || "";
       if (!url) throw new Error("API 未返回图片 URL");
       setSlots((current) => ({ ...current, [key]: { loading: false, url } }));
+      onImageGenerated?.({
+        promptIndex: index,
+        url,
+        style: item.style,
+        coverText: item.coverText,
+      });
     } catch (error) {
       setSlots((current) => ({
         ...current,
@@ -89,13 +122,11 @@ export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }
         {prompts.map((item, index) => {
           const key = slotKey(contentId, index);
           const slot = slots[key];
+          const imageUrl = resolveSlotUrl(slot, savedImages, index);
           const hasPrompt = Boolean(item.prompt?.trim());
 
           return (
-            <div
-              key={key}
-              className="rounded-lg border border-border/70 bg-muted/15 p-3"
-            >
+            <div key={key} className="rounded-lg border border-border/70 bg-muted/15 p-3">
               <div className="mb-2 flex flex-wrap items-center gap-1.5">
                 {item.style ? (
                   <Badge variant={item.style === "fallback-cover" ? "outline" : "secondary"} className="text-[10px]">
@@ -114,7 +145,7 @@ export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }
                   <button
                     type="button"
                     disabled={!hasPrompt || slot?.loading}
-                    onClick={() => generate(index, item.prompt)}
+                    onClick={() => generate(index, item.prompt, item)}
                     className={cn(
                       "inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors",
                       "border-primary/40 bg-primary/10 text-primary hover:bg-primary/15",
@@ -126,6 +157,8 @@ export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }
                         <Loader2 className="h-3 w-3 animate-spin" />
                         生成中…
                       </>
+                    ) : imageUrl ? (
+                      "重新生成"
                     ) : (
                       generateLabel
                     )}
@@ -135,14 +168,12 @@ export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }
                 )}
               </div>
 
-              {slot?.error ? (
-                <p className="mt-2 text-[11px] text-destructive">{slot.error}</p>
-              ) : null}
+              {slot?.error ? <p className="mt-2 text-[11px] text-destructive">{slot.error}</p> : null}
 
-              {slot?.url ? (
+              {imageUrl ? (
                 <div className="mt-3 space-y-2">
                   <a
-                    href={slot.url}
+                    href={imageUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline"
@@ -152,7 +183,7 @@ export function ImagePromptLab({ contentId, prompts, imageApiReady, imageModel }
                   </a>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={slot.url}
+                    src={imageUrl}
                     alt={`封面方案 ${index + 1}`}
                     className="max-h-48 w-full rounded-md border border-border/60 object-contain bg-background"
                   />

@@ -23,6 +23,7 @@ interface AnglesPanelProps {
   isGeneratingAngles: boolean;
   isGeneratingContent: boolean;
   anglesUpToDate: boolean;
+  hasGeneratedContent: boolean;
   apiReady: boolean;
   onBriefChange: (patch: Partial<BriefInput>) => void;
   onBriefReplace: (updater: (current: BriefInput) => BriefInput) => void;
@@ -90,6 +91,7 @@ export function AnglesPanel({
   isGeneratingAngles,
   isGeneratingContent,
   anglesUpToDate,
+  hasGeneratedContent,
   apiReady,
   onBriefChange,
   onBriefReplace,
@@ -195,8 +197,9 @@ export function AnglesPanel({
                   <Button type="button" variant="ghost" size="sm" onClick={() => onSelectedAngleIdsChange(angles.map((a) => a.angleId))}>
                     全选
                   </Button>
-                  <Button type="button" variant="ghost" size="sm" onClick={() => onSelectedAngleIdsChange([])}>
-                    清空
+                  <Button type="button" variant="ghost" size="sm" onClick={onGenerateAngles} disabled={!apiReady || isGeneratingAngles}>
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    刷新
                   </Button>
                 </div>
               ) : null
@@ -234,16 +237,13 @@ export function AnglesPanel({
                       <div className="min-w-0 space-y-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <strong className="text-sm leading-snug">{angle.angleName}</strong>
-                          <Badge variant={angle.riskLevel === "low" ? "success" : "warning"} className="text-[10px]">
-                            {angle.riskLevel}
-                          </Badge>
                         </div>
                         <p className="text-sm leading-relaxed text-muted-foreground">{angle.coreIdea}</p>
-                        {angle.titleDirections.length > 0 ? (
+                        {angle.displayTags && angle.displayTags.length > 0 ? (
                           <div className="flex flex-wrap gap-1 pt-0.5">
-                            {angle.titleDirections.slice(0, 2).map((t) => (
-                              <Badge key={t} variant="outline" className="text-[10px] font-normal">
-                                {t}
+                            {angle.displayTags.slice(0, 5).map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-[10px] font-normal">
+                                {tag}
                               </Badge>
                             ))}
                           </div>
@@ -308,7 +308,10 @@ export function AnglesPanel({
                 生成中…
               </>
             ) : (
-              <>生成正文{selectedAngleIds.length > 0 ? `（${selectedAngleIds.length}）` : ""}</>
+              <>
+                {hasGeneratedContent ? "重新生成" : "生成正文"}
+                {selectedAngleIds.length > 0 ? `（${selectedAngleIds.length}）` : ""}
+              </>
             )}
           </Button>
         </div>

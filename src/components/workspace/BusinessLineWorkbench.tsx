@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Archive, CheckCircle2, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Archive } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { BriefPanel } from "@/components/workspace/LicaitongBriefPanel";
 import { AnglesPanel } from "@/components/workspace/LicaitongAnglesPanel";
+import { ContentResultsPanel } from "@/components/workspace/ContentResultsPanel";
 import { BriefSummaryCard } from "@/components/workspace/BriefSummaryCard";
 import { DraftBoxPanel } from "@/components/workspace/DraftBoxPanel";
-import { ImagePromptLab } from "@/components/workspace/ImagePromptLab";
 import { WorkflowStepper } from "@/components/workspace/WorkflowStepper";
 import {
   buildWorkflowDefaults,
+  buildSuggestedTopic,
   filterOfferFeatures,
   getAnglesStatusMessage,
   getBriefStorageKey,
@@ -41,8 +42,10 @@ import {
 import type {
   BriefInput,
   BusinessLine,
+  CreativeAngle,
   Draft,
   GeneratedContent,
+  GeneratedImage,
   KnowledgeListView,
   Material,
 } from "@/lib/types";
@@ -57,6 +60,8 @@ type WorkbenchView = "workflow" | "drafts";
 
 const LLM_NOT_CONFIGURED =
   "服务端未配置 LLM_API_KEY，请在项目根目录 .env 中设置后重启开发服务器";
+const ANGLE_HISTORY_STORAGE_KEY = "c3-v0-angle-history";
+const MAX_ANGLE_HISTORY_KEYS = 20;
 
 interface ApiStatus {
   ready: boolean;
@@ -69,6 +74,53 @@ interface ApiStatus {
 
 interface BusinessLineWorkbenchProps {
   businessLine: BusinessLine;
+}
+
+interface RecentAngleSummary {
+  angleName: string;
+  coreIdea: string;
+  differentiationAxis?: string;
+  userPainPoint?: string;
+  contentStructure?: string;
+  displayTags?: string[];
+}
+
+function summarizeAnglesForAvoidance(angles: CreativeAngle[]): RecentAngleSummary[] {
+  return angles.slice(0, 5).map((angle) => ({
+    angleName: angle.angleName,
+    coreIdea: angle.coreIdea,
+    differentiationAxis: angle.differentiationAxis,
+    userPainPoint: angle.userPainPoint,
+    contentStructure: angle.contentStructure,
+    displayTags: angle.displayTags?.slice(0, 5),
+  }));
+}
+
+function readAngleHistory() {
+  if (typeof window === "undefined") return {};
+  return safeJsonParse<Record<string, RecentAngleSummary[]>>(
+    localStorage.getItem(ANGLE_HISTORY_STORAGE_KEY) || "",
+    {},
+  );
+}
+
+function resolveRecentAnglesForConfig(
+  configKey: string,
+  generatedForKey: string | null,
+  currentAngles: CreativeAngle[],
+) {
+  if (generatedForKey === configKey && currentAngles.length > 0) {
+    return summarizeAnglesForAvoidance(currentAngles);
+  }
+  return readAngleHistory()[configKey] || [];
+}
+
+function writeAngleHistory(configKey: string, angles: CreativeAngle[]) {
+  const history = readAngleHistory();
+  delete history[configKey];
+  history[configKey] = summarizeAnglesForAvoidance(angles);
+  const compact = Object.fromEntries(Object.entries(history).slice(-MAX_ANGLE_HISTORY_KEYS));
+  localStorage.setItem(ANGLE_HISTORY_STORAGE_KEY, JSON.stringify(compact));
 }
 
 function buildDefaultBrief(businessLine: BusinessLine): BriefInput {
@@ -107,7 +159,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   const [activeHotspotTab, setActiveHotspotTab] = useState<HotspotTabId>("finance");
   const [customHotspotQuery, setCustomHotspotQuery] = useState("");
   const [hotspotCandidates, setHotspotCandidates] = useState<Material[]>([]);
-  const [angles, setAngles] = useState<import("@/lib/types").CreativeAngle[]>([]);
+  const [angles, setAngles] = useState<CreativeAngle[]>([]);
   const [selectedAngleIds, setSelectedAngleIds] = useState<string[]>([]);
   const [results, setResults] = useState<GeneratedContent[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
@@ -202,8 +254,12 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   );
   const selectedMaterials = useMemo(() => getSelectedMaterials(materials), [materials]);
   const canContinueFromBrief = useMemo(
-    () => canProceedFromBrief(brief.personaId, materials, brief.creationScene, workflowConfig),
-    [brief.personaId, brief.creationScene, materials, workflowConfig],
+    () => canProceedFromBrief(brief, materials, workflowConfig),
+    [brief, materials, workflowConfig],
+  );
+  const suggestedTopic = useMemo(
+    () => buildSuggestedTopic(brief, workflowConfig),
+    [brief, workflowConfig],
   );
   const anglesUpToDate = anglesGeneratedForKey === anglesConfigKey && angles.length > 0;
 
@@ -418,20 +474,29 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
 
   async function generateAngles() {
     const configKey = anglesConfigKey;
+    const avoidRecentAngles = resolveRecentAnglesForConfig(configKey, anglesGeneratedForKey, angles);
     setIsGeneratingAngles(true);
-    setStatus(getAnglesStatusMessage(businessLine));
+    setStatus(
+      avoidRecentAngles.length > 0
+        ? "正在刷新创意角度，并避开上一批相似表达..."
+        : getAnglesStatusMessage(businessLine),
+    );
     setAngles([]);
     setSelectedAngleIds([]);
     setAnglesGeneratedForKey(null);
     try {
       if (!apiStatus.ready) throw new Error(LLM_NOT_CONFIGURED);
-      const input = { ...brief, materials: selectedMaterials };
+      const input = { ...brief, materials: selectedMaterials, avoidRecentAngles, diversitySeed: uid("angle_batch") };
       const prompt = await buildPrompt("creativeAngles", input);
-      const raw = await callTextModel(prompt, { temperature: 0.35, maxTokens: 8192 });
+      const raw = await callTextModel(prompt, {
+        temperature: avoidRecentAngles.length > 0 ? 0.75 : 0.45,
+        maxTokens: 8192,
+      });
       const normalized = normalizeAngles(parseLLMJson(raw), brief);
       setAngles(normalized);
       setSelectedAngleIds([]);
       setAnglesGeneratedForKey(configKey);
+      writeAngleHistory(configKey, normalized);
       setStatus(`已生成 ${normalized.length} 个创意角度，请勾选要写成稿的角度`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "创意角度生成失败");
@@ -505,6 +570,16 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     setStatus("已保存到草稿箱");
   }
 
+  function updateResultImage(contentId: string, image: GeneratedImage) {
+    setResults((current) =>
+      current.map((item) => {
+        if (item.id !== contentId) return item;
+        const rest = (item.generatedImages || []).filter((entry) => entry.promptIndex !== image.promptIndex);
+        return { ...item, generatedImages: [...rest, image] };
+      }),
+    );
+  }
+
   function deleteDraft(draftEntryId: string) {
     setDrafts((current) => current.filter((item) => (item.draftEntryId || `${item.id}_${item.savedAt}`) !== draftEntryId));
     setStatus("草稿已删除");
@@ -512,14 +587,26 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
 
   function goToWorkflowStep(nextStep: number) {
     setView("workflow");
-    if (nextStep <= step) setStep(nextStep);
+    if (nextStep <= step || (nextStep === 2 && angles.length > 0) || (nextStep === 3 && results.length > 0)) {
+      setStep(nextStep);
+    }
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1">
-          <WorkflowStepper steps={WORKFLOW_STEPS} current={step} onStepClick={goToWorkflowStep} />
+          <WorkflowStepper
+            steps={WORKFLOW_STEPS}
+            current={step}
+            onStepClick={goToWorkflowStep}
+            canClickStep={(targetStep) =>
+              (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
+            }
+            isStepComplete={(targetStep) =>
+              (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
+            }
+          />
         </div>
         <button
           type="button"
@@ -579,6 +666,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
             hotspotCandidates={hotspotCandidates}
             isSearchingHotspot={isSearchingHotspot}
             canContinue={canContinueFromBrief}
+            topicExample={suggestedTopic}
             onBriefChange={(patch) => {
               if (typeof patch === "function") setBrief((c) => patch(c));
               else updateBrief(patch);
@@ -629,6 +717,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
               isGeneratingAngles={isGeneratingAngles}
               isGeneratingContent={isGeneratingContent}
               anglesUpToDate={anglesUpToDate}
+              hasGeneratedContent={results.length > 0}
               apiReady={apiStatus.ready}
               onBriefChange={updateBrief}
               onBriefReplace={(updater) => setBrief(updater)}
@@ -652,61 +741,16 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
                 </div>
               </div>
             ) : (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  {results.map((item) => (
-                    <Button
-                      key={item.id}
-                      size="sm"
-                      variant={activeResult?.id === item.id ? "default" : "secondary"}
-                      onClick={() => setActiveResultId(item.id)}
-                    >
-                      {item.selectedTitle}
-                    </Button>
-                  ))}
-                </div>
-                {activeResult ? (
-                  <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-                    <article className="rounded-xl border border-border bg-card p-5 sm:p-6">
-                      <Badge variant="secondary">{activeResult.angleName}</Badge>
-                      <h2 className="mt-3 text-xl font-semibold leading-snug">{activeResult.selectedTitle}</h2>
-                      <p className="mt-2 text-sm text-muted-foreground">封面：{activeResult.selectedCoverText}</p>
-                      <pre className="mt-4 whitespace-pre-wrap rounded-lg bg-muted/50 p-4 font-sans text-sm leading-7">
-                        {activeResult.content}
-                      </pre>
-                      <div className="mt-4 flex flex-wrap gap-1.5">
-                        {activeResult.tags.map((tag) => (
-                          <Badge key={tag} variant="outline">
-                            #{tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    </article>
-                    <div className="space-y-4">
-                      <section className="rounded-xl border border-border p-4">
-                        <div className="mb-2 flex items-center gap-2 text-sm font-medium">
-                          <ShieldCheck className="h-4 w-4" /> 合规审查
-                        </div>
-                        <p className="text-sm text-muted-foreground">{activeResult.complianceReport?.summary}</p>
-                        <div className="mt-3 flex gap-2">
-                          <Badge variant={activeResult.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}>
-                            {activeResult.complianceReport?.publishReadiness || "unknown"}
-                          </Badge>
-                        </div>
-                      </section>
-                      <ImagePromptLab
-                        contentId={activeResult.id}
-                        prompts={activeResult.imagePromptSuggestions}
-                        imageApiReady={apiStatus.image}
-                        imageModel={apiStatus.imageModel}
-                      />
-                      <Button className="w-full" onClick={saveActiveDraft}>
-                        <CheckCircle2 className="h-4 w-4" /> 保存草稿
-                      </Button>
-                    </div>
-                  </div>
-                ) : null}
-              </>
+              <ContentResultsPanel
+                results={results}
+                activeResultId={activeResult?.id || results[0]?.id || ""}
+                imageApiReady={apiStatus.image}
+                imageModel={apiStatus.imageModel}
+                onActiveResultChange={setActiveResultId}
+                onImageGenerated={updateResultImage}
+                onSaveDraft={saveActiveDraft}
+                onBackToAngles={() => setStep(2)}
+              />
             )}
           </div>
         )}
