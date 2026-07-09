@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { BriefPanel } from "@/components/workspace/LicaitongBriefPanel";
 import { AnglesPanel } from "@/components/workspace/LicaitongAnglesPanel";
 import { ContentResultsPanel } from "@/components/workspace/ContentResultsPanel";
+import { VisualPlanStudio } from "@/components/workspace/VisualPlanStudio";
 import { BriefSummaryCard } from "@/components/workspace/BriefSummaryCard";
 import { DraftBoxPanel } from "@/components/workspace/DraftBoxPanel";
 import { WorkflowStepper } from "@/components/workspace/WorkflowStepper";
@@ -54,6 +55,7 @@ import type {
   GeneratedImage,
   KnowledgeListView,
   Material,
+  VisualPlan,
 } from "@/lib/types";
 
 const WORKFLOW_STEPS = [
@@ -170,6 +172,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   const [results, setResults] = useState<GeneratedContent[]>([]);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeResultId, setActiveResultId] = useState("");
+  const [contentSubView, setContentSubView] = useState<"result" | "studio">("result");
   const [status, setStatus] = useState("");
   const [isSearchingHotspot, setIsSearchingHotspot] = useState(false);
   const [isGeneratingAngles, setIsGeneratingAngles] = useState(false);
@@ -277,6 +280,11 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       setAnglesGeneratedForKey(null);
     }
   }, [anglesConfigKey, anglesGeneratedForKey, isGeneratingAngles]);
+
+  useEffect(() => {
+    // 切换到不同结果 / 离开第 3 步时，退出制图子视图
+    setContentSubView("result");
+  }, [activeResultId, step, view]);
 
   async function refreshApiStatus() {
     try {
@@ -631,9 +639,19 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     setResults((current) =>
       current.map((item) => {
         if (item.id !== contentId) return item;
-        const rest = (item.generatedImages || []).filter((entry) => entry.promptIndex !== image.promptIndex);
+        const targetIndex = image.imageIndex ?? image.promptIndex;
+        const rest = (item.generatedImages || []).filter((entry) => {
+          const entryIndex = entry.imageIndex ?? entry.promptIndex;
+          return entryIndex !== targetIndex;
+        });
         return { ...item, generatedImages: [...rest, image] };
       }),
+    );
+  }
+
+  function updateResultVisualPlan(contentId: string, plan: VisualPlan | undefined) {
+    setResults((current) =>
+      current.map((item) => (item.id === contentId ? { ...item, visualPlan: plan } : item)),
     );
   }
 
@@ -802,6 +820,16 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
                   </Button>
                 </div>
               </div>
+            ) : contentSubView === "studio" && activeResult ? (
+              <VisualPlanStudio
+                content={activeResult}
+                brief={brief}
+                imageApiReady={apiStatus.image}
+                imageModel={apiStatus.imageModel}
+                onBack={() => setContentSubView("result")}
+                onVisualPlanChange={updateResultVisualPlan}
+                onImageGenerated={updateResultImage}
+              />
             ) : (
               <ContentResultsPanel
                 results={results}
@@ -809,7 +837,10 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
                 imageApiReady={apiStatus.image}
                 imageModel={apiStatus.imageModel}
                 onActiveResultChange={setActiveResultId}
-                onImageGenerated={updateResultImage}
+                onEnterVisualStudio={(contentId) => {
+                  setActiveResultId(contentId);
+                  setContentSubView("studio");
+                }}
                 onSaveDraft={saveActiveDraft}
                 onBackToAngles={() => setStep(2)}
               />

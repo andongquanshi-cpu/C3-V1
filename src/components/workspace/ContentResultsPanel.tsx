@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, Copy, ShieldCheck } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Copy, ImageIcon, ShieldCheck, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ImagePromptLab } from "@/components/workspace/ImagePromptLab";
 import { buildContentCopyText, copyTextToClipboard } from "@/lib/clipboard-utils";
 import { cn } from "@/lib/utils";
-import type { GeneratedContent, GeneratedImage } from "@/lib/types";
+import type { GeneratedContent } from "@/lib/types";
 
 interface ContentResultsPanelProps {
   results: GeneratedContent[];
@@ -15,7 +14,7 @@ interface ContentResultsPanelProps {
   imageApiReady: boolean;
   imageModel?: string;
   onActiveResultChange: (id: string) => void;
-  onImageGenerated: (contentId: string, image: GeneratedImage) => void;
+  onEnterVisualStudio: (contentId: string) => void;
   onSaveDraft: () => void;
   onBackToAngles: () => void;
 }
@@ -49,7 +48,7 @@ export function ContentResultsPanel({
   imageApiReady,
   imageModel,
   onActiveResultChange,
-  onImageGenerated,
+  onEnterVisualStudio,
   onSaveDraft,
   onBackToAngles,
 }: ContentResultsPanelProps) {
@@ -199,14 +198,79 @@ export function ContentResultsPanel({
                 <p className="text-sm text-muted-foreground">{activeResult.complianceReport?.summary}</p>
               </section>
 
-              <ImagePromptLab
-                contentId={activeResult.id}
-                prompts={activeResult.imagePromptSuggestions}
-                generatedImages={activeResult.generatedImages}
-                imageApiReady={imageApiReady}
-                imageModel={imageModel}
-                onImageGenerated={(image) => onImageGenerated(activeResult.id, image)}
-              />
+              <section className="rounded-xl border border-border p-4">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <ImageIcon className="h-4 w-4" />
+                    图片
+                  </div>
+                  {imageModel ? (
+                    <Badge variant="outline" className="text-[10px] font-normal">
+                      {imageModel}
+                    </Badge>
+                  ) : null}
+                </div>
+
+                {activeResult.visualPlan ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-muted-foreground">
+                      已规划 {activeResult.visualPlan.items.length} 张（封面 + 内容图）。
+                    </p>
+                    {activeResult.generatedImages?.length ? (
+                      <div className="grid grid-cols-3 gap-1.5">
+                        {activeResult.visualPlan.items.map((item, index) => {
+                          const image = activeResult.generatedImages?.find(
+                            (entry) =>
+                              (entry.imageIndex ?? entry.promptIndex) === item.imageIndex,
+                          );
+                          const url = image?.localPath || image?.url;
+                          return (
+                            <div
+                              key={item.id}
+                              className="relative aspect-[3/4] overflow-hidden rounded-md border border-border/60 bg-muted/30"
+                              title={item.title}
+                            >
+                              {url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={url}
+                                  alt={item.title}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-[10px] text-muted-foreground">
+                                  {index === 0 ? "封面" : `图${index}`}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-muted-foreground">尚未生成图片</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">
+                    AI 会根据正文规划封面 + 内容图，并可自由编辑后一键出图。
+                  </p>
+                )}
+
+                <Button
+                  className="mt-3 w-full"
+                  variant={activeResult.visualPlan ? "outline" : "default"}
+                  onClick={() => onEnterVisualStudio(activeResult.id)}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {activeResult.visualPlan ? "继续编辑 / 生成" : "开始制图"}
+                </Button>
+
+                {!imageApiReady ? (
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    未配置 IMAGE_API_KEY 时，可先进入制图编辑视觉计划。
+                  </p>
+                ) : null}
+              </section>
 
               <Button className="w-full" onClick={onSaveDraft}>
                 <CheckCircle2 className="h-4 w-4" />

@@ -117,6 +117,49 @@ export interface GeneratedImage {
   url: string;
   style?: string;
   coverText?: string;
+  /** 由视觉计划产生时使用：区分封面 / 内容图 */
+  kind?: "cover" | "content";
+  /** 视觉计划序号（封面=0，内容图从 1 起） */
+  imageIndex?: number;
+  /** 生成时的本地持久化路径（如 /generated/xxx/yyy.png），存在时优先使用 */
+  localPath?: string;
+  /** 生成时的 prompt 快照，方便回溯 */
+  promptSnapshot?: string;
+  /** 生成时间 */
+  createdAt?: string;
+}
+
+/** 视觉计划中的单个卡片（对应一张图） */
+export interface VisualPlanItem {
+  /** 稳定 ID，前端使用 */
+  id: string;
+  /** 0 = 封面，1..N = 内容图 */
+  imageIndex: number;
+  /** cover / hook-context / key-insight / action-cta 等 */
+  role: string;
+  /** 卡片标题，UI 用（例："封面" / "问题引入"） */
+  title: string;
+  /** 图上显示的文案（画面内直接出现的字） */
+  copy: string;
+  /** 生图提示词（不含整体把控） */
+  prompt: string;
+  /** 封面钩子逻辑说明 / 内部注释 */
+  hookAngle?: string;
+  /** 与上一张的衔接关系 */
+  connection?: string;
+}
+
+/** 一整套视觉计划（封面 + 内容图） */
+export interface VisualPlan {
+  /** 生成版本 */
+  version: string;
+  /** 总图数 */
+  totalImages: number;
+  /** 整体把控提示词，会拼接到每一次生图 prompt 前 */
+  overallStyle: string;
+  /** 计划创建时间 */
+  createdAt: string;
+  items: VisualPlanItem[];
 }
 
 export interface GeneratedContent {
@@ -139,6 +182,8 @@ export interface GeneratedContent {
     riskNotes?: string[];
   }>;
   generatedImages?: GeneratedImage[];
+  /** 视觉计划（点击"制图"进入次级页面后由 AI 生成） */
+  visualPlan?: VisualPlan;
   qualityScore?: QualityScore;
   complianceReport?: ComplianceReport;
   debugKnowledgeUsed?: unknown;

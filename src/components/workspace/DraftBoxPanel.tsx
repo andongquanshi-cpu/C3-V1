@@ -175,21 +175,48 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
 
         {selectedDraft.generatedImages && selectedDraft.generatedImages.length > 0 ? (
           <section className="rounded-xl border border-border bg-card p-4">
-            <h3 className="text-sm font-semibold">已生成封面图</h3>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {selectedDraft.generatedImages.map((image) => (
-                <div key={`${image.promptIndex}-${image.url}`} className="space-y-2">
-                  {image.coverText ? (
-                    <p className="text-xs text-muted-foreground">封面字：{image.coverText}</p>
-                  ) : null}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={image.url}
-                    alt={`封面图 ${image.promptIndex + 1}`}
-                    className="max-h-56 w-full rounded-md border border-border/60 object-contain bg-background"
-                  />
-                </div>
-              ))}
+            <h3 className="text-sm font-semibold">已生成图片</h3>
+            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+              {[...selectedDraft.generatedImages]
+                .sort((a, b) => (a.imageIndex ?? a.promptIndex) - (b.imageIndex ?? b.promptIndex))
+                .map((image) => {
+                  const url = image.localPath || image.url;
+                  const idx = image.imageIndex ?? image.promptIndex;
+                  const label = image.kind === "content" ? `内容图 ${idx}` : idx === 0 ? "封面" : `图 ${idx}`;
+                  return (
+                    <div key={`${idx}-${url}`} className="space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-medium">{label}</span>
+                        {image.coverText ? (
+                          <span className="text-muted-foreground">字：{image.coverText}</span>
+                        ) : null}
+                      </div>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={label}
+                        className="w-full rounded-md border border-border/60 object-cover bg-background aspect-[3/4]"
+                      />
+                      <div className="flex items-center gap-2 text-[11px]">
+                        <a
+                          href={url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-primary hover:underline"
+                        >
+                          原图
+                        </a>
+                        <a
+                          href={url}
+                          download={`${selectedDraft.id}_${label}.png`}
+                          className="text-muted-foreground hover:text-foreground"
+                        >
+                          下载
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
           </section>
         ) : null}
@@ -258,7 +285,7 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
                       </Badge>
                       {draft.generatedImages && draft.generatedImages.length > 0 ? (
                         <Badge variant="outline" className="text-[10px] font-normal">
-                          含封面图
+                          含 {draft.generatedImages.length} 张图
                         </Badge>
                       ) : null}
                     </div>

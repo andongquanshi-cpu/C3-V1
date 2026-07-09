@@ -5,6 +5,7 @@ import {
   buildCoverSuggestionsPrompt,
   buildCreativeAnglesPrompt,
   buildPersonaContentGenerationPrompt,
+  buildVisualPlanPrompt,
 } from "@/lib/prompt-engine";
 
 const builders = {
@@ -13,6 +14,7 @@ const builders = {
   personaContent: buildPersonaContentGenerationPrompt,
   complianceReview: buildComplianceReviewPrompt,
   coverSuggestions: buildCoverSuggestionsPrompt,
+  visualPlan: buildVisualPlanPrompt,
 };
 
 export async function POST(request: Request) {

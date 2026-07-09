@@ -224,6 +224,15 @@ export function buildCoverSuggestionsPrompt(input: AnyRecord = {}) {
   }));
 }
 
+export function buildVisualPlanPrompt(input: AnyRecord = {}) {
+  return buildPrompt("visual-plan.md", input, "visual-plan", (data) => ({
+    selectedTitle: data.selectedTitle || "未提供",
+    selectedCoverText: data.selectedCoverText || "未提供",
+    generatedContent: data.generatedContent || data.content || "未提供",
+    selectedAngle: data.selectedAngle || data.angle || "未提供",
+  }));
+}
+
 export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
   const personaId = dataPersonaId(input);
   if (!personaId) throw new Error("personaContent 需要 personaId");
