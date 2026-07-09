@@ -15,7 +15,7 @@ import {
   sceneRequiresHotspotMaterials,
   type HotspotTabId,
 } from "@/lib/hotspot-workflow";
-import { formatMaterialSource } from "@/lib/hotspot-display";
+import { formatHotspotSourceLine, formatMaterialSource } from "@/lib/hotspot-display";
 import {
   applyAudienceChange,
   applyOfferChange,
@@ -50,6 +50,7 @@ interface BriefPanelProps {
   customHotspotQuery: string;
   hotspotCandidates: Material[];
   isSearchingHotspot: boolean;
+  hotspotSearchError?: string | null;
   canContinue: boolean;
   topicExample?: string;
   onBriefChange: (patch: Partial<BriefInput> | ((current: BriefInput) => BriefInput)) => void;
@@ -62,6 +63,8 @@ interface BriefPanelProps {
   onToggleCandidate: (candidate: Material, selected: boolean) => void;
   onSetPrimaryMaterial: (id: string) => void;
   onRemoveMaterial: (id: string) => void;
+  onDeselectHotspot?: (material: Material) => void;
+  onClearHotspotSelection?: () => void;
   onEditHotspotMaterials?: () => void;
   onCloseHotspotPanel?: () => void;
   onContinue: () => void;
@@ -96,6 +99,91 @@ function Column({
   );
 }
 
+function SelectedHotspotStrip({
+  items,
+  showPrimary,
+  onRemove,
+  onSetPrimary,
+  onClearAll,
+  compact,
+}: {
+  items: Material[];
+  showPrimary?: boolean;
+  onRemove: (item: Material) => void;
+  onSetPrimary?: (id: string) => void;
+  onClearAll?: () => void;
+  compact?: boolean;
+}) {
+  if (!items.length) return null;
+
+  return (
+    <div
+      className={cn(
+        "rounded-md border border-primary/25 bg-primary/5",
+        compact ? "px-2 py-1.5" : "px-2.5 py-2",
+      )}
+    >
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[10px] font-medium text-primary">已选 {items.length} 条</span>
+        {onClearAll && items.length > 1 ? (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className="text-[10px] text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+          >
+            清空已选
+          </button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const pasted = item.source === "手动输入";
+          return (
+            <span
+              key={item.id}
+              className={cn(
+                "inline-flex max-w-full items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] leading-tight",
+                item.isPrimary
+                  ? "border-amber-500/40 bg-amber-500/10"
+                  : "border-primary/20 bg-background/80",
+              )}
+            >
+              {showPrimary && onSetPrimary ? (
+                <button
+                  type="button"
+                  onClick={() => onSetPrimary(item.id)}
+                  className="shrink-0 text-muted-foreground hover:text-amber-600"
+                  aria-label={item.isPrimary ? "主素材" : "设为主素材"}
+                  title={item.isPrimary ? "主素材" : "设为主素材"}
+                >
+                  <Star
+                    className={cn(
+                      "h-3 w-3",
+                      item.isPrimary && "fill-amber-500 text-amber-500",
+                    )}
+                  />
+                </button>
+              ) : null}
+              <span className="max-w-[200px] truncate" title={item.title}>
+                {pasted ? "粘贴 · " : ""}
+                {item.title}
+              </span>
+              <button
+                type="button"
+                onClick={() => onRemove(item)}
+                className="shrink-0 rounded-sm text-muted-foreground hover:bg-muted hover:text-foreground"
+                aria-label="取消选用"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function HotspotFeedItem({
   rank,
   material,
@@ -117,7 +205,7 @@ function HotspotFeedItem({
   onRemove?: () => void;
   pasted?: boolean;
 }) {
-  const sourceLabel = formatMaterialSource(material.source);
+  const sourceLabel = pasted ? formatMaterialSource(material.source) : formatHotspotSourceLine(material);
 
   if (pasted) {
     return (
@@ -165,9 +253,6 @@ function HotspotFeedItem({
       />
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium leading-snug text-foreground line-clamp-2">{material.title}</p>
-        {material.body ? (
-          <p className="mt-1 text-xs leading-relaxed text-muted-foreground line-clamp-2">{material.body}</p>
-        ) : null}
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           {sourceLabel ? <span className="text-[10px] text-muted-foreground/75">来源 · {sourceLabel}</span> : null}
           {showPrimary && selected ? (
@@ -205,6 +290,7 @@ export function BriefPanel({
   customHotspotQuery,
   hotspotCandidates,
   isSearchingHotspot,
+  hotspotSearchError,
   canContinue,
   topicExample,
   onBriefChange,
@@ -217,6 +303,8 @@ export function BriefPanel({
   onToggleCandidate,
   onSetPrimaryMaterial,
   onRemoveMaterial,
+  onDeselectHotspot,
+  onClearHotspotSelection,
   onEditHotspotMaterials,
   onCloseHotspotPanel,
   onContinue,
@@ -246,6 +334,7 @@ export function BriefPanel({
   const selectedMaterials = getSelectedMaterials(materials);
   const selectedHotspotMaterials = listSelectedHotspotMaterials(materials);
   const pastedMaterials = selectedMaterials.filter((item) => item.source === "手动输入");
+  const allSelectedForStrip = [...pastedMaterials, ...selectedHotspotMaterials];
   const candidateSelectedIds = new Set(
     hotspotCandidates
       .filter((item) => {
@@ -487,7 +576,7 @@ export function BriefPanel({
             <div className="flex items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <Label className="shrink-0 text-xs">
-                  {hotspotRequired ? "热点素材（必选）" : "素材 / 热点（选填）"}
+                  {hotspotRequired ? "热点素材（必选）" : "背景补充（选填）"}
                 </Label>
                 {hotspotRequired && hotspotRequirementLabel ? (
                   <Badge variant="outline" className="shrink-0 px-1.5 py-0 text-[9px] text-amber-600 dark:text-amber-400">
@@ -495,21 +584,23 @@ export function BriefPanel({
                   </Badge>
                 ) : null}
               </div>
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
-                onClick={onSearchHotspot}
-                disabled={isSearchingHotspot}
-                className="h-7 shrink-0 px-2.5 text-xs"
-              >
-                {isSearchingHotspot ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Search className="h-3.5 w-3.5" />
-                )}
-                搜索热点
-              </Button>
+              {hotspotRequired ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  onClick={onSearchHotspot}
+                  disabled={isSearchingHotspot}
+                  className="h-7 shrink-0 px-2.5 text-xs"
+                >
+                  {isSearchingHotspot ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Search className="h-3.5 w-3.5" />
+                  )}
+                  搜索热榜
+                </Button>
+              ) : null}
             </div>
 
             <Textarea
@@ -517,11 +608,15 @@ export function BriefPanel({
               onChange={(event) => onMaterialDraftChange(event.target.value)}
               onBlur={onMaterialDraftCommit}
               onKeyDown={handlePasteKeyDown}
-              placeholder="粘贴新闻摘要或用户洞察"
+              placeholder={
+                hotspotRequired
+                  ? "粘贴新闻摘要或用户洞察"
+                  : "可粘贴用户洞察、竞品信息等背景（非新闻主线，角度将围绕场景+主题展开）"
+              }
               className="min-h-[72px] resize-none text-sm"
             />
 
-            {hotspotPanelOpen ? (
+            {hotspotRequired && hotspotPanelOpen ? (
               <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-1">
@@ -543,8 +638,14 @@ export function BriefPanel({
                     ))}
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    {selectedMaterials.length > 0 ? (
-                      <span className="text-[10px] text-muted-foreground">已选 {selectedMaterials.length}</span>
+                    {onEditHotspotMaterials && selectedMaterials.length > 0 && !hotspotPanelOpen ? (
+                      <button
+                        type="button"
+                        onClick={onEditHotspotMaterials}
+                        className="text-[10px] text-primary underline-offset-2 hover:underline"
+                      >
+                        修改
+                      </button>
                     ) : null}
                     {onCloseHotspotPanel ? (
                       <button
@@ -558,18 +659,14 @@ export function BriefPanel({
                   </div>
                 </div>
 
-                {pastedMaterials.length > 0 ? (
-                  <div className="space-y-1">
-                    {pastedMaterials.map((item) => (
-                      <HotspotFeedItem
-                        key={item.id}
-                        material={item}
-                        selected
-                        pasted
-                        onRemove={() => onRemoveMaterial(item.id)}
-                      />
-                    ))}
-                  </div>
+                {allSelectedForStrip.length > 0 ? (
+                  <SelectedHotspotStrip
+                    items={allSelectedForStrip}
+                    showPrimary={hotspotRequired && allSelectedForStrip.length > 1}
+                    onRemove={(item) => onDeselectHotspot?.(item) ?? onRemoveMaterial(item.id)}
+                    onSetPrimary={onSetPrimaryMaterial}
+                    onClearAll={onClearHotspotSelection}
+                  />
                 ) : null}
 
                 {activeHotspotTab === "custom" ? (
@@ -580,7 +677,7 @@ export function BriefPanel({
                       onKeyDown={(event) => {
                         if (event.key === "Enter") onCustomHotspotSearch();
                       }}
-                      placeholder="输入搜索词，如：央行降准、A股"
+                      placeholder={brief.topic.trim() ? `优先结合主题「${brief.topic.trim().slice(0, 24)}」搜索` : "输入问句，如：央行降准对A股影响"}
                       className="h-8 flex-1 text-xs"
                     />
                     <Button
@@ -606,9 +703,22 @@ export function BriefPanel({
                     <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                   </div>
                 ) : hotspotCandidates.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-muted-foreground">暂无结果</p>
+                  <div className="space-y-2 py-4 text-center text-xs">
+                    {hotspotSearchError ? (
+                      <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-left leading-5 text-destructive">
+                        {hotspotSearchError}
+                      </p>
+                    ) : null}
+                    <p className="text-muted-foreground">
+                      暂无结果。请确认已在妙想平台领取「资讯搜索」Skill 的 API Key，写入 .env 后重启 dev。
+                    </p>
+                  </div>
                 ) : (
-                  <div className="max-h-[280px] divide-y divide-border/50 overflow-y-auto rounded-md bg-card/40">
+                  <div className="overflow-hidden rounded-md bg-card/40">
+                    <p className="border-b border-border/50 px-2.5 py-1.5 text-[10px] text-muted-foreground">
+                      {hotspotTabs.find((tab) => tab.id === activeHotspotTab)?.label || "热榜"} · 按热度排序
+                    </p>
+                    <div className="max-h-[280px] divide-y divide-border/50 overflow-y-auto">
                     {hotspotCandidates.map((candidate, index) => {
                       const stored = findStoredHotspotMaterial(materials, candidate);
                       const selected = candidateSelectedIds.has(candidate.id);
@@ -625,15 +735,24 @@ export function BriefPanel({
                         />
                       );
                     })}
+                    </div>
                   </div>
                 )}
               </div>
-            ) : selectedMaterials.length > 0 ? (
+            ) : !hotspotRequired && pastedMaterials.length > 0 ? (
+              <div className="space-y-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                <span className="text-xs font-medium text-foreground/90">已添加背景 · {pastedMaterials.length} 条</span>
+                <SelectedHotspotStrip
+                  items={pastedMaterials}
+                  compact
+                  onRemove={(item) => onDeselectHotspot?.(item) ?? onRemoveMaterial(item.id)}
+                  onClearAll={onClearHotspotSelection}
+                />
+              </div>
+            ) : hotspotRequired && allSelectedForStrip.length > 0 ? (
               <div className="space-y-2 rounded-lg border border-primary/25 bg-primary/5 p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-medium text-foreground/90">
-                    已选素材 · {selectedMaterials.length} 条
-                  </span>
+                  <span className="text-xs font-medium text-foreground/90">已选热点</span>
                   {onEditHotspotMaterials ? (
                     <Button
                       type="button"
@@ -642,49 +761,18 @@ export function BriefPanel({
                       onClick={onEditHotspotMaterials}
                       className="h-7 px-2 text-xs text-primary hover:text-primary"
                     >
-                      修改热点
+                      继续添加
                     </Button>
                   ) : null}
                 </div>
-                <div className="space-y-1">
-                  {pastedMaterials.map((item) => (
-                    <HotspotFeedItem
-                      key={item.id}
-                      material={item}
-                      selected
-                      pasted
-                      onRemove={() => onRemoveMaterial(item.id)}
-                    />
-                  ))}
-                  {selectedHotspotMaterials.map((item) => (
-                    <div
-                      key={item.id}
-                      className="flex items-start gap-2 rounded-md border border-border/60 bg-card/50 px-2 py-2"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium leading-snug line-clamp-2">{item.title}</p>
-                        {item.body ? (
-                          <p className="mt-0.5 text-[10px] leading-relaxed text-muted-foreground line-clamp-1">
-                            {item.body}
-                          </p>
-                        ) : null}
-                        <div className="mt-1 flex flex-wrap items-center gap-2">
-                          {formatMaterialSource(item.source) ? (
-                            <span className="text-[10px] text-muted-foreground/75">
-                              来源 · {formatMaterialSource(item.source)}
-                            </span>
-                          ) : null}
-                          {item.isPrimary ? (
-                            <span className="inline-flex items-center gap-0.5 text-[10px] text-amber-600 dark:text-amber-400">
-                              <Star className="h-3 w-3 fill-current" />
-                              主素材
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <SelectedHotspotStrip
+                  items={allSelectedForStrip}
+                  showPrimary={hotspotRequired && allSelectedForStrip.length > 1}
+                  compact
+                  onRemove={(item) => onDeselectHotspot?.(item) ?? onRemoveMaterial(item.id)}
+                  onSetPrimary={onSetPrimaryMaterial}
+                  onClearAll={onClearHotspotSelection}
+                />
               </div>
             ) : null}
           </div>

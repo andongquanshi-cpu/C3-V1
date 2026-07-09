@@ -1,25 +1,25 @@
 import type { BriefInput, Material, BusinessLine } from "@/lib/types";
+import { buildEastMoneySearchQueries } from "@/lib/eastmoney-hotspot";
 import { buildHotspotMaterialId, isSameHotspotMaterial } from "@/lib/hotspot-display";
 import {
   getWorkflowFallback,
   isFeatureSelectionActive,
   type BusinessLineWorkflowConfig,
 } from "@/lib/business-line-workflow";
-import { buildHotspotSearchQuery as buildHotspotSearchQueryFromDisplay } from "@/lib/hotspot-display";
 
-export type HotspotTabId = "finance" | "policy" | "fund" | "equity" | "custom";
+export type HotspotTabId = "trending" | "tech" | "policy" | "sector" | "fund" | "custom";
 
 export const LICAITONG_HOTSPOT_TABS: Array<{ id: HotspotTabId; label: string }> = [
-  { id: "finance", label: "今日财经" },
-  { id: "policy", label: "政策监管" },
-  { id: "fund", label: "基金固收" },
+  { id: "trending", label: "财经热搜" },
+  { id: "tech", label: "科技热榜" },
+  { id: "fund", label: "基金热榜" },
   { id: "custom", label: "自定义" },
 ];
 
 export const WEISEC_HOTSPOT_TABS: Array<{ id: HotspotTabId; label: string }> = [
-  { id: "finance", label: "今日财经" },
-  { id: "policy", label: "政策监管" },
-  { id: "equity", label: "股市热点" },
+  { id: "trending", label: "财经热搜" },
+  { id: "tech", label: "科技热榜" },
+  { id: "sector", label: "板块热榜" },
   { id: "custom", label: "自定义" },
 ];
 
@@ -30,10 +30,19 @@ export function getHotspotTabs(businessLine: BusinessLine) {
   return businessLine === "weisec" ? WEISEC_HOTSPOT_TABS : LICAITONG_HOTSPOT_TABS;
 }
 
-export function normalizeHotspotTabForLine(tab: HotspotTabId, businessLine: BusinessLine): HotspotTabId {
-  if (businessLine === "weisec" && tab === "fund") return "equity";
-  if (businessLine === "licaitong" && tab === "equity") return "fund";
-  return tab;
+const LEGACY_TAB_MAP: Record<string, HotspotTabId> = {
+  finance: "trending",
+  equity: "sector",
+  policy: "trending",
+};
+
+export function normalizeHotspotTabForLine(tab: string, businessLine: BusinessLine): HotspotTabId {
+  const mapped = LEGACY_TAB_MAP[tab] || tab;
+  const tabs = getHotspotTabs(businessLine);
+  if (tabs.some((item) => item.id === mapped)) return mapped as HotspotTabId;
+  if (businessLine === "weisec" && mapped === "fund") return "sector";
+  if (businessLine === "licaitong" && mapped === "sector") return "fund";
+  return "trending";
 }
 
 export function isHotspotTabValidForLine(tab: HotspotTabId, businessLine: BusinessLine) {
@@ -42,8 +51,18 @@ export function isHotspotTabValidForLine(tab: HotspotTabId, businessLine: Busine
 
 export const HOTSPOT_REQUIRED_SCENE_IDS = new Set(["market-hotspot"]);
 
+export function buildHotspotSearchQueries(
+  tab: HotspotTabId,
+  topic: string,
+  customQuery?: string,
+  businessLine?: BusinessLine,
+) {
+  return buildEastMoneySearchQueries(tab, topic, customQuery, businessLine);
+}
+
+/** 单条 query 兼容旧调用 */
 export function buildHotspotSearchQuery(tab: HotspotTabId, topic: string, customQuery?: string, businessLine?: BusinessLine) {
-  return buildHotspotSearchQueryFromDisplay(tab, topic, customQuery, businessLine);
+  return buildHotspotSearchQueries(tab, topic, customQuery, businessLine)[0] || "今日财经热点";
 }
 
 export function sceneRequiresHotspotMaterials(
@@ -130,7 +149,7 @@ export function findStoredHotspotMaterial(materials: Material[], candidate: Pick
 
 /** 搜索候选与已选库合并：保留 id、勾选态、主素材标记 */
 export function mergeHotspotSearchCandidates(
-  rawResults: Array<Pick<Material, "title" | "body" | "source">>,
+  rawResults: Array<Pick<Material, "title" | "body" | "source" | "tags">>,
   materials: Material[],
 ): Material[] {
   return rawResults
@@ -141,7 +160,7 @@ export function mergeHotspotSearchCandidates(
         title: item.title,
         body: item.body,
         source: item.source,
-        tags: ["热点"],
+        tags: item.tags?.length ? item.tags : ["热点"],
         selected: false,
         createdAt: new Date().toISOString(),
       };
@@ -150,6 +169,7 @@ export function mergeHotspotSearchCandidates(
       return {
         ...candidate,
         id: stored.id,
+        body: candidate.body?.trim() || stored.body || "",
         selected: stored.selected !== false,
         isPrimary: stored.isPrimary,
         createdAt: stored.createdAt,

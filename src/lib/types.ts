@@ -12,7 +12,7 @@ export type TextContentLength = "under-200" | "200-500" | "500-1000" | "long-for
 export type VideoScriptDuration = "15s" | "30s" | "60s";
 export type ContentLength = TextContentLength | VideoScriptDuration;
 export type BloggerLevel = "tail" | "middle" | "head";
-export type EmbedLevel = "none" | "low" | "medium" | "high";
+export type EmbedLevel = "none" | "medium" | "high";
 export type RiskLevel = "low" | "medium" | "high";
 export type BusinessLine = "weisec" | "licaitong";
 

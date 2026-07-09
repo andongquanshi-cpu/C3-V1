@@ -1,5 +1,6 @@
 import type { EmbedLevel, GenerationMode } from "@/lib/types";
-import { formatEmbedLevelForPrompt } from "@/lib/embed-level";
+import { formatEmbedLevelForPrompt, normalizeEmbedLevel } from "@/lib/embed-level";
+import { buildNarrativeAntiTemplateLock } from "@/lib/narrative-anti-template";
 import { isSkeletonVideoScript } from "@/lib/video-script-quality";
 
 type AnyRecord = Record<string, unknown>;
@@ -25,13 +26,26 @@ export function buildBusinessLineRuntimeLock(
   brandVoice?: AnyRecord,
   embedLevel?: EmbedLevel | string,
   generationMode?: GenerationMode | string,
+  narrativeOptions?: { creationScene?: string; personaId?: string },
 ): string {
-  const embedGuide = formatEmbedLevelForPrompt(embedLevel || "low");
+  const embedGuide = formatEmbedLevelForPrompt(embedLevel || "medium");
   const paths = toArray(brandVoice?.standardConversionPaths).slice(0, 2);
   const isVideo = generationMode === "video-script";
+  const isHighEmbed = normalizeEmbedLevel(embedLevel || "medium") === "high";
   const bodyRule = isVideo
     ? "- 必须先有完整分镜与口播主体，CTA/interactionGuide 最多 1 句，不得用 CTA 代替脚本。"
-    : "- 正文必须先有完整的生活/故事/观点/干货（至少 200 字），CTA/interactionGuide 最多 1 句，不得用 CTA 代替正文。";
+    : isHighEmbed
+      ? "- high 档位：正文须满足约 40% 场景铺垫 + 60% 产品/功能组合说明；CTA/interactionGuide 最多 1 句。"
+      : "- 正文必须先有完整的生活/故事/观点/干货（至少 200 字），CTA/interactionGuide 最多 1 句，不得用 CTA 代替正文。";
+
+  const narrativeLock = buildNarrativeAntiTemplateLock(
+    isLicaitongLine(businessLine) ? "licaitong" : "weisec",
+    {
+      creationScene: narrativeOptions?.creationScene,
+      personaId: narrativeOptions?.personaId,
+      generationMode,
+    },
+  );
 
   if (isLicaitongLine(businessLine)) {
     const pathHint = paths.length ? paths.join("；") : "微信 → 我 → 服务 → 理财通";
@@ -42,6 +56,7 @@ export function buildBusinessLineRuntimeLock(
       "- 产品能力只能来自运行时注入的 selectedFeatures（如严选专区、虚拟理财金、AI 辅助等），禁止编造未提供的功能。",
       bodyRule,
       "- 禁止把理财通与微证券写在同一句 CTA 里。",
+      narrativeLock,
       embedGuide,
     ].join("\n");
   }
@@ -56,6 +71,7 @@ export function buildBusinessLineRuntimeLock(
     `- 若需要 CTA，仅允许：${pathHint}；或口语「微信里搜腾讯微证券」。`,
     "- 产品能力只能来自运行时注入的 selectedFeatures。",
     weisecBodyRule,
+    narrativeLock,
     embedGuide,
   ].join("\n");
 }
@@ -101,8 +117,8 @@ export function validateGeneratedBody(
       };
     }
     const voiceChars = (body.match(/[\u4e00-\u9fff]/g) || []).length;
-    if (voiceChars < 50) {
-      return { ok: false, reason: "视频脚本口播内容过短，疑似未生成完整分镜" };
+    if (voiceChars < 35) {
+      return { ok: false, reason: `视频脚本口播内容过短（约${voiceChars}字），疑似未生成完整分镜` };
     }
   }
 

@@ -20,11 +20,13 @@ import {
   normalizeContentLength,
   resolveWorkflowForLine,
 } from "@/lib/business-line-workflow";
+import { assessBriefProductIntegration, resolveBriefPromptSlice } from "@/lib/brief-prompt-context";
+import { normalizeEmbedLevel, requiresStrictProductHierarchy } from "@/lib/embed-level";
 import { validateGeneratedBody } from "@/lib/business-line-prompt";
 import { resolveContentPromptAction } from "@/lib/content-generation-routing";
 import { validateVideoScriptPayload } from "@/lib/video-script-quality";
 import {
-  buildHotspotSearchQuery,
+  buildHotspotSearchQueries,
   canProceedFromBrief,
   findStoredHotspotMaterial,
   getSelectedMaterials,
@@ -34,7 +36,15 @@ import {
   sceneRequiresHotspotMaterials,
   type HotspotTabId,
 } from "@/lib/hotspot-workflow";
-import { HOTSPOT_TAB_DOMAINS, normalizeHotspotFromTavily, buildHotspotSearchFallbackQuery } from "@/lib/hotspot-display";
+import {
+  filterMaterialsForPrompt,
+  isHotspotLinkedBrief,
+  stripHotspotSearchMaterials,
+} from "@/lib/material-prompt-routing";
+import {
+  dedupeHotspotMaterials,
+  filterHotspotForBusinessLine,
+} from "@/lib/eastmoney-hotspot";
 import {
   finalizeImagePromptSuggestions,
   shouldRequestCoverSuggestions,
@@ -139,7 +149,7 @@ function buildDefaultBrief(businessLine: BusinessLine): BriefInput {
     ...buildWorkflowDefaults(businessLine),
     generationMode: "image-text",
     bloggerLevel: "middle",
-    embedLevel: "low",
+    embedLevel: "medium",
     contentLength: "200-500",
     generateCount: 2,
     customRequirement: "",
@@ -166,9 +176,10 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   const [materials, setMaterials] = useState<Material[]>([]);
   const [materialDraft, setMaterialDraft] = useState("");
   const [hotspotPanelOpen, setHotspotPanelOpen] = useState(false);
-  const [activeHotspotTab, setActiveHotspotTab] = useState<HotspotTabId>("finance");
+  const [activeHotspotTab, setActiveHotspotTab] = useState<HotspotTabId>("trending");
   const [customHotspotQuery, setCustomHotspotQuery] = useState("");
   const [hotspotCandidates, setHotspotCandidates] = useState<Material[]>([]);
+  const [hotspotSearchError, setHotspotSearchError] = useState<string | null>(null);
   const [angles, setAngles] = useState<CreativeAngle[]>([]);
   const [selectedAngleIds, setSelectedAngleIds] = useState<string[]>([]);
   const [results, setResults] = useState<GeneratedContent[]>([]);
@@ -190,6 +201,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       businessLine,
       generationMode: mode,
       contentLength: normalizeContentLength(stored.contentLength, mode),
+      embedLevel: normalizeEmbedLevel(stored.embedLevel ?? defaultBrief.embedLevel),
     });
     setMaterials(safeJsonParse(localStorage.getItem(storageKeys.materials) || "", []));
     setDrafts(safeJsonParse(localStorage.getItem(storageKeys.drafts) || "", []));
@@ -214,7 +226,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   useEffect(() => {
     setActiveHotspotTab((current) => {
       const normalized = normalizeHotspotTabForLine(current, businessLine);
-      return isHotspotTabValidForLine(normalized, businessLine) ? normalized : "finance";
+      return isHotspotTabValidForLine(normalized, businessLine) ? normalized : "trending";
     });
   }, [businessLine]);
 
@@ -259,9 +271,17 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     () => results.find((r) => r.id === activeResultId) || results[0],
     [activeResultId, results],
   );
+  const hotspotLinked = useMemo(
+    () => isHotspotLinkedBrief(brief, workflowConfig),
+    [brief.personaId, brief.creationScene, workflowConfig],
+  );
+  const promptMaterials = useMemo(
+    () => filterMaterialsForPrompt(materials, hotspotLinked),
+    [materials, hotspotLinked],
+  );
   const anglesConfigKey = useMemo(
-    () => buildAnglesConfigFingerprint(brief, materials),
-    [brief, materials],
+    () => buildAnglesConfigFingerprint(brief, promptMaterials),
+    [brief, promptMaterials],
   );
   const selectedMaterials = useMemo(() => getSelectedMaterials(materials), [materials]);
   const canContinueFromBrief = useMemo(
@@ -273,6 +293,16 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     [brief, workflowConfig],
   );
   const anglesUpToDate = anglesGeneratedForKey === anglesConfigKey && angles.length > 0;
+
+  useEffect(() => {
+    if (hotspotLinked) return;
+    setMaterials((current) => {
+      const next = stripHotspotSearchMaterials(current);
+      return next.length === current.length ? current : next;
+    });
+    setHotspotPanelOpen(false);
+    setHotspotCandidates([]);
+  }, [hotspotLinked]);
 
   useEffect(() => {
     if (isGeneratingAngles) return;
@@ -323,63 +353,78 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     };
     setMaterials((current) => [material, ...current].slice(0, 12));
     setMaterialDraft("");
-    setStatus("素材已加入已选列表");
+    setStatus(hotspotLinked ? "素材已加入已选列表" : "背景补充已加入");
   }
 
-  async function fetchHotspotResults(
-    query: string,
-    options: { includeDomains?: string[]; timeRange?: "day" | "week" | "month" } = {},
-  ) {
-    const response = await fetch("/api/tavily-proxy", {
+  async function fetchEastMoneyNews(query: string) {
+    const response = await fetch("/api/eastmoney-proxy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query,
-        maxResults: 8,
-        topic: "news",
-        timeRange: options.timeRange || "week",
-        searchDepth: "basic",
-        ...(options.includeDomains?.length ? { includeDomains: options.includeDomains } : {}),
-      }),
+      body: JSON.stringify({ query }),
     });
     const data = await response.json();
     if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error("Tavily API Key 无效，请到 tavily.com Dashboard 重新复制 Key 并更新 .env");
-      }
-      throw new Error(data.error || "热点搜索失败");
+      throw new Error(data.error || "东财资讯搜索失败");
     }
-    return (data.results || []) as Array<{ title?: string; content?: string; snippet?: string; url?: string }>;
+    return (data.items || []) as Array<Pick<Material, "title" | "body" | "source">>;
   }
 
   async function searchHotspot(tab: HotspotTabId = activeHotspotTab) {
     setIsSearchingHotspot(true);
-    setStatus("正在搜索热点...");
+    setHotspotSearchError(null);
+      setStatus("正在拉取热榜...");
     try {
-      const query = buildHotspotSearchQuery(tab, brief.topic, customHotspotQuery, businessLine);
-      const includeDomains = HOTSPOT_TAB_DOMAINS[tab];
+      const queries = buildHotspotSearchQueries(tab, brief.topic, customHotspotQuery, businessLine);
+      const errors: string[] = [];
+      const batches: Awaited<ReturnType<typeof fetchEastMoneyNews>>[] = [];
 
-      let rawResults = await fetchHotspotResults(query, { includeDomains, timeRange: "week" });
-      if (rawResults.length === 0 && includeDomains?.length) {
-        rawResults = await fetchHotspotResults(query, { timeRange: "week" });
-      }
-      if (rawResults.length === 0) {
-        const fallbackQuery = buildHotspotSearchFallbackQuery(tab, customHotspotQuery, businessLine);
-        rawResults = await fetchHotspotResults(fallbackQuery, { timeRange: "week" });
+      for (const query of queries) {
+        try {
+          batches.push(await fetchEastMoneyNews(query));
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "东财资讯搜索失败";
+          errors.push(message);
+          batches.push([]);
+        }
       }
 
-      const normalizedResults = rawResults
-        .slice(0, 8)
-        .map((item) => normalizeHotspotFromTavily(item))
-        .filter((item) => item.title);
+      let mergedItems = filterHotspotForBusinessLine(
+        dedupeHotspotMaterials(batches.flat()),
+        businessLine,
+        tab,
+      );
+      if (!mergedItems.length && errors.length === queries.length) {
+        throw new Error(errors[0] || "东财 MCP 资讯搜索失败，请检查 EASTMONEY_API_KEY");
+      }
+      if (!mergedItems.length) {
+        throw new Error("热榜结果质量过低（多为日报聚合页），请换「财经热搜」分类或手动粘贴新闻");
+      }
+
+      const normalizedResults = mergedItems.filter((item) => item.title);
 
       const next = mergeHotspotSearchCandidates(normalizedResults, materials);
 
       setHotspotCandidates(next);
-      setStatus(next.length > 0 ? `找到 ${next.length} 条热点，请勾选要使用的素材` : "暂无匹配热点，可换分类或自定义搜索词");
+      setMaterials((current) =>
+        current.map((item) => {
+          const refreshed = next.find((candidate) => findStoredHotspotMaterial([item], candidate));
+          if (refreshed?.body?.trim()) {
+            return { ...item, body: refreshed.body, tags: refreshed.tags || item.tags };
+          }
+          return item;
+        }),
+      );
+      setHotspotSearchError(null);
+      setStatus(
+        next.length > 0
+          ? `热榜 ${next.length} 条，勾选即可`
+          : "暂无匹配资讯，可换分类、用主题搜索或手动粘贴",
+      );
     } catch (error) {
+      const message = error instanceof Error ? error.message : "东财资讯搜索失败，可手动粘贴素材";
       setHotspotCandidates([]);
-      setStatus(error instanceof Error ? error.message : "热点搜索失败，可手动粘贴素材");
+      setHotspotSearchError(message);
+      setStatus(message);
     } finally {
       setIsSearchingHotspot(false);
     }
@@ -388,7 +433,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   async function openHotspotPanel() {
     const nextStatus = await refreshApiStatus();
     if (!nextStatus.hotspot) {
-      setStatus("未检测到 TAVILY_API_KEY，请保存 .env 后重启 npm run dev");
+      setStatus("未检测到 EASTMONEY_API_KEY，请到妙想平台领取后写入 .env 并重启 dev");
       return;
     }
     setHotspotPanelOpen(true);
@@ -406,9 +451,9 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
   }
 
   function searchCustomHotspot() {
-    const query = customHotspotQuery.trim();
+    const query = customHotspotQuery.trim() || brief.topic.trim();
     if (!query) {
-      setStatus("请输入搜索词");
+      setStatus("请输入搜索问句，或先填写主题");
       return;
     }
     setHotspotPanelOpen(true);
@@ -484,6 +529,37 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     setMaterials((current) => current.filter((item) => item.id !== id));
   }
 
+  function deselectHotspotMaterial(material: Material) {
+    if (material.source === "手动输入") {
+      removeMaterial(material.id);
+      setStatus("已移除粘贴素材");
+      return;
+    }
+
+    const candidate = hotspotCandidates.find((item) => {
+      const stored = findStoredHotspotMaterial(materials, item);
+      return stored?.id === material.id || item.id === material.id;
+    });
+
+    if (candidate) {
+      toggleHotspotCandidate(candidate, false);
+      return;
+    }
+
+    removeMaterial(material.id);
+    setStatus("已取消选用该热点");
+  }
+
+  function clearHotspotSelection() {
+    const selected = getSelectedMaterials(materials);
+    if (!selected.length) return;
+
+    const selectedIds = new Set(selected.map((item) => item.id));
+    setMaterials((current) => current.filter((item) => !selectedIds.has(item.id)));
+    setHotspotCandidates((current) => current.map((item) => ({ ...item, selected: false })));
+    setStatus("已清空选用");
+  }
+
   async function buildPrompt(action: string, input: Record<string, unknown>) {
     const response = await fetch("/api/prompt-engine", {
       method: "POST",
@@ -527,19 +603,26 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     setAnglesGeneratedForKey(null);
     try {
       if (!apiStatus.ready) throw new Error(LLM_NOT_CONFIGURED);
-      const input = { ...brief, materials: selectedMaterials, avoidRecentAngles, diversitySeed: uid("angle_batch") };
+      const input = {
+        ...brief,
+        materials: promptMaterials,
+        hotspotLinked,
+        workflowConfig,
+        avoidRecentAngles,
+        diversitySeed: uid("angle_batch"),
+      };
       const prompt = await buildPrompt("creativeAngles", input);
-      const hasHotspotMaterials = selectedMaterials.some((item) => item.source !== "手动输入");
+      const hasHotspotMaterials = hotspotLinked && promptMaterials.some((item) => item.source !== "手动输入");
       const raw = await callTextModel(prompt, {
         temperature: avoidRecentAngles.length > 0 ? 0.75 : hasHotspotMaterials ? 0.58 : 0.45,
         maxTokens: 8192,
       });
       const normalized = normalizeAngles(parseLLMJson(raw), brief);
       setAngles(normalized);
-      setSelectedAngleIds(normalized.map((item) => item.angleId));
+      setSelectedAngleIds([]);
       setAnglesGeneratedForKey(configKey);
       writeAngleHistory(configKey, normalized);
-      setStatus(`已生成 ${normalized.length} 个创意角度，已默认全选，可直接生成正文`);
+      setStatus(`已生成 ${normalized.length} 个创意角度，请勾选要写成正文的角度（可点全选）`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "创意角度生成失败");
     } finally {
@@ -564,101 +647,174 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     setStatus("正在生成正文并完成合规审查...");
     try {
       const nextResults: GeneratedContent[] = [];
-      for (const angle of selectedAngles) {
-        const contentAction = resolveContentPromptAction(brief);
-        const isVideo = (brief.generationMode || "image-text") === "video-script";
-        const maxAttempts = isVideo ? 2 : 1;
-        let content: GeneratedContent | null = null;
-        let lastError = "";
+      const failedAngles: string[] = [];
+      const isVideo = (brief.generationMode || "image-text") === "video-script";
+      const needsProductEmbed = requiresStrictProductHierarchy(brief.embedLevel);
+      const maxAttempts = isVideo ? 3 : needsProductEmbed ? 3 : 2;
 
-        for (let attempt = 0; attempt < maxAttempts; attempt++) {
-          const retryHint =
-            attempt > 0
-              ? "\n\n【重试 · 上次只有镜头时长占位、没有口播原文】本次 storyboard 每镜 voiceover 和 visual 必填，每镜口播≥12字，content 写完整分镜稿。"
-              : "";
-          const contentPrompt = await buildPrompt(contentAction, {
-            ...brief,
-            materials: selectedMaterials,
-            selectedAngle: angle,
-            templateId: angle.recommendedTemplateId,
-            selectedFeatureIds: [
-              ...new Set([...(brief.selectedFeatureIds || []), ...(angle.recommendedFeatureIds || [])]),
-            ],
-          });
-          const rawContent = await callTextModel(
-            { system: contentPrompt.system, user: contentPrompt.user + retryHint },
-            { maxTokens: 8192, temperature: attempt > 0 ? 0.78 : 0.72 },
-          );
-          const parsed = parseLLMJson(rawContent);
-          const candidate = normalizeContent(parsed, angle, { generationMode: brief.generationMode });
-          const bodyCheck = validateGeneratedBody(candidate.content, brief.businessLine, brief.generationMode);
-          if (!bodyCheck.ok) {
-            lastError = bodyCheck.reason || "质检未通过";
-            continue;
-          }
-          if (!candidate.content.trim()) {
-            lastError = "正文为空";
-            continue;
-          }
-          if (isVideo) {
-            const videoCheck = validateVideoScriptPayload(candidate.content, parsed);
-            if (!videoCheck.ok) {
-              lastError = videoCheck.reason || "视频脚本不完整";
-              setStatus(`「${angle.angleName}」脚本不完整，正在重试…`);
+      for (let angleIndex = 0; angleIndex < selectedAngles.length; angleIndex++) {
+        const angle = selectedAngles[angleIndex];
+        const ordinal = angleIndex + 1;
+        const total = selectedAngles.length;
+
+        try {
+          setStatus(`正在生成第 ${ordinal}/${total} 条：「${angle.angleName}」…`);
+
+          const contentAction = resolveContentPromptAction(brief);
+          let content: GeneratedContent | null = null;
+          let lastError = "";
+          let lastMissingFeatures: string[] = [];
+          const briefSlice = resolveBriefPromptSlice({ ...brief }, workflowConfig);
+
+          for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            const retryHint =
+              attempt > 0
+                ? isVideo
+                  ? "\n\n【重试 · 上次只有镜头时长占位、没有口播原文】本次 storyboard 每镜 voiceover 和 visual 必填，每镜口播≥12字，content 写完整分镜稿。"
+                  : needsProductEmbed
+                    ? `\n\n【重试 · high 强硬植入不合规】层级：${briefSlice.brandName}(平台) → ${briefSlice.offerLabel}(主推产品) → 子功能。${
+                        lastMissingFeatures.length
+                          ? `须补充子功能：${lastMissingFeatures.join("、")}，且必须写在${briefSlice.offerLabel}的语境里。`
+                          : ""
+                      }正文须同时体现平台、主推产品「${briefSlice.offerLabel}」，禁止只写子功能。`
+                    : lastError === "模型返回的 JSON 格式有误"
+                      ? "\n\n【重试 · 上次 JSON 非法】只输出合法 JSON：不要用 Markdown 代码块；字符串里的换行写成 \\n，双引号写成 \\\"；确保括号配对完整。"
+                      : ""
+                : "";
+            const contentPrompt = await buildPrompt(contentAction, {
+              ...brief,
+              materials: promptMaterials,
+              hotspotLinked,
+              workflowConfig,
+              selectedAngle: angle,
+              templateId: angle.recommendedTemplateId,
+              selectedFeatureIds: [
+                ...new Set([...(brief.selectedFeatureIds || []), ...(angle.recommendedFeatureIds || [])]),
+              ],
+            });
+            const rawContent = await callTextModel(
+              { system: contentPrompt.system, user: contentPrompt.user + retryHint },
+              {
+                maxTokens: isVideo ? 12288 : 8192,
+                temperature: isVideo ? (attempt > 0 ? 0.72 : 0.62) : attempt > 0 ? 0.78 : 0.72,
+              },
+            );
+            let parsed: Record<string, unknown>;
+            try {
+              parsed = parseLLMJson<Record<string, unknown>>(rawContent);
+            } catch {
+              lastError = "模型返回的 JSON 格式有误（可能输出被截断）";
+              if (attempt < maxAttempts - 1) {
+                setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」JSON 解析失败，正在重试…`);
+              }
               continue;
             }
+            const candidate = normalizeContent(parsed, angle, { generationMode: brief.generationMode });
+            if (isVideo) {
+              const videoCheck = validateVideoScriptPayload(candidate.content, parsed);
+              if (!videoCheck.ok) {
+                lastError = videoCheck.reason || "视频脚本不完整";
+                if (attempt < maxAttempts - 1) {
+                  setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」${lastError}，正在重试…`);
+                }
+                continue;
+              }
+            }
+            const bodyCheck = validateGeneratedBody(candidate.content, brief.businessLine, brief.generationMode);
+            if (!bodyCheck.ok) {
+              lastError = bodyCheck.reason || "质检未通过";
+              if (isVideo && attempt < maxAttempts - 1) {
+                setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」${lastError}，正在重试…`);
+              }
+              continue;
+            }
+            const embedCheck = assessBriefProductIntegration(candidate.content, brief.embedLevel, briefSlice);
+            if (!embedCheck.ok) {
+              lastError = embedCheck.reason || "植入质检未通过";
+              lastMissingFeatures = embedCheck.missingFeatures;
+              if (needsProductEmbed) {
+                setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」${lastError}，正在重试…`);
+              }
+              continue;
+            }
+            if (!candidate.content.trim()) {
+              lastError = "正文为空";
+              continue;
+            }
+            content = candidate;
+            break;
           }
-          content = candidate;
-          break;
-        }
 
-        if (!content) {
-          throw new Error(
-            `「${angle.angleName}」生成失败：${lastError || "未知错误"}。请换角度或缩短时长后重试。`,
-          );
-        }
+          if (!content) {
+            failedAngles.push(`「${angle.angleName}」${lastError || "生成失败"}`);
+            continue;
+          }
 
-        let coverPayload: unknown;
-        const isImageText = (brief.generationMode || "image-text") !== "video-script";
-        if (isImageText && shouldRequestCoverSuggestions(content.imagePromptSuggestions)) {
-          setStatus(`正在为「${angle.angleName}」生成封面 Prompt…`);
-          const coverPrompt = await buildPrompt("coverSuggestions", {
-            ...brief,
-            materials: selectedMaterials,
-            selectedAngle: angle,
-            generatedContent: content,
-            templateId: angle.recommendedTemplateId,
-            selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
-          });
-          const rawCover = await callTextModel(coverPrompt, { temperature: 0.45, maxTokens: 4096 });
-          coverPayload = parseLLMJson(rawCover);
-        }
+          const isImageText = !isVideo;
+          if (isImageText && shouldRequestCoverSuggestions(content.imagePromptSuggestions)) {
+            setStatus(`第 ${ordinal}/${total} 条：正在为「${angle.angleName}」生成封面 Prompt…`);
+            const coverPrompt = await buildPrompt("coverSuggestions", {
+              ...brief,
+              materials: promptMaterials,
+              hotspotLinked,
+              selectedAngle: angle,
+              generatedContent: content,
+              templateId: angle.recommendedTemplateId,
+              selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
+            });
+            const rawCover = await callTextModel(coverPrompt, { temperature: 0.45, maxTokens: 4096 });
+            let coverPayload: unknown;
+            try {
+              coverPayload = parseLLMJson(rawCover);
+            } catch {
+              coverPayload = undefined;
+            }
+            content = {
+              ...content,
+              imagePromptSuggestions: finalizeImagePromptSuggestions(content, angle, coverPayload),
+            };
+          }
 
-        if (isImageText) {
-          content = {
-            ...content,
-            imagePromptSuggestions: finalizeImagePromptSuggestions(content, angle, coverPayload),
-          };
-        }
+          setStatus(`第 ${ordinal}/${total} 条：正在为「${angle.angleName}」完成合规审查…`);
+          const defaultCompliance = buildDefaultCompliance(content, { generationMode: brief.generationMode });
+          try {
+            const compliancePrompt = await buildPrompt("complianceReview", {
+              ...brief,
+              generatedContent: content,
+              selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
+            });
+            const rawCompliance = await callTextModel(compliancePrompt, { temperature: 0.2, maxTokens: 4096 });
+            content.complianceReport = normalizeCompliance(parseLLMJson(rawCompliance), defaultCompliance);
+          } catch {
+            content.complianceReport = defaultCompliance;
+          }
 
-        setStatus("正在完成合规审查...");
-        const compliancePrompt = await buildPrompt("complianceReview", {
-          ...brief,
-          generatedContent: content,
-          selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
-        });
-        const rawCompliance = await callTextModel(compliancePrompt, { temperature: 0.2, maxTokens: 4096 });
-        content.complianceReport = normalizeCompliance(
-          parseLLMJson(rawCompliance),
-          buildDefaultCompliance(content, { generationMode: brief.generationMode }),
-        );
-        nextResults.push(content);
+          nextResults.push(content);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "未知错误";
+          failedAngles.push(`「${angle.angleName}」${message}`);
+          console.error(`[generateContent] angle ${angle.angleId}`, error);
+        }
       }
+
       setResults(nextResults);
       setActiveResultId(nextResults[0]?.id || "");
       setView("workflow");
       setStep(3);
-      setStatus(`已生成 ${nextResults.length} 条内容`);
+
+      if (nextResults.length === selectedAngles.length) {
+        setStatus(`已生成 ${nextResults.length} 条${isVideo ? "视频脚本" : "内容"}`);
+      } else if (nextResults.length > 0) {
+        setStatus(
+          `已生成 ${nextResults.length}/${selectedAngles.length} 条；未成功 ${failedAngles.length} 条：${failedAngles.join("；")}`,
+        );
+      } else {
+        setStatus(
+          failedAngles.length
+            ? `全部角度生成失败：${failedAngles.join("；")}`
+            : "全部角度生成失败，请检查植入档位或换角度后重试",
+        );
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "内容生成失败";
       setStatus(`内容生成失败：${message}`);
@@ -674,7 +830,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       ...activeResult,
       savedAt: new Date().toISOString(),
       draftEntryId: uid("draft"),
-      generationSnapshot: { ...brief, materials: selectedMaterials },
+      generationSnapshot: { ...brief, materials: promptMaterials },
     };
     setDrafts((current) => [draft, ...current].slice(0, 30));
     setView("drafts");
@@ -789,6 +945,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
             customHotspotQuery={customHotspotQuery}
             hotspotCandidates={hotspotCandidates}
             isSearchingHotspot={isSearchingHotspot}
+            hotspotSearchError={hotspotSearchError}
             canContinue={canContinueFromBrief}
             topicExample={suggestedTopic}
             onBriefChange={(patch) => {
@@ -804,6 +961,8 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
             onToggleCandidate={toggleHotspotCandidate}
             onSetPrimaryMaterial={setPrimaryMaterial}
             onRemoveMaterial={removeMaterial}
+            onDeselectHotspot={deselectHotspotMaterial}
+            onClearHotspotSelection={clearHotspotSelection}
             onEditHotspotMaterials={editHotspotMaterials}
             onCloseHotspotPanel={closeHotspotPanel}
             onContinue={() => {

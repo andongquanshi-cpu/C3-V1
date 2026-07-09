@@ -24,7 +24,7 @@
 1. 标出所有可能违规或高风险句子（重点：口播 voiceover、标题、开篇钩子）。
 2. 风险类型必须对应 complianceRules 中的 ruleId。
 3. 给出保守替代表达，不要给更激进的营销表达。
-4. 检查是否包含风险提示（口播或 riskReminder 字段）。
+4. 检查是否包含风险提示（口播或 riskReminder 字段）；接受口语化改写，不要求逐字匹配「市场有风险，投资需谨慎」。
 5. 检查是否存在收益承诺、个股/基金推荐、买卖点、内幕消息、私信导流、夸大产品能力。
 6. 检查 storyboard 分镜是否具备可拍摄的口播与画面备忘；若仅有镜头时长占位、无口播原文，publishReadiness 应为 blocked。
 7. 输出 publishReadiness：ready / needs_revision / blocked。
@@ -52,7 +52,7 @@
   "missingRequiredElements": [
     {
       "type": "riskReminder",
-      "suggestedText": "市场有风险，投资需谨慎。"
+      "suggestedText": "口播末段补充：信息仅供参考，不构成投资建议。"
     }
   ],
   "qualityScore": {

@@ -50,7 +50,7 @@ C3-V2.2/
 │   │   │   ├── image-save/        # 图片落地存档（maxDuration=90s）
 │   │   │   ├── llm-proxy/         # 文本 LLM 代理
 │   │   │   ├── prompt-engine/     # 提示词引擎路由
-│   │   │   └── tavily-proxy/      # 热点搜索（可选）
+│   │   │   └── eastmoney-proxy/   # 东财妙想资讯搜索（可选）
 │   │   └── ...
 │   ├── components/
 │   │   └── workspace/
@@ -114,7 +114,7 @@ IMAGE_MODEL=doubao-seedream-5-0-pro-260628
 IMAGE_API_FORMAT=volcengine
 
 # 热点搜索（可选，跳过不影响主流程）
-TAVILY_API_KEY=
+EASTMONEY_API_KEY=
 ```
 
 **注意事项：**

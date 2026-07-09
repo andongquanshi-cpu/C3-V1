@@ -16,14 +16,29 @@ import {
 } from "@/lib/image-prompt-utils";
 import {
   buildHotspotCoveragePlan,
+  buildSceneModeCoveragePlan,
+  formatBackgroundMaterialsForPrompt,
+  formatMaterialsForPrompt,
   formatTopicMaterialsForPrompt,
   getPrimaryMaterialTitle,
   resolvePromptMaterials,
 } from "@/lib/topic-materials";
 import {
+  buildBriefProductRuntimeLock,
+  buildEmbedAngleProductRules,
+  formatBriefBusinessContext,
+  resolveBriefPromptSlice,
+} from "@/lib/brief-prompt-context";
+import {
+  buildCreationSceneAngleRules,
+  buildCreationSceneContentRules,
+} from "@/lib/creation-scene-prompt";
+import { isHotspotLinkedBrief } from "@/lib/material-prompt-routing";
+import {
   formatVideoScriptModulesForPrompt,
   resolveVideoScriptModules,
 } from "@/lib/video-script-routing";
+import { formatVideoRiskReminderGuide } from "@/lib/risk-reminder";
 
 type AnyRecord = Record<string, any>;
 
@@ -164,17 +179,37 @@ function clampGenerateCount(value: unknown) {
 
 export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
   const generateCount = clampGenerateCount(input.generateCount);
-  const materials = resolvePromptMaterials(input);
-  const topicMaterialsText = formatTopicMaterialsForPrompt(materials);
-  const primaryHotspot = getPrimaryMaterialTitle(materials);
-  const hotspotCoveragePlan = buildHotspotCoveragePlan(materials, generateCount);
+  const hotspotLinked =
+    input.hotspotLinked !== undefined
+      ? Boolean(input.hotspotLinked)
+      : isHotspotLinkedBrief(input, input.workflowConfig);
+  const allMaterials = resolvePromptMaterials(input);
+  const materials = hotspotLinked
+    ? allMaterials
+    : allMaterials.filter((item) => !item.source || item.source === "手动输入");
+  const topicMaterialsText = hotspotLinked
+    ? formatTopicMaterialsForPrompt(materials)
+    : formatBackgroundMaterialsForPrompt(materials);
+  const primaryHotspot = hotspotLinked ? getPrimaryMaterialTitle(materials) : "无（场景创作模式，不以新闻为主线）";
+  const hotspotCoveragePlan = hotspotLinked
+    ? buildHotspotCoveragePlan(materials, generateCount)
+    : buildSceneModeCoveragePlan(generateCount, materials.length > 0);
   return buildPrompt("creative-angles.md", input, "creative-angles", (data, knowledge) => ({
+    ...buildBriefPromptFields(data),
+    creationSceneRules: buildCreationSceneAngleRules(
+      (knowledge.businessLine || data.businessLine || "weisec") as "weisec" | "licaitong",
+      data.creationScene,
+      data.workflowConfig,
+    ),
     contentType: data.contentType || "brand-seed",
     topic: data.topic || data.hotspot || "未提供",
     primaryHotspotReference: primaryHotspot || "无",
+    materialModeHint: hotspotLinked
+      ? "热点解读模式：已选热点是选题主线，每个角度都必须挂钩热点素材；用户主题决定「怎么聊」，不是「聊别的」。"
+      : "场景创作模式：角度必须围绕主题与创作场景，不得做新闻解读；背景补充仅可一句带过。",
     targetUser: data.targetUser || "投资小白",
     campaignGoal: data.campaignGoal || "内容种草和功能认知",
-    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
+    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "medium"),
     bloggerLevel: data.bloggerLevel || "middle",
     customRequirement: data.customRequirement || data.customPrompt || "无",
     topicMaterials: topicMaterialsText,
@@ -195,24 +230,56 @@ function buildVideoScriptVariables(data: AnyRecord, knowledge: AnyRecord) {
   const contentLength = normalizeContentLength(data.contentLength || data.length, generationMode);
   const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
   const selectedAngle = data.selectedAngle || data.angle;
+  const materialFields = resolveContentMaterialFields(data);
   const modules = resolveVideoScriptModules({
     campaignGoal: data.campaignGoal,
     contentLength,
     selectedAngle,
   });
   return {
+    ...materialFields,
     contentType: data.contentType || "brand-seed",
     generationMode,
     length: lengthHint,
     campaignGoal: data.campaignGoal || "内容种草和功能认知",
     bloggerLevel: data.bloggerLevel || "middle",
-    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
+    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "medium"),
     topic: data.topic || data.hotspot || "未提供",
     customRequirement: data.customRequirement || data.customPrompt || "无",
     selectedAngle: selectedAngle || "未提供，请基于主题生成一个保守安全的单一角度",
     selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
-    topicMaterials: data.topicMaterials || data.materials || [],
     viralMethodology: formatVideoScriptModulesForPrompt(modules, selectedAngle),
+    videoRiskReminderGuide: formatVideoRiskReminderGuide(
+      knowledge.riskDisclaimers,
+      String(
+        (selectedAngle as { angleId?: string })?.angleId ||
+          data.diversitySeed ||
+          data.topic ||
+          "video",
+      ),
+    ),
+  };
+}
+
+function appendBriefLocks(user: string, input: AnyRecord) {
+  const slice = resolveBriefPromptSlice(input, input.workflowConfig);
+  const briefLock = buildBriefProductRuntimeLock(slice, input.embedLevel);
+  if (!briefLock) return user;
+  return `${user}\n\n${briefLock}`;
+}
+
+function buildBriefPromptFields(input: AnyRecord) {
+  const slice = resolveBriefPromptSlice(input, input.workflowConfig);
+  return {
+    briefBusinessContext: formatBriefBusinessContext(slice, input.embedLevel),
+    embedAngleProductRules: buildEmbedAngleProductRules(input.embedLevel, slice),
+  };
+}
+
+function buildRuntimeNarrativeOptions(input: AnyRecord) {
+  return {
+    creationScene: input.creationScene,
+    personaId: input.personaId,
   };
 }
 
@@ -224,8 +291,9 @@ function finalizePromptWithRuntimeLock(built: ReturnType<typeof buildPrompt>, in
     built.knowledge?.brandVoice,
     input.embedLevel,
     generationMode,
+    buildRuntimeNarrativeOptions(input),
   );
-  const user = `${built.user}\n\n${runtimeLock}`;
+  const user = appendBriefLocks(`${built.user}\n\n${runtimeLock}`, input);
   return {
     ...built,
     user,
@@ -237,6 +305,30 @@ function finalizePromptWithRuntimeLock(built: ReturnType<typeof buildPrompt>, in
   };
 }
 
+function resolveHotspotLinked(input: AnyRecord) {
+  return input.hotspotLinked !== undefined
+    ? Boolean(input.hotspotLinked)
+    : isHotspotLinkedBrief(input, input.workflowConfig);
+}
+
+function resolveContentMaterialFields(input: AnyRecord) {
+  const hotspotLinked = resolveHotspotLinked(input);
+  const allMaterials = resolvePromptMaterials(input);
+  const materials = hotspotLinked
+    ? allMaterials
+    : allMaterials.filter((item) => !item.source || item.source === "手动输入");
+  return {
+    hotspotLinked,
+    topicMaterials: formatMaterialsForPrompt(materials, hotspotLinked),
+    primaryHotspotReference: hotspotLinked
+      ? getPrimaryMaterialTitle(materials) || "未指定"
+      : "无（场景创作模式）",
+    hotspotContentHint: hotspotLinked
+      ? "热点解读成稿：正文=事实引用+因果分析+普通人视角，至少2个来自事实要点的信息点；禁止编造数据/公司/政策原文；禁止只有「我的第一反应」类空泛Reaction。"
+      : "场景创作成稿：不得做新闻解读；背景补充最多一句带过。",
+  };
+}
+
 export function buildContentGenerationPrompt(input: AnyRecord = {}) {
   if (isVideoScriptMode(input)) {
     return buildVideoScriptGenerationPrompt(input);
@@ -244,25 +336,38 @@ export function buildContentGenerationPrompt(input: AnyRecord = {}) {
   const generationMode = input.generationMode || "image-text";
   const contentLength = normalizeContentLength(input.contentLength || input.length, generationMode);
   const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
+  const materialFields = resolveContentMaterialFields(input);
   const built = buildPrompt("content-generation.md", input, "content-generation", (data, knowledge) => ({
+    ...buildBriefPromptFields(data),
+    ...materialFields,
+    creationSceneRules: buildCreationSceneContentRules(
+      (knowledge.businessLine || data.businessLine || "weisec") as "weisec" | "licaitong",
+      data.creationScene,
+      data.workflowConfig,
+    ),
     contentType: data.contentType || "brand-seed",
     generationMode,
     length: lengthHint,
     bloggerLevel: data.bloggerLevel || "middle",
-    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
+    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "medium"),
     topic: data.topic || data.hotspot || "未提供",
     customRequirement: data.customRequirement || data.customPrompt || "无",
     selectedAngle: data.selectedAngle || data.angle || "未提供，请基于主题生成一个保守安全的单一角度",
     selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
-    topicMaterials: data.topicMaterials || data.materials || [],
   }));
   return finalizePromptWithRuntimeLock(built, input);
 }
 
 export function buildVideoScriptGenerationPrompt(input: AnyRecord = {}) {
-  const built = buildPrompt("video-script-generation.md", input, "video-script-generation", (data, knowledge) =>
-    buildVideoScriptVariables(data, knowledge),
-  );
+  const built = buildPrompt("video-script-generation.md", input, "video-script-generation", (data, knowledge) => ({
+    ...buildVideoScriptVariables(data, knowledge),
+    ...buildBriefPromptFields(data),
+    creationSceneRules: buildCreationSceneContentRules(
+      (knowledge.businessLine || data.businessLine || "weisec") as "weisec" | "licaitong",
+      data.creationScene,
+      data.workflowConfig,
+    ),
+  }));
   return finalizePromptWithRuntimeLock(built, { ...input, generationMode: "video-script" });
 }
 
@@ -272,6 +377,7 @@ const VIDEO_PERSONA_TASK_LOCK = [
   "- 人设 system 只约束：语气、场景、称呼、禁忌词、口播气质",
   "- 忽略人设中的：图文正文结构、emoji 分段标题、400-500 字篇幅、imageTextSuggestions、封面文案",
   "- 创作优先级：先写满 storyboard[].voiceover 口播原文，再填 visual；禁止只输出镜头时长占位",
+  "- 忽略人设模板里固定的 ⚠️ 风险标语句式；风险提示须口语化嵌入最后一镜，禁止每条都念「市场有风险投资需谨慎」",
 ].join("\n");
 
 /** 有人设时：user 统一走 video-script-generation.md，避免 persona video 模板的 Markdown 格式冲突 */
@@ -366,6 +472,14 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
     knowledge.brandVoice,
     input.embedLevel,
     generationMode,
+    buildRuntimeNarrativeOptions(input),
+  );
+
+  const briefFields = buildBriefPromptFields(input);
+  const sceneRules = buildCreationSceneContentRules(
+    businessLine as "weisec" | "licaitong",
+    input.creationScene,
+    input.workflowConfig,
   );
 
   const personaPrompt = buildPersonaContentPrompt(
@@ -378,9 +492,9 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       generationMode,
       businessLine: resolveBrandName(businessLine),
       selectedAngle: input.selectedAngle || input.angle || "未提供",
-      embedLevel: formatEmbedLevelForPrompt(input.embedLevel || "low"),
+      embedLevel: formatEmbedLevelForPrompt(input.embedLevel || "medium"),
       customRequirement: input.customRequirement || input.customPrompt || "无",
-      topicMaterials: input.topicMaterials || input.materials || [],
+      ...resolveContentMaterialFields(input),
       selectedFeatures: knowledge.selectedFeatures,
       selectedTemplate: knowledge.selectedTemplates[0] || null,
       phraseGroup: knowledge.phraseGroup,
@@ -390,6 +504,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       platformRules: knowledge.platformRules,
       visualGuidelines: formatVisualGuidelinesForPrompt(knowledge.visualGuidelines),
       debugKnowledgeUsed: knowledge.debugKnowledgeUsed,
+      briefBusinessContext: briefFields.briefBusinessContext,
     },
     input.personaVariant,
     businessLine === "licaitong" ? "licaitong" : "weisec",
@@ -397,7 +512,12 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
 
   const globalSystem = buildSystemPrompt(knowledge);
   const personaSystem = `${personaPrompt.system}\n\n${runtimeLock}`;
-  const personaUser = `${personaPrompt.user}\n\n${runtimeLock}`;
+  const personaUser = appendBriefLocks(
+    `${personaPrompt.user}\n\n【Brief 业务配置 · 必须服从】\n${briefFields.briefBusinessContext}${
+      sceneRules ? `\n\n${sceneRules}` : ""
+    }\n\n${runtimeLock}`,
+    input,
+  );
   return {
     ...personaPrompt,
     system: `${globalSystem}\n\n${personaSystem}`,

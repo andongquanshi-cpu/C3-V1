@@ -65,8 +65,13 @@ export function getImageConfig(): ServerImageConfig {
   };
 }
 
+export function getEastMoneyApiKey() {
+  return (process.env.EASTMONEY_API_KEY || process.env.EASTMONEY_APIKEY || process.env.MX_APIKEY || "").trim();
+}
+
+/** @deprecated 热点搜索已切换至东方财富，保留别名避免旧代码报错 */
 export function getHotspotApiKey() {
-  return (process.env.TAVILY_API_KEY || "").trim();
+  return getEastMoneyApiKey();
 }
 
 export function getServerApiStatus() {

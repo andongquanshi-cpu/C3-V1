@@ -48,7 +48,7 @@
     {
       "id": "dry-goods-list",
       "label": "干货组合推荐",
-      "description": "清单/框架/几步走，信息密度高但克制。",
+      "description": "高密度信息，但用叙事/对比/踩坑讲，不写步骤清单或 N 点框架。",
       "contentType": "finance-tips"
     }
   ],

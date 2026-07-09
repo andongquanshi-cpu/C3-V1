@@ -10,7 +10,8 @@ import {
   type BusinessLineWorkflowConfig,
 } from "@/lib/business-line-workflow";
 import { getBusinessLinePreset } from "@/lib/business-line";
-import { getPrimaryMaterial, getSelectedMaterials } from "@/lib/hotspot-workflow";
+import { filterMaterialsForPrompt } from "@/lib/material-prompt-routing";
+import { getPrimaryMaterial, requiresHotspotMaterials } from "@/lib/hotspot-workflow";
 import { getWeisecPersonaDisplayLabel } from "@/lib/weisec-persona-ui";
 import type { BriefInput, Material } from "@/lib/types";
 
@@ -48,8 +49,13 @@ export function BriefSummaryCard({
       : persona?.label;
   const lengthLabel =
     getContentLengthOptions(brief.generationMode).find((item) => item.value === brief.contentLength)?.label || "-";
-  const selectedMaterials = getSelectedMaterials(materials);
-  const primaryMaterial = getPrimaryMaterial(materials);
+  const hotspotLinked = requiresHotspotMaterials({
+    personaId: brief.personaId,
+    creationScene: brief.creationScene,
+    config: workflowConfig,
+  });
+  const selectedMaterials = filterMaterialsForPrompt(materials, hotspotLinked);
+  const primaryMaterial = hotspotLinked ? getPrimaryMaterial(materials) : selectedMaterials[0];
 
   return (
     <Card className="border-border/80 bg-card/80 backdrop-blur-sm">
@@ -99,7 +105,7 @@ export function BriefSummaryCard({
             <dd className="font-medium">{lengthLabel}</dd>
           </div>
           <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">已选素材</dt>
+            <dt className="shrink-0 text-muted-foreground">{hotspotLinked ? "已选素材" : "背景补充"}</dt>
             <dd className="text-right font-medium">{selectedMaterials.length} 条</dd>
           </div>
           <div className="flex justify-between gap-3">
@@ -110,7 +116,7 @@ export function BriefSummaryCard({
 
         {primaryMaterial ? (
           <div className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
-            <p className="mb-1 font-medium text-foreground/80">主热点</p>
+            <p className="mb-1 font-medium text-foreground/80">{hotspotLinked ? "主热点" : "背景补充"}</p>
             {primaryMaterial.title}
           </div>
         ) : null}

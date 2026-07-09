@@ -132,7 +132,7 @@ export function AnglesPanel({
           <SectionTitle step={1} title="生成参数" />
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs">产品出现方式</Label>
+              <Label className="text-xs">植入强度</Label>
               <Select
                 value={brief.embedLevel}
                 onChange={(e) => onBriefChange({ embedLevel: e.target.value as BriefInput["embedLevel"] })}
@@ -298,7 +298,9 @@ export function AnglesPanel({
           <Button
             size="lg"
             onClick={onGenerateContent}
-            disabled={isGeneratingContent || isGeneratingAngles || !apiReady}
+            disabled={
+              isGeneratingContent || isGeneratingAngles || !apiReady || angles.length === 0 || selectedAngleIds.length === 0
+            }
             title={
               angles.length === 0
                 ? "请先生成创意角度"

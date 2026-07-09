@@ -444,7 +444,7 @@ function pruneFeature(feature: AnyRecord, embedLevel: string) {
 }
 
 function selectFeatures(features: AnyRecord[], input: KnowledgeInput, contentTypeCandidates: string[], businessLine: string) {
-  const embedLevel = normalizeEmbedLevel(input.embedLevel || "low");
+  const embedLevel = normalizeEmbedLevel(input.embedLevel || "medium");
   const requestedFeatureIds = unique([
     ...toArray(input.featureId),
     ...toArray(input.featureIds),
@@ -708,17 +708,12 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
   };
   const contentTypeCandidates = getContentTypeCandidates(resolvedInput.contentType);
   const purpose = normalizeText(resolvedInput.task || resolvedInput.promptTask || "");
-  const materialTerms =
+  const rawMaterialTerms =
     purpose === "creative-angles"
       ? collectAngleGenerationRetrievalTerms(resolvedInput.materials || resolvedInput.topicMaterials)
       : collectMaterialRetrievalTerms(resolvedInput.materials || resolvedInput.topicMaterials);
-  const retrievalInput =
-    materialTerms.length > 0
-      ? {
-          ...resolvedInput,
-          topic: [resolvedInput.topic, ...materialTerms.slice(0, 2)].filter(Boolean).join(" "),
-        }
-      : resolvedInput;
+  const materialTerms = purpose === "creative-angles" ? rawMaterialTerms : [];
+  const retrievalInput = resolvedInput;
   const featurePool = resolveRetrievalFeatures(scoped, retrievalInput);
   const selectedFeatures = selectFeatures(featurePool, retrievalInput, contentTypeCandidates, businessLine);
   const selectedTemplates = selectTemplates(scoped.contentTemplates, retrievalInput, contentTypeCandidates, businessLine);
@@ -749,7 +744,7 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
 
   return {
     ...knowledge,
-    debugKnowledgeUsed: buildDebugKnowledgeUsed(kb.basePath, knowledge, kb.index.version || "5.0", materialTerms),
+    debugKnowledgeUsed: buildDebugKnowledgeUsed(kb.basePath, knowledge, kb.index.version || "5.0", rawMaterialTerms),
   };
 }
 

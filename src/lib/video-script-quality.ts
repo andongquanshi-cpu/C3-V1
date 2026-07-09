@@ -13,25 +13,30 @@ export function isSkeletonVideoScript(content: string): boolean {
   const body = String(content || "").trim();
   if (!body) return true;
 
+  const totalCjk = countCjk(body);
   const lines = body.split("\n").filter(Boolean);
   if (!lines.length) return true;
 
   const placeholderOnly = lines.every((line) => {
     const hasShot = /【镜头\d+】|镜头\s*\d+/i.test(line);
-    const hasVoice = /口播[：:]/i.test(line) && countCjk(line.replace(/口播[：:]/, "")) >= 8;
-    const hasVisual = /画面[：:]/i.test(line) && countCjk(line.replace(/画面[：:]/, "")) >= 4;
+    if (!hasShot) return false;
+    const hasVoice = /口播[：:]/i.test(line) && countCjk(line.replace(/口播[：:]/i, "")) >= 6;
+    const hasVisual = /画面[：:]/i.test(line) && countCjk(line.replace(/画面[：:]/i, "")) >= 4;
     const onlyDuration = /时长[：:]?\s*\d+/.test(line);
     return hasShot && onlyDuration && !hasVoice && !hasVisual;
   });
 
-  if (placeholderOnly && lines.length >= 1) return true;
+  if (placeholderOnly) return true;
 
-  const voiceoverChars = countCjk(
+  const labeledVoice = countCjk(
     (body.match(/口播[：:]([^|【\n]+)/gi) || []).map((m) => m.replace(/口播[：:]/i, "")).join(""),
   );
-  if (voiceoverChars < 30) return true;
+  if (labeledVoice >= 30) return false;
 
-  return false;
+  // 模型常把口播写在 content 正文里、不带「口播：」标签——有够字数就算有效
+  if (totalCjk >= 40) return false;
+
+  return true;
 }
 
 export function extractVoiceoverFromPayload(data: LooseRecord): string {
@@ -69,18 +74,20 @@ export function validateVideoScriptPayload(
   const data = (rawPayload && typeof rawPayload === "object" ? rawPayload : {}) as LooseRecord;
   const storyboard = Array.isArray(data.storyboard) ? data.storyboard : [];
   if (storyboard.length > 0) {
-    const emptyShots = storyboard.filter((item) => {
+    const voicedShots = storyboard.filter((item) => {
       const row = item as LooseRecord;
-      return countCjk(asString(row.voiceover)) < 8;
+      return countCjk(asString(row.voiceover)) >= 6;
     });
-    if (emptyShots.length === storyboard.length) {
+    if (voicedShots.length === 0) {
       return { ok: false, reason: "storyboard 每一镜都缺少有效口播（voiceover 过短或为空）" };
     }
   }
 
   const totalVoice = countCjk(extractVoiceoverFromPayload(data));
-  if (totalVoice < 40) {
-    return { ok: false, reason: `口播总字数过少（约${totalVoice}字），需要完整可拍摄的口播句` };
+  const bodyCjk = countCjk(body);
+  const effectiveVoice = Math.max(totalVoice, bodyCjk);
+  if (effectiveVoice < 35) {
+    return { ok: false, reason: `口播总字数过少（约${effectiveVoice}字），需要完整可拍摄的口播句` };
   }
 
   return { ok: true };

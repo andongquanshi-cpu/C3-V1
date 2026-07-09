@@ -1,5 +1,6 @@
 import { validateGeneratedBody } from "@/lib/business-line-prompt";
 import { buildImagePromptFromScene } from "@/lib/image-prompt-utils";
+import { hasAdequateRiskReminder } from "@/lib/risk-reminder";
 import { isSkeletonVideoScript } from "@/lib/video-script-quality";
 import { getSelectedMaterials } from "@/lib/hotspot-workflow";
 import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent, Material } from "@/lib/types";
@@ -259,17 +260,16 @@ export function buildDefaultCompliance(
   options?: { generationMode?: string },
 ): ComplianceReport {
   const isVideo = options?.generationMode === "video-script";
-  const hasRiskReminder =
-    content.content.includes("市场有风险") || content.riskReminder.includes("市场有风险");
+  const hasRiskReminder = hasAdequateRiskReminder(content.content, content.riskReminder);
   return {
     overallRiskLevel: "medium",
     publishReadiness: "needs_revision",
     riskFindings: [],
     missingRequiredElements: hasRiskReminder
       ? []
-      : [{ type: "riskReminder", suggestedText: "市场有风险，投资需谨慎。" }],
+      : [{ type: "riskReminder", suggestedText: "口播末段补充：信息仅供参考，不构成投资建议。" }],
     qualityScore: content.qualityScore,
-    requiredFixes: hasRiskReminder ? [] : ["补充标准风险提示。"],
+    requiredFixes: hasRiskReminder ? [] : ["补充口语化风险提示（嵌入最后一镜口播）。"],
     summary: isVideo
       ? "视频脚本合规审查结果解析不完整，请人工复核口播与分镜后再拍摄。"
       : "合规审查结果解析不完整，请人工复核后再发布。",
@@ -360,7 +360,7 @@ export function normalizeContent(
     insertStrategy: data.insertStrategy || {},
     tags: Array.isArray(data.tags) && data.tags.length ? data.tags : buildFallbackContentTags(angle),
     interactionGuide: data.interactionGuide || "",
-    riskReminder: data.riskReminder || "市场有风险，投资需谨慎。",
+    riskReminder: data.riskReminder || (isVideo ? "" : "市场有风险，投资需谨慎。"),
     imagePromptSuggestions: isVideo ? [] : Array.isArray(data.imagePromptSuggestions) ? data.imagePromptSuggestions : [],
     qualityScore: data.qualityScore,
     complianceReport: data.complianceReport,

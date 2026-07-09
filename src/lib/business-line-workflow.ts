@@ -120,7 +120,7 @@ export const FALLBACK_LICAITONG_WORKFLOW: BusinessLineWorkflowConfig = {
     {
       id: "dry-goods-list",
       label: "干货组合推荐",
-      description: "清单/框架/几步走，信息密度高但克制。",
+      description: "高密度信息，但用叙事/对比/踩坑讲，不写步骤清单或 N 点框架。",
       contentType: "finance-tips",
     },
   ],
@@ -204,7 +204,8 @@ export const FALLBACK_WEISEC_WORKFLOW: BusinessLineWorkflowConfig = {
     {
       id: "tool-review",
       label: "炒股工具测评",
-      description: "客观对比、优缺点、适合谁/不适合谁。真实体验或冷静拆解，避免硬广。",
+      description:
+        "独立 App（如同花顺、东方财富、富途等）与微信内微证券的客观对比：安装门槛、上手成本、信息获取方式。突出新手友好、低门槛；Brief 功能作体验佐证，不是功能清单硬广。",
       contentType: "finance-tips",
     },
     {
@@ -699,7 +700,7 @@ export function buildSuggestedTopic(brief: BriefInput, config?: BusinessLineWork
   if (businessLine === "weisec") {
     const templates: Record<string, string> = {
       "newcomer-guide": `${audience}第一次看行情工具，可以先了解哪些基础信息`,
-      "tool-review": `${audience}选微信里的炒股工具，哪些体验最影响使用感`,
+      "tool-review": `${audience}对比同花顺/富途等独立 App 与微信微证券：哪个更适合新手先了解行情`,
       "life-story-seed": `${audience}在通勤/午休这种碎片时间，会怎么轻量看行情`,
       "market-hotspot": `热点刷屏时，${audience}可以先从哪些公开信息看起`,
     };
@@ -709,7 +710,7 @@ export function buildSuggestedTopic(brief: BriefInput, config?: BusinessLineWork
       "newcomer-guide": `${audience}第一次看${offerLabel}，可以先确认哪些基础信息`,
       "review-diary": `${audience}复盘一次理财选择，会重新看哪些信息`,
       "pain-story": `${audience}选理财产品纠结时，可以先比较哪些维度`,
-      "dry-goods-list": `${audience}看${offerLabel}前，可以准备一份哪些信息清单`,
+      "dry-goods-list": `${audience}聊一次选${offerLabel}的真实纠结，用经历讲清取舍逻辑`,
     };
     topic = templates[brief.creationScene] || `${audience}怎么理解${offerLabel}里的理财信息`;
   }
@@ -869,7 +870,7 @@ export function buildDraftArchiveFields(
     },
     { label: "内容形式", value: snapshot.generationMode === "video-script" ? "视频脚本" : "图文内容" },
     { label: getContentLengthFieldLabel(snapshot.generationMode), value: lengthLabel },
-    { label: "产品出现方式", value: getEmbedLevelLabel(snapshot.embedLevel) },
+    { label: "植入强度", value: getEmbedLevelLabel(snapshot.embedLevel) },
     { label: "素材", value: `${materialCount} 条` },
     ...(snapshot.topic ? [{ label: "主题", value: snapshot.topic }] : []),
   );
