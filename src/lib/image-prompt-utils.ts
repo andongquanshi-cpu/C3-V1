@@ -45,28 +45,89 @@ export function isWeakImagePrompt(prompt: string): boolean {
   return !hasLayout;
 }
 
+/** 从风格/场景描述中剥离色号，避免文生图把 #RRGGBB 渲染成便签文字 */
+const HEX_COLOR_RE = /#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6}|[0-9A-Fa-f]{8})\b/g;
+const HEX_IN_PARENS_RE = /\s*[（(]\s*#[0-9A-Fa-f]{3,8}\s*[）)]/g;
+
+export function stripHexColorCodes(text: string): string {
+  return text
+    .replace(HEX_IN_PARENS_RE, "")
+    .replace(HEX_COLOR_RE, "")
+    .replace(/[，,]\s*[，,]/g, "，")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+/** 清理画面上应出现的中文文案，去掉色号、长英文串等技术残留 */
+export function sanitizeOnImageCopy(copy: string): string {
+  return stripHexColorCodes(copy)
+    .replace(/\b[A-Za-z]{4,}\b/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+export function buildImageTextRenderLock(onImageCopy?: string, role?: string): string {
+  const label = role === "cover" ? "封面大字" : "画面内文案";
+  const lines = [
+    "【画面文字硬约束】",
+    "- 风格描述、色号、英文、技术参数仅用于配色与构图，严禁渲染为画面内可见文字、便签、标签、色卡、调色板",
+  ];
+  const copy = sanitizeOnImageCopy(onImageCopy || "");
+  if (copy) {
+    lines.push(`- 本张图上只允许出现${label}：「${copy}」，字体清晰、位置醒目、不得错别字`);
+    lines.push("- 除上述文案外，禁止出现任何其他可读文字（含英文、数字串、色号、#号）");
+  } else {
+    lines.push("- 本张图尽量避免可读文字；装饰元素不得形成可辨认的色号或英文");
+  }
+  return lines.join("\n");
+}
+
+/** 视觉计划 / 制图工作台：合成发给 Seedream 的最终 prompt */
+export function assembleSeedreamImagePrompt(input: {
+  overallStyle?: string;
+  prompt: string;
+  coverText?: string;
+  role?: string;
+}): string {
+  const style = stripHexColorCodes(input.overallStyle || "");
+  const scene = stripHexColorCodes(input.prompt.trim());
+  const copy = sanitizeOnImageCopy(input.coverText || "");
+
+  return [
+    "小红书竖版 3:4 卡片",
+    style ? `【整体视觉规范 · 仅配色构图，禁止渲染为文字】\n${style}` : "",
+    scene ? `【本张画面】\n${scene}` : "",
+    buildImageTextRenderLock(copy, input.role),
+    "【合规约束】不出现真实人物正脸特写；禁止：股票代码、具体收益数字、承诺性文案、暴富金币、满屏红绿 K 线、二维码、水印、明星肖像。",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 /** 组装发给 Seedream 的最终画面描述（含版式、封面字、合规约束） */
 export function formatImagePromptForSeedream(prompt: string, coverText?: string, style?: string): string {
-  const base = prompt.trim();
+  const base = stripHexColorCodes(prompt.trim());
   if (!base) return "";
 
+  const copy = sanitizeOnImageCopy(coverText || "");
   const alreadyStructured =
-    base.includes("3:4") && base.includes("禁止") && (!coverText || base.includes(coverText));
+    base.includes("3:4") && base.includes("禁止") && base.includes("画面文字硬约束");
   if (alreadyStructured) return base;
 
   const styleLabel =
     style && !["default", "cover", "fallback-cover"].includes(style) ? `风格：${style}` : "";
 
-  return [
+  const draft = [
     "小红书财经笔记封面，竖版 3:4",
     styleLabel,
-    coverText ? `画面内醒目封面大字：「${coverText}」` : "",
     base,
     "生活化场景，柔和自然光，画面整洁有秩序感；不出现真实人物正脸特写",
     "禁止：股票代码、收益数字、承诺性文案、暴富金币、满屏红绿K线、二维码、水印",
   ]
     .filter(Boolean)
     .join("。");
+
+  return assembleSeedreamImagePrompt({ prompt: draft, coverText: copy, role: "cover" });
 }
 
 export function buildImagePromptFromScene(input: {

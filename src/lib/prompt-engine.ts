@@ -6,6 +6,7 @@ import { buildBusinessLineRuntimeLock, resolveBrandName } from "@/lib/business-l
 import { formatContentLengthForPrompt, normalizeContentLength } from "@/lib/licaitong-workflow";
 import {
   buildPersonaContentPrompt,
+  buildPersonaSystemPrompt,
   isPersonasLibraryAvailable,
   loadAudiences,
   loadPersonaStandard,
@@ -19,6 +20,10 @@ import {
   getPrimaryMaterialTitle,
   resolvePromptMaterials,
 } from "@/lib/topic-materials";
+import {
+  formatVideoScriptModulesForPrompt,
+  resolveVideoScriptModules,
+} from "@/lib/video-script-routing";
 
 type AnyRecord = Record<string, any>;
 
@@ -133,7 +138,7 @@ function buildPrompt(templateName: string, input: AnyRecord, taskName: string, v
     rewriteRules: knowledge.rewriteRules,
     riskDisclaimers: knowledge.riskDisclaimers,
     platformRules: knowledge.platformRules,
-    visualGuidelines: knowledge.visualGuidelines,
+    visualGuidelines: taskName === "video-script-generation" ? "不适用（视频脚本不接生图）" : knowledge.visualGuidelines,
     businessLine: knowledge.businessLine,
     debugKnowledgeUsed: knowledge.debugKnowledgeUsed,
   });
@@ -181,7 +186,61 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
   }));
 }
 
+function isVideoScriptMode(input: AnyRecord) {
+  return (input.generationMode || "image-text") === "video-script";
+}
+
+function buildVideoScriptVariables(data: AnyRecord, knowledge: AnyRecord) {
+  const generationMode = "video-script";
+  const contentLength = normalizeContentLength(data.contentLength || data.length, generationMode);
+  const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
+  const selectedAngle = data.selectedAngle || data.angle;
+  const modules = resolveVideoScriptModules({
+    campaignGoal: data.campaignGoal,
+    contentLength,
+    selectedAngle,
+  });
+  return {
+    contentType: data.contentType || "brand-seed",
+    generationMode,
+    length: lengthHint,
+    campaignGoal: data.campaignGoal || "内容种草和功能认知",
+    bloggerLevel: data.bloggerLevel || "middle",
+    embedLevel: formatEmbedLevelForPrompt(data.embedLevel || "low"),
+    topic: data.topic || data.hotspot || "未提供",
+    customRequirement: data.customRequirement || data.customPrompt || "无",
+    selectedAngle: selectedAngle || "未提供，请基于主题生成一个保守安全的单一角度",
+    selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
+    topicMaterials: data.topicMaterials || data.materials || [],
+    viralMethodology: formatVideoScriptModulesForPrompt(modules, selectedAngle),
+  };
+}
+
+function finalizePromptWithRuntimeLock(built: ReturnType<typeof buildPrompt>, input: AnyRecord) {
+  const businessLine = built.knowledge?.businessLine || input.businessLine || "weisec";
+  const generationMode = input.generationMode || "image-text";
+  const runtimeLock = buildBusinessLineRuntimeLock(
+    businessLine,
+    built.knowledge?.brandVoice,
+    input.embedLevel,
+    generationMode,
+  );
+  const user = `${built.user}\n\n${runtimeLock}`;
+  return {
+    ...built,
+    user,
+    prompt: `${built.system}\n\n${user}`,
+    messages: [
+      { role: "system", content: built.system },
+      { role: "user", content: user },
+    ],
+  };
+}
+
 export function buildContentGenerationPrompt(input: AnyRecord = {}) {
+  if (isVideoScriptMode(input)) {
+    return buildVideoScriptGenerationPrompt(input);
+  }
   const generationMode = input.generationMode || "image-text";
   const contentLength = normalizeContentLength(input.contentLength || input.length, generationMode);
   const lengthHint = formatContentLengthForPrompt(contentLength, generationMode);
@@ -197,23 +256,73 @@ export function buildContentGenerationPrompt(input: AnyRecord = {}) {
     selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
     topicMaterials: data.topicMaterials || data.materials || [],
   }));
-  const businessLine = built.knowledge?.businessLine || input.businessLine || "weisec";
-  const runtimeLock = buildBusinessLineRuntimeLock(businessLine, built.knowledge?.brandVoice, input.embedLevel);
-  const user = `${built.user}\n\n${runtimeLock}`;
+  return finalizePromptWithRuntimeLock(built, input);
+}
+
+export function buildVideoScriptGenerationPrompt(input: AnyRecord = {}) {
+  const built = buildPrompt("video-script-generation.md", input, "video-script-generation", (data, knowledge) =>
+    buildVideoScriptVariables(data, knowledge),
+  );
+  return finalizePromptWithRuntimeLock(built, { ...input, generationMode: "video-script" });
+}
+
+const VIDEO_PERSONA_TASK_LOCK = [
+  "【视频任务锁定 · 覆盖人设模板中的图文要求】",
+  "- 当前任务：口播短视频脚本（JSON），不是小红书图文笔记",
+  "- 人设 system 只约束：语气、场景、称呼、禁忌词、口播气质",
+  "- 忽略人设中的：图文正文结构、emoji 分段标题、400-500 字篇幅、imageTextSuggestions、封面文案",
+  "- 创作优先级：先写满 storyboard[].voiceover 口播原文，再填 visual；禁止只输出镜头时长占位",
+].join("\n");
+
+/** 有人设时：user 统一走 video-script-generation.md，避免 persona video 模板的 Markdown 格式冲突 */
+export function buildPersonaVideoScriptGenerationPrompt(input: AnyRecord = {}) {
+  const personaId = dataPersonaId(input);
+  if (!personaId) return buildVideoScriptGenerationPrompt(input);
+
+  if (!isPersonasLibraryAvailable()) {
+    return buildVideoScriptGenerationPrompt(input);
+  }
+
+  const videoBuilt = buildVideoScriptGenerationPrompt(input);
+  const businessLine = videoBuilt.knowledge?.businessLine || input.businessLine || "weisec";
+  const line = businessLine === "licaitong" ? "licaitong" : "weisec";
+  const personaSystem = buildPersonaSystemPrompt(personaId, input.personaVariant, line);
+  const system = `${videoBuilt.system}\n\n${personaSystem}\n\n${VIDEO_PERSONA_TASK_LOCK}`;
+
   return {
-    ...built,
-    user,
-    prompt: `${built.system}\n\n${user}`,
+    ...videoBuilt,
+    personaId,
+    system,
+    prompt: `${system}\n\n${videoBuilt.user}`,
     messages: [
-      { role: "system", content: built.system },
-      { role: "user", content: user },
+      { role: "system", content: system },
+      { role: "user", content: videoBuilt.user },
     ],
   };
 }
 
+function sanitizeGeneratedContentForCompliance(content: unknown, generationMode?: string) {
+  if (!content || typeof content !== "object") return content;
+  if ((generationMode || "image-text") !== "video-script") return content;
+  const raw = content as AnyRecord;
+  const { imagePromptSuggestions, coverTextCandidates, selectedCoverText, visualPlan, generatedImages, ...rest } =
+    raw;
+  return {
+    ...rest,
+    generationMode: "video-script",
+    note: "口播短视频脚本；无封面文案、无文生图字段",
+  };
+}
+
 export function buildComplianceReviewPrompt(input: AnyRecord = {}) {
-  return buildPrompt("compliance-review.md", input, "compliance-review", (data) => ({
-    generatedContent: data.generatedContent || data.content || "未提供",
+  const isVideo = isVideoScriptMode(input);
+  const template = isVideo ? "compliance-review-video.md" : "compliance-review.md";
+  const taskName = isVideo ? "compliance-review-video" : "compliance-review";
+  return buildPrompt(template, input, taskName, (data) => ({
+    generatedContent: sanitizeGeneratedContentForCompliance(
+      data.generatedContent || data.content || "未提供",
+      input.generationMode || data.generationMode,
+    ),
   }));
 }
 
@@ -234,6 +343,10 @@ export function buildVisualPlanPrompt(input: AnyRecord = {}) {
 }
 
 export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
+  if (isVideoScriptMode(input)) {
+    return buildPersonaVideoScriptGenerationPrompt(input);
+  }
+
   const personaId = dataPersonaId(input);
   if (!personaId) throw new Error("personaContent 需要 personaId");
 
@@ -248,7 +361,12 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
 
   const knowledge = retrieveKnowledge({ ...input, promptTask: "content-generation" }, input.knowledgeOptions || {});
   const businessLine = knowledge.businessLine || input.businessLine || "weisec";
-  const runtimeLock = buildBusinessLineRuntimeLock(businessLine, knowledge.brandVoice, input.embedLevel);
+  const runtimeLock = buildBusinessLineRuntimeLock(
+    businessLine,
+    knowledge.brandVoice,
+    input.embedLevel,
+    generationMode,
+  );
 
   const personaPrompt = buildPersonaContentPrompt(
     personaId,

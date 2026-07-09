@@ -11,6 +11,7 @@ import type { GeneratedContent } from "@/lib/types";
 interface ContentResultsPanelProps {
   results: GeneratedContent[];
   activeResultId: string;
+  isVideoScript?: boolean;
   imageApiReady: boolean;
   imageModel?: string;
   onActiveResultChange: (id: string) => void;
@@ -45,6 +46,7 @@ function TagLine({ tags, className }: { tags: string[]; className?: string }) {
 export function ContentResultsPanel({
   results,
   activeResultId,
+  isVideoScript = false,
   imageApiReady,
   imageModel,
   onActiveResultChange,
@@ -80,7 +82,7 @@ export function ContentResultsPanel({
             <ArrowLeft className="h-3.5 w-3.5" />
             返回创意角度
           </button>
-          <h2 className="text-lg font-semibold">生成内容</h2>
+          <h2 className="text-lg font-semibold">{isVideoScript ? "视频脚本" : "生成内容"}</h2>
         </div>
         <Badge variant="outline" className="shrink-0">
           共 {results.length} 篇
@@ -125,8 +127,12 @@ export function ContentResultsPanel({
                   <div className="min-w-0 flex-1 space-y-2">
                     <h3 className="text-xl font-semibold leading-snug">{activeResult.selectedTitle}</h3>
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      <span>封面：{activeResult.selectedCoverText}</span>
-                      <span className="text-border">|</span>
+                      {!isVideoScript && activeResult.selectedCoverText ? (
+                        <>
+                          <span>封面：{activeResult.selectedCoverText}</span>
+                          <span className="text-border">|</span>
+                        </>
+                      ) : null}
                       <Badge
                         variant={activeResult.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}
                         className="text-[10px]"
@@ -198,6 +204,7 @@ export function ContentResultsPanel({
                 <p className="text-sm text-muted-foreground">{activeResult.complianceReport?.summary}</p>
               </section>
 
+              {!isVideoScript ? (
               <section className="rounded-xl border border-border p-4">
                 <div className="mb-2 flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm font-medium">
@@ -271,6 +278,7 @@ export function ContentResultsPanel({
                   </p>
                 ) : null}
               </section>
+              ) : null}
 
               <Button className="w-full" onClick={onSaveDraft}>
                 <CheckCircle2 className="h-4 w-4" />

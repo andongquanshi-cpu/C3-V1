@@ -127,6 +127,7 @@
       "licaitong": "layers/L3-content-pattern/licaitong/phrase-library.json",
       "weisec": "layers/L3-content-pattern/weizhengquan/phrase-library.json"
     },
+    "xhsViralMethodology": "layers/L3-content-pattern/a_shared/xhs-viral-methodology.json",
     "audienceProfiles": {
       "licaitong": "layers/L4-audience/licaitong/target-readers.json",
       "weisec": "layers/L4-audience/weizhengquan/target-readers.json"
@@ -175,6 +176,14 @@
       "L3 contentTemplates.coverTextPatterns",
       "L0 platformRules.image",
       "L0 complianceRules"
+    ],
+    "videoScriptGeneration": [
+      "L3 xhsViralMethodology（script1+script2 爆文范式，按路由模块注入）",
+      "L1 brandVoice by businessLine folder",
+      "L2 productFeatures by embedLevel",
+      "L0 riskDisclaimers + complianceRules + platformRules",
+      "L4 persona voice via personaId（口播语气）",
+      "禁止：visualGuidelines / coverGeneration / 文生图"
     ]
   }
 }

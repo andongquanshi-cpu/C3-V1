@@ -1,5 +1,6 @@
 import { validateGeneratedBody } from "@/lib/business-line-prompt";
 import { buildImagePromptFromScene } from "@/lib/image-prompt-utils";
+import { isSkeletonVideoScript } from "@/lib/video-script-quality";
 import { getSelectedMaterials } from "@/lib/hotspot-workflow";
 import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent, Material } from "@/lib/types";
 
@@ -49,23 +50,66 @@ export function normalizeMultilineText(value: unknown): string {
     .trim();
 }
 
+function formatStoryboardAsContent(storyboard: unknown): string {
+  if (!Array.isArray(storyboard) || storyboard.length === 0) return "";
+  const lines = storyboard
+    .map((item, index) => {
+      const row = asRecord(item);
+      const shotIndex = row.shotIndex ?? index + 1;
+      const visual = asString(row.visual);
+      const voiceover = asString(row.voiceover);
+      const durationSec = row.durationSec ?? row.duration ?? "";
+      const onScreen = asString(row.onScreenText);
+      if (!visual && !voiceover) return "";
+      const parts = [`【镜头${shotIndex}】`];
+      if (visual) parts.push(`画面：${visual}`);
+      if (voiceover) parts.push(`口播：${voiceover}`);
+      if (durationSec !== "") parts.push(`时长：${durationSec}秒`);
+      if (onScreen) parts.push(`字幕：${onScreen}`);
+      return parts.join(" | ");
+    })
+    .filter(Boolean);
+  return lines.join("\n");
+}
+
+function extractOpeningHookLine(data: LooseRecord): string {
+  const hook = asRecord(data.openingHook);
+  return asString(hook.spokenLine);
+}
+
 function assembleGeneratedContentText(data: LooseRecord): string {
   const opening = normalizeMultilineText(data.opening);
   const body = normalizeMultilineText(data.body);
   const closing = normalizeMultilineText(data.closing);
   const explicit = normalizeMultilineText(data.content);
-  const fromParts = [opening, body, closing].filter(Boolean).join("\n\n");
+  const hookLine = extractOpeningHookLine(data);
+  const fromStoryboard = formatStoryboardAsContent(data.storyboard);
+  const fromParts = [hookLine, opening, body, closing].filter(Boolean).join("\n\n");
 
-  if (!explicit) return fromParts;
-  if (!fromParts) return explicit;
+  if (fromStoryboard && !isSkeletonVideoScript(fromStoryboard)) {
+    if (!explicit || isSkeletonVideoScript(explicit)) {
+      return hookLine ? `${hookLine}\n\n${fromStoryboard}` : fromStoryboard;
+    }
+  }
+
+  if (!explicit) return fromParts || fromStoryboard;
+  if (!fromParts && !fromStoryboard) return explicit;
+  if (isSkeletonVideoScript(explicit) && fromParts) return fromParts;
+  if (isSkeletonVideoScript(explicit) && fromStoryboard && !isSkeletonVideoScript(fromStoryboard)) {
+    return fromStoryboard;
+  }
 
   const explicitHasBreaks = explicit.includes("\n");
-  const partsHasBreaks = fromParts.includes("\n");
+  const partsHasBreaks = fromParts.includes("\n") || Boolean(fromStoryboard);
 
-  if (partsHasBreaks && !explicitHasBreaks) return fromParts;
+  if (partsHasBreaks && !explicitHasBreaks && !isSkeletonVideoScript(fromParts)) return fromParts || fromStoryboard;
   if (explicitHasBreaks && !partsHasBreaks) return explicit;
 
-  return explicit.length >= fromParts.length ? explicit : fromParts;
+  const candidates = [explicit, fromParts, fromStoryboard].filter((t) => t && !isSkeletonVideoScript(t));
+  if (candidates.length) {
+    return candidates.sort((a, b) => b.length - a.length)[0];
+  }
+  return explicit || fromParts || fromStoryboard;
 }
 
 /** 将 personaContent 等人设专用 JSON 映射为 contentGeneration 标准字段 */
@@ -210,7 +254,11 @@ function hasUsableImagePrompts(items: GeneratedContent["imagePromptSuggestions"]
   return items.some((item) => asString(item.prompt));
 }
 
-export function buildDefaultCompliance(content: GeneratedContent): ComplianceReport {
+export function buildDefaultCompliance(
+  content: GeneratedContent,
+  options?: { generationMode?: string },
+): ComplianceReport {
+  const isVideo = options?.generationMode === "video-script";
   const hasRiskReminder =
     content.content.includes("市场有风险") || content.riskReminder.includes("市场有风险");
   return {
@@ -222,7 +270,9 @@ export function buildDefaultCompliance(content: GeneratedContent): ComplianceRep
       : [{ type: "riskReminder", suggestedText: "市场有风险，投资需谨慎。" }],
     qualityScore: content.qualityScore,
     requiredFixes: hasRiskReminder ? [] : ["补充标准风险提示。"],
-    summary: "合规审查结果解析不完整，请人工复核后再发布。",
+    summary: isVideo
+      ? "视频脚本合规审查结果解析不完整，请人工复核口播与分镜后再拍摄。"
+      : "合规审查结果解析不完整，请人工复核后再发布。",
   };
 }
 
@@ -291,7 +341,12 @@ export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngl
   });
 }
 
-export function normalizeContent(value: unknown, angle: CreativeAngle): GeneratedContent {
+export function normalizeContent(
+  value: unknown,
+  angle: CreativeAngle,
+  options?: { generationMode?: string },
+): GeneratedContent {
+  const isVideo = options?.generationMode === "video-script";
   const data = adaptPersonaContentPayload(value) as Partial<GeneratedContent>;
   const base: GeneratedContent = {
     id: uid("content"),
@@ -300,19 +355,25 @@ export function normalizeContent(value: unknown, angle: CreativeAngle): Generate
     titleCandidates: Array.isArray(data.titleCandidates) ? data.titleCandidates : [],
     selectedTitle: data.selectedTitle || data.titleCandidates?.[0]?.text || angle.titleDirections[0] || angle.angleName,
     coverTextCandidates: Array.isArray(data.coverTextCandidates) ? data.coverTextCandidates : [],
-    selectedCoverText: data.selectedCoverText || data.coverTextCandidates?.[0]?.text || "财经干货",
+    selectedCoverText: data.selectedCoverText || data.coverTextCandidates?.[0]?.text || (isVideo ? "" : "财经干货"),
     content: data.content || "",
     insertStrategy: data.insertStrategy || {},
     tags: Array.isArray(data.tags) && data.tags.length ? data.tags : buildFallbackContentTags(angle),
     interactionGuide: data.interactionGuide || "",
     riskReminder: data.riskReminder || "市场有风险，投资需谨慎。",
-    imagePromptSuggestions: Array.isArray(data.imagePromptSuggestions) ? data.imagePromptSuggestions : [],
+    imagePromptSuggestions: isVideo ? [] : Array.isArray(data.imagePromptSuggestions) ? data.imagePromptSuggestions : [],
     qualityScore: data.qualityScore,
     complianceReport: data.complianceReport,
     debugKnowledgeUsed: data.debugKnowledgeUsed,
   };
 
-  if (!hasUsableImagePrompts(base.imagePromptSuggestions)) {
+  if (isVideo) {
+    base.coverTextCandidates = [];
+    base.selectedCoverText = "";
+    base.imagePromptSuggestions = [];
+    base.visualPlan = undefined;
+    base.generatedImages = undefined;
+  } else if (!hasUsableImagePrompts(base.imagePromptSuggestions)) {
     base.imagePromptSuggestions = buildFallbackImagePromptSuggestions(base, angle);
   }
 

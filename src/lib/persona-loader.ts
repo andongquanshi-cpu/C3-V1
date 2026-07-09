@@ -58,6 +58,7 @@ export interface PersonaVariant {
   prompts?: {
     system?: string;
     content?: { user?: string };
+    video?: { user?: string };
   };
   output?: { mode: string; schemaHint: string };
 }
@@ -357,6 +358,37 @@ export function buildPersonaSystemPrompt(
   return base;
 }
 
+function isVideoScriptMode(variables: Record<string, unknown>) {
+  return String(variables.generationMode || "").trim() === "video-script";
+}
+
+function resolvePersonaUserTemplate(persona: PersonaStandard, variant: PersonaVariant | undefined, variables: Record<string, unknown>) {
+  if (!isVideoScriptMode(variables)) {
+    return variant?.prompts?.content?.user || persona.prompts.content.user;
+  }
+  const videoTemplate = variant?.prompts?.video?.user || persona.prompts.video?.user;
+  if (videoTemplate?.trim()) return videoTemplate;
+  return variant?.prompts?.content?.user || persona.prompts.content.user;
+}
+
+function appendVideoOutputRequirements(parts: string[]) {
+  parts.push(
+    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- storyboard 每一镜 visual 和 voiceover **必填**，每镜口播至少 12 个汉字\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePrompt / 封面图 / 配图字段\n- tags 必填 5-8 个话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
+  );
+}
+
+function appendVideoJsonSchemaOverride(parts: string[]) {
+  parts.push(
+    `\n\n【视频 JSON 硬性要求】\nopeningHook.spokenLine 和 storyboard[].voiceover 必须写完整口播原文，不能留空。示例结构：\n{"openingHook":{"spokenLine":"..."},"storyboard":[{"shotIndex":1,"durationSec":5,"visual":"宿舍举手机","voiceover":"室友问我实习工资咋理财，我说先从这一步开始"}],"content":"【镜头1】画面：... | 口播：... | 时长：5秒"}`,
+  );
+}
+
+function appendImageTextOutputRequirements(parts: string[]) {
+  parts.push(
+    `\n\n【输出要求 · 通用】\n- tags 字段必填：5-8 个小红书话题词（不带 #），与主题、标题、人设相关；不得省略或留空数组\n- emoji 按人设 emojiDensity 适量使用（多数人设全文 3-7 个）：点缀在句中、段尾或偶发段首，有小红书氛围；禁止每篇按固定 emoji 顺序当分段小标题\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一/第二」等可见结构标记\n- interactionGuide 最多一句轻互动，不得替代正文\n- imageTextSuggestions 必填 1-3 条；每条必须有可执行的 prompt 字段（竖版 3:4 小红书封面画面描述，含主体/场景/光线/色调；若有 coverText 须写明画面内压字位置），scene/visualNotes 仅作补充`,
+  );
+}
+
 export function buildPersonaContentUserPrompt(
   personaId: string,
   variables: Record<string, unknown>,
@@ -365,14 +397,18 @@ export function buildPersonaContentUserPrompt(
 ) {
   const persona = loadPersonaStandard(personaId, businessLine);
   const variant = resolveVariant(persona, variantId);
-  const template = variant?.prompts?.content?.user || persona.prompts.content.user;
+  const template = resolvePersonaUserTemplate(persona, variant, variables);
   const userBody = replaceTemplate(template, {
     personaVariant: variant?.id || variantId || persona.defaultVariantId || "default",
     ...variables,
   });
   const parts = [userBody];
+  const videoMode = isVideoScriptMode(variables);
   const schemaHint = variant?.output?.schemaHint || persona.output?.schemaHint;
-  if (schemaHint) {
+  if (videoMode) {
+    appendVideoOutputRequirements(parts);
+    appendVideoJsonSchemaOverride(parts);
+  } else if (schemaHint) {
     parts.push(`\n\n【输出 JSON Schema】\n${schemaHint}`);
   }
   const anti = variant?.antiHomogeneity || persona.antiHomogeneity;
@@ -382,11 +418,17 @@ export function buildPersonaContentUserPrompt(
       `\n\n【防同质化】archetype=${archetype || ""}\n禁止：${anti.neverUse.join("；")}\n勿模仿：${anti.neverSoundLike.join("；")}\n必须有：${anti.mandatoryMarkers.join("；")}`,
     );
   }
-  parts.push(
-    `\n\n【输出要求 · 通用】\n- tags 字段必填：5-8 个小红书话题词（不带 #），与主题、标题、人设相关；不得省略或留空数组\n- emoji 按人设 emojiDensity 适量使用（多数人设全文 3-7 个）：点缀在句中、段尾或偶发段首，有小红书氛围；禁止每篇按固定 emoji 顺序当分段小标题\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一/第二」等可见结构标记\n- interactionGuide 最多一句轻互动，不得替代正文\n- imageTextSuggestions 必填 1-3 条；每条必须有可执行的 prompt 字段（竖版 3:4 小红书封面画面描述，含主体/场景/光线/色调；若有 coverText 须写明画面内压字位置），scene/visualNotes 仅作补充`,
-  );
+  if (!videoMode) {
+    appendImageTextOutputRequirements(parts);
+  }
   const visualGuidelines = variables.visualGuidelines;
-  if (typeof visualGuidelines === "string" && visualGuidelines.trim() && visualGuidelines !== "未提供") {
+  if (
+    !videoMode &&
+    typeof visualGuidelines === "string" &&
+    visualGuidelines.trim() &&
+    visualGuidelines !== "未提供" &&
+    visualGuidelines !== "不适用"
+  ) {
     parts.push(`\n\n【品牌视觉规范 · 封面参考】\n${visualGuidelines}`);
   }
   return parts.join("");

@@ -21,6 +21,8 @@ import {
   resolveWorkflowForLine,
 } from "@/lib/business-line-workflow";
 import { validateGeneratedBody } from "@/lib/business-line-prompt";
+import { resolveContentPromptAction } from "@/lib/content-generation-routing";
+import { validateVideoScriptPayload } from "@/lib/video-script-quality";
 import {
   buildHotspotSearchQuery,
   canProceedFromBrief,
@@ -534,10 +536,10 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       });
       const normalized = normalizeAngles(parseLLMJson(raw), brief);
       setAngles(normalized);
-      setSelectedAngleIds([]);
+      setSelectedAngleIds(normalized.map((item) => item.angleId));
       setAnglesGeneratedForKey(configKey);
       writeAngleHistory(configKey, normalized);
-      setStatus(`已生成 ${normalized.length} 个创意角度，请勾选要写成稿的角度`);
+      setStatus(`已生成 ${normalized.length} 个创意角度，已默认全选，可直接生成正文`);
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "创意角度生成失败");
     } finally {
@@ -550,8 +552,12 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       setStatus(LLM_NOT_CONFIGURED);
       return;
     }
+    if (angles.length === 0) {
+      setStatus("请先在上方生成创意角度");
+      return;
+    }
     if (!selectedAngles.length) {
-      setStatus("请至少选择一个创意角度");
+      setStatus("请至少勾选一个创意角度（点击下方角度卡片左侧复选框）");
       return;
     }
     setIsGeneratingContent(true);
@@ -559,22 +565,57 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     try {
       const nextResults: GeneratedContent[] = [];
       for (const angle of selectedAngles) {
-        const contentAction = brief.personaId ? "personaContent" : "contentGeneration";
-        const contentPrompt = await buildPrompt(contentAction, {
-          ...brief,
-          materials: selectedMaterials,
-          selectedAngle: angle,
-          templateId: angle.recommendedTemplateId,
-          selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
-        });
-        const rawContent = await callTextModel(contentPrompt, { maxTokens: 8192 });
-        let content = normalizeContent(parseLLMJson(rawContent), angle);
-        const bodyCheck = validateGeneratedBody(content.content, brief.businessLine);
-        if (!bodyCheck.ok) {
-          throw new Error(`正文质检未通过：${bodyCheck.reason}。请调整「产品出现方式」或换角度后重试。`);
+        const contentAction = resolveContentPromptAction(brief);
+        const isVideo = (brief.generationMode || "image-text") === "video-script";
+        const maxAttempts = isVideo ? 2 : 1;
+        let content: GeneratedContent | null = null;
+        let lastError = "";
+
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+          const retryHint =
+            attempt > 0
+              ? "\n\n【重试 · 上次只有镜头时长占位、没有口播原文】本次 storyboard 每镜 voiceover 和 visual 必填，每镜口播≥12字，content 写完整分镜稿。"
+              : "";
+          const contentPrompt = await buildPrompt(contentAction, {
+            ...brief,
+            materials: selectedMaterials,
+            selectedAngle: angle,
+            templateId: angle.recommendedTemplateId,
+            selectedFeatureIds: [
+              ...new Set([...(brief.selectedFeatureIds || []), ...(angle.recommendedFeatureIds || [])]),
+            ],
+          });
+          const rawContent = await callTextModel(
+            { system: contentPrompt.system, user: contentPrompt.user + retryHint },
+            { maxTokens: 8192, temperature: attempt > 0 ? 0.78 : 0.72 },
+          );
+          const parsed = parseLLMJson(rawContent);
+          const candidate = normalizeContent(parsed, angle, { generationMode: brief.generationMode });
+          const bodyCheck = validateGeneratedBody(candidate.content, brief.businessLine, brief.generationMode);
+          if (!bodyCheck.ok) {
+            lastError = bodyCheck.reason || "质检未通过";
+            continue;
+          }
+          if (!candidate.content.trim()) {
+            lastError = "正文为空";
+            continue;
+          }
+          if (isVideo) {
+            const videoCheck = validateVideoScriptPayload(candidate.content, parsed);
+            if (!videoCheck.ok) {
+              lastError = videoCheck.reason || "视频脚本不完整";
+              setStatus(`「${angle.angleName}」脚本不完整，正在重试…`);
+              continue;
+            }
+          }
+          content = candidate;
+          break;
         }
-        if (!content.content.trim()) {
-          throw new Error("模型返回的正文为空，请重试或检查人设 Prompt 输出格式");
+
+        if (!content) {
+          throw new Error(
+            `「${angle.angleName}」生成失败：${lastError || "未知错误"}。请换角度或缩短时长后重试。`,
+          );
         }
 
         let coverPayload: unknown;
@@ -607,7 +648,10 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
           selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
         });
         const rawCompliance = await callTextModel(compliancePrompt, { temperature: 0.2, maxTokens: 4096 });
-        content.complianceReport = normalizeCompliance(parseLLMJson(rawCompliance), buildDefaultCompliance(content));
+        content.complianceReport = normalizeCompliance(
+          parseLLMJson(rawCompliance),
+          buildDefaultCompliance(content, { generationMode: brief.generationMode }),
+        );
         nextResults.push(content);
       }
       setResults(nextResults);
@@ -616,7 +660,9 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       setStep(3);
       setStatus(`已生成 ${nextResults.length} 条内容`);
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "内容生成失败");
+      const message = error instanceof Error ? error.message : "内容生成失败";
+      setStatus(`内容生成失败：${message}`);
+      console.error("[generateContent]", error);
     } finally {
       setIsGeneratingContent(false);
     }
@@ -820,7 +866,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
                   </Button>
                 </div>
               </div>
-            ) : contentSubView === "studio" && activeResult ? (
+            ) : contentSubView === "studio" && activeResult && (brief.generationMode || "image-text") !== "video-script" ? (
               <VisualPlanStudio
                 content={activeResult}
                 brief={brief}
@@ -834,6 +880,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
               <ContentResultsPanel
                 results={results}
                 activeResultId={activeResult?.id || results[0]?.id || ""}
+                isVideoScript={(brief.generationMode || "image-text") === "video-script"}
                 imageApiReady={apiStatus.image}
                 imageModel={apiStatus.imageModel}
                 onActiveResultChange={setActiveResultId}

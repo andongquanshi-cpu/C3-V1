@@ -59,6 +59,7 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
   }
 
   if (selectedDraft) {
+    const isVideoScript = selectedDraft.generationSnapshot.generationMode === "video-script";
     const archiveFields = buildDraftArchiveFields(
       selectedDraft.generationSnapshot,
       selectedDraft.angleName,
@@ -94,8 +95,12 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
               <div className="min-w-0 flex-1 space-y-2">
                 <h2 className="text-xl font-semibold leading-snug">{selectedDraft.selectedTitle}</h2>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                  <span>封面：{selectedDraft.selectedCoverText}</span>
-                  <span className="text-border">|</span>
+                  {!isVideoScript && selectedDraft.selectedCoverText ? (
+                    <>
+                      <span>封面：{selectedDraft.selectedCoverText}</span>
+                      <span className="text-border">|</span>
+                    </>
+                  ) : null}
                   <Badge
                     variant={selectedDraft.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}
                     className="text-[10px]"
@@ -173,7 +178,7 @@ export function DraftBoxPanel({ drafts, onDeleteDraft, onBackToWorkflow }: Draft
           </dl>
         </section>
 
-        {selectedDraft.generatedImages && selectedDraft.generatedImages.length > 0 ? (
+        {selectedDraft.generatedImages && selectedDraft.generatedImages.length > 0 && !isVideoScript ? (
           <section className="rounded-xl border border-border bg-card p-4">
             <h3 className="text-sm font-semibold">已生成图片</h3>
             <div className="mt-3 grid gap-3 sm:grid-cols-3">

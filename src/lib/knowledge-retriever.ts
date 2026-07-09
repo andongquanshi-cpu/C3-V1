@@ -729,7 +729,11 @@ export function retrieveKnowledge(input: KnowledgeInput = {}, options: Knowledge
   const riskDisclaimers = selectRiskDisclaimers(scoped.riskDisclaimers, resolvedInput, contentTypeCandidates, businessLine);
   const platformRules = selectPlatformRules(scoped.platformRules, resolvedInput, contentTypeCandidates, purpose);
   const visualGuidelines =
-    /cover|content-generation|persona/.test(purpose) ? selectVisualGuidelines(scoped.visualGuidelines, businessLine) : [];
+    purpose === "video-script-generation"
+      ? []
+      : /cover|content-generation|persona/.test(purpose)
+        ? selectVisualGuidelines(scoped.visualGuidelines, businessLine)
+        : [];
   const knowledge = {
     businessLine,
     brandVoice,

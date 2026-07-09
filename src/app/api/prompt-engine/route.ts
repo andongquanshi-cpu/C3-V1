@@ -5,12 +5,14 @@ import {
   buildCoverSuggestionsPrompt,
   buildCreativeAnglesPrompt,
   buildPersonaContentGenerationPrompt,
+  buildVideoScriptGenerationPrompt,
   buildVisualPlanPrompt,
 } from "@/lib/prompt-engine";
 
 const builders = {
   creativeAngles: buildCreativeAnglesPrompt,
   contentGeneration: buildContentGenerationPrompt,
+  videoScriptGeneration: buildVideoScriptGenerationPrompt,
   personaContent: buildPersonaContentGenerationPrompt,
   complianceReview: buildComplianceReviewPrompt,
   coverSuggestions: buildCoverSuggestionsPrompt,

@@ -1,4 +1,5 @@
 import type { GeneratedContent, VisualPlan, VisualPlanItem } from "@/lib/types";
+import { sanitizeOnImageCopy, stripHexColorCodes } from "@/lib/image-prompt-utils";
 
 type LooseRecord = Record<string, unknown>;
 
@@ -43,8 +44,8 @@ function normalizeItem(row: LooseRecord, fallbackIndex: number): VisualPlanItem 
     imageIndex,
     role,
     title,
-    copy: asString(row.copy) || asString(row.coverText),
-    prompt: asString(row.prompt) || asString(row.imagePrompt),
+    copy: sanitizeOnImageCopy(asString(row.copy) || asString(row.coverText)),
+    prompt: stripHexColorCodes(asString(row.prompt) || asString(row.imagePrompt)),
     hookAngle: asString(row.hookAngle) || undefined,
     connection: asString(row.connection) || undefined,
   };
@@ -54,7 +55,7 @@ function normalizeItem(row: LooseRecord, fallbackIndex: number): VisualPlanItem 
 export function parseVisualPlanPayload(value: unknown): VisualPlan | null {
   if (!value || typeof value !== "object") return null;
   const data = value as LooseRecord;
-  const overallStyle = asString(data.overallStyle);
+  const overallStyle = stripHexColorCodes(asString(data.overallStyle));
   const itemsRaw = Array.isArray(data.items) ? data.items : [];
   if (!overallStyle || itemsRaw.length === 0) return null;
 
@@ -92,9 +93,9 @@ export function buildFallbackVisualPlan(
   const totalImages = count + 1;
   const overallStyle = [
     "整体视觉风格：柔和暖色调生活化摄影，画面有秩序感、清爽干净。",
-    "主色调：暖白 (#F6F1EA)、燕麦米 (#E7DFCE) 与低饱和木色 (#B79573) 为主，点缀墨绿 (#3F5E4A)。",
+    "主色调：暖白、燕麦米与低饱和木色为主，点缀墨绿。",
     "构图：全部竖版 3:4；文字区居中或顶部，四周保留 12% 留白；主体物件呈三分法。",
-    "统一元素：木质桌面、简洁小卡片、绿植点缀、暖色台灯光；每张不同视角，色卡完全一致。",
+    "统一元素：木质桌面、简洁小卡片、绿植点缀、暖色台灯光；每张不同视角，色调完全一致。",
     "禁止：真实人物正脸、股票代码、具体收益数字、承诺性文案、暴富金币、K 线、二维码。",
   ].join("\n");
 

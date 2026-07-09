@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { assembleSeedreamImagePrompt } from "@/lib/image-prompt-utils";
 import { getImageConfig } from "@/lib/server-api-config";
 
 // Seedream 5.0 pro 首图耗时约 60–80s，需将 Route Handler 超时抬到 120s。
@@ -23,7 +24,6 @@ function formatFetchError(error: unknown, apiUrl: string) {
 
 /**
  * 将「整体把控提示词 + 视觉计划单张 prompt + 画面文案」合成为最终 prompt。
- * 复用同样的合规兜底句，避免上游 LLM 忘记禁项。
  */
 function assembleFinalPrompt({
   overallStyle,
@@ -36,20 +36,7 @@ function assembleFinalPrompt({
   coverText?: string;
   role?: string;
 }): string {
-  const parts: string[] = [];
-  parts.push("小红书竖版 3:4 卡片");
-  if (overallStyle && overallStyle.trim()) {
-    parts.push(`【整体视觉规范】\n${overallStyle.trim()}`);
-  }
-  parts.push(`【本张画面】\n${prompt.trim()}`);
-  if (coverText && coverText.trim()) {
-    const label = role === "cover" ? "封面大字" : "画面内文案";
-    parts.push(`【${label}】\n在画面显著位置醒目呈现文字：「${coverText.trim()}」，字体清晰易读、留有充足留白，禁止出现错别字。`);
-  }
-  parts.push(
-    "【合规约束】不出现真实人物正脸特写；禁止：股票代码、具体收益数字、承诺性文案、暴富金币、满屏红绿 K 线、二维码、水印、明星肖像。",
-  );
-  return parts.join("\n\n");
+  return assembleSeedreamImagePrompt({ overallStyle, prompt, coverText, role });
 }
 
 export async function POST(request: Request) {

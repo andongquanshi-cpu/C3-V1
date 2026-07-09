@@ -174,7 +174,7 @@ export function AnglesPanel({
                 生成中…
               </Button>
             ) : anglesUpToDate ? (
-              <Button size="lg" variant="secondary" disabled className="min-w-[200px]">
+              <Button size="lg" variant="secondary" onClick={onGenerateAngles} disabled={!apiReady || isGeneratingAngles} className="min-w-[200px]">
                 <RefreshCw className="h-4 w-4" />
                 重新生成
               </Button>
@@ -298,8 +298,13 @@ export function AnglesPanel({
           <Button
             size="lg"
             onClick={onGenerateContent}
-            disabled={
-              isGeneratingContent || isGeneratingAngles || !apiReady || angles.length === 0 || selectedAngleIds.length === 0
+            disabled={isGeneratingContent || isGeneratingAngles || !apiReady}
+            title={
+              angles.length === 0
+                ? "请先生成创意角度"
+                : selectedAngleIds.length === 0
+                  ? "请勾选至少一个创意角度"
+                  : undefined
             }
           >
             {isGeneratingContent ? (
