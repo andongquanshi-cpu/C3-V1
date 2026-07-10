@@ -1,7 +1,18 @@
-import type { BusinessLine } from "@/lib/types";
+import type { BusinessLine, EmbedLevel } from "@/lib/types";
 import { getScene, type BusinessLineWorkflowConfig, getWorkflowFallback } from "@/lib/business-line-workflow";
+import { normalizeEmbedLevel } from "@/lib/embed-level";
 
-function weisecToolReviewAngleRules(sceneLabel: string): string {
+function weisecToolReviewAngleRules(sceneLabel: string, embedLevel?: EmbedLevel | string): string {
+  if (normalizeEmbedLevel(embedLevel) === "none") {
+    return [
+      `【创作场景 · ${sceneLabel} · 纯内容】`,
+      "- 从生活场景/情绪/困惑切入，写普通人面对「看盘工具多、不知怎么选」的真实感受。",
+      "- 可泛化对比「独立 App vs 微信里轻量入口」的使用习惯，**不点名**腾讯微证券/具体功能名。",
+      "- 角度优先：生活场景 / 情绪钩子 / 信息增量 / 风险意识；productBridge、recommendedFeatureIds 留空。",
+      "- 禁止把角度写成产品卖点标题或功能清单。",
+    ].join("\n");
+  }
+
   return [
     `【创作场景锁定 · ${sceneLabel}】`,
     "本篇是「炒股/看盘工具测评」选题，不是单功能种草帖。",
@@ -19,7 +30,16 @@ function weisecToolReviewAngleRules(sceneLabel: string): string {
   ].join("\n");
 }
 
-function weisecToolReviewContentRules(sceneLabel: string): string {
+function weisecToolReviewContentRules(sceneLabel: string, embedLevel?: EmbedLevel | string): string {
+  if (normalizeEmbedLevel(embedLevel) === "none") {
+    return [
+      `【正文场景锁定 · ${sceneLabel} · 纯内容】`,
+      "- 主线是生活经历/情绪/判断，不是产品测评帖；禁止开篇就写品牌或功能名。",
+      "- 可写「独立 App vs 微信里轻量看盘」的泛化感受，不点名腾讯微证券、不问元宝、不写具体功能。",
+      "- 禁止 CTA、导流句、操作路径；合规声明信息整理不构成投资建议。",
+    ].join("\n");
+  }
+
   return [
     `【正文场景锁定 · ${sceneLabel}】`,
     "- 正文须具备测评感：至少 1 组对比（独立炒股 App vs 微信内微证券），从「安装门槛 / 上手成本 / 信息获取方式 / 是否打扰生活」等维度展开。",
@@ -49,6 +69,7 @@ export function buildCreationSceneAngleRules(
   businessLine: BusinessLine,
   creationScene: string | undefined,
   workflowConfig?: BusinessLineWorkflowConfig,
+  embedLevel?: EmbedLevel | string,
 ): string {
   const sceneId = String(creationScene || "").trim();
   if (!sceneId) return "";
@@ -58,7 +79,7 @@ export function buildCreationSceneAngleRules(
   if (!scene) return "";
 
   if (businessLine === "weisec" && sceneId === "tool-review") {
-    return weisecToolReviewAngleRules(scene.label);
+    return weisecToolReviewAngleRules(scene.label, embedLevel);
   }
   if (businessLine === "licaitong") {
     return licaitongSceneNarrativeRules(sceneId, scene.label, scene.description);
@@ -71,6 +92,7 @@ export function buildCreationSceneContentRules(
   businessLine: BusinessLine,
   creationScene: string | undefined,
   workflowConfig?: BusinessLineWorkflowConfig,
+  embedLevel?: EmbedLevel | string,
 ): string {
   const sceneId = String(creationScene || "").trim();
   if (!sceneId) return "";
@@ -80,7 +102,7 @@ export function buildCreationSceneContentRules(
   if (!scene) return "";
 
   if (businessLine === "weisec" && sceneId === "tool-review") {
-    return weisecToolReviewContentRules(scene.label);
+    return weisecToolReviewContentRules(scene.label, embedLevel);
   }
   if (businessLine === "licaitong") {
     return licaitongSceneNarrativeRules(sceneId, scene.label, scene.description);

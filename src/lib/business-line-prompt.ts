@@ -28,6 +28,28 @@ export function buildBusinessLineRuntimeLock(
   generationMode?: GenerationMode | string,
   narrativeOptions?: { creationScene?: string; personaId?: string },
 ): string {
+  const embed = normalizeEmbedLevel(embedLevel || "medium");
+  if (embed === "none") {
+    const brandName = resolveBrandName(businessLine);
+    const narrativeLock = buildNarrativeAntiTemplateLock(
+      isLicaitongLine(businessLine) ? "licaitong" : "weisec",
+      {
+        creationScene: narrativeOptions?.creationScene,
+        personaId: narrativeOptions?.personaId,
+        generationMode,
+      },
+    );
+    return [
+      "【纯内容档位 · 覆盖业务线默认推广与人设 CTA】",
+      "- 本篇是经历/观点/情绪/干货分享，不是品牌帖或产品帖。",
+      `- 正文禁止出现：${brandName}、平台名、产品名、功能名、操作路径、开户/申购/搜索引导。`,
+      "- 标题与开头围绕生活/情绪/困惑，禁止从第一句就写产品或品牌。",
+      "- 禁止 CTA、interactionGuide、「微信搜 XX」类导流。",
+      narrativeLock,
+      formatEmbedLevelForPrompt("none"),
+    ].join("\n");
+  }
+
   const embedGuide = formatEmbedLevelForPrompt(embedLevel || "medium");
   const paths = toArray(brandVoice?.standardConversionPaths).slice(0, 2);
   const isVideo = generationMode === "video-script";

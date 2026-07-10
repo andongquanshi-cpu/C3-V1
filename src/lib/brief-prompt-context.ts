@@ -39,6 +39,7 @@ function hasProductHierarchy(slice: BriefPromptSlice): boolean {
 }
 
 function formatProductHierarchyBlock(slice: BriefPromptSlice, embed: EmbedLevel): string {
+  if (embed === "none") return "";
   if (!hasProductHierarchy(slice)) return "";
 
   const subFeatures = slice.briefFeatureNames.map((name) => `        ├── ${name}（${slice.offerLabel} 的子功能）`).join("\n");
@@ -145,9 +146,13 @@ export function resolveBriefPromptSlice(
   const cfg = workflowConfig || getWorkflowFallback(businessLine);
   const offer = getOffer(String(input.offerId || ""), cfg, businessLine);
   const scene = getScene(String(input.creationScene || ""), cfg, businessLine);
-  const names = Array.isArray(input.selectedFeatureNames)
-    ? input.selectedFeatureNames.map(String).filter(Boolean)
-    : [];
+  const embed = normalizeEmbedLevel(input.embedLevel);
+  const names =
+    embed === "none"
+      ? []
+      : Array.isArray(input.selectedFeatureNames)
+        ? input.selectedFeatureNames.map(String).filter(Boolean)
+        : [];
 
   return {
     brandName: resolveBrandName(businessLine),
@@ -162,6 +167,15 @@ export function resolveBriefPromptSlice(
 
 export function formatBriefBusinessContext(slice: BriefPromptSlice, embedLevel?: EmbedLevel | string): string {
   const embed = normalizeEmbedLevel(embedLevel || "medium");
+  if (embed === "none") {
+    return [
+      "【纯内容 Brief · 不得写成推广帖】",
+      `- 创作场景：${slice.creationSceneLabel} — ${slice.creationSceneDescription}`,
+      `- 用户主题：${slice.topic || "未填写"}`,
+      "- 价值来自经历/观点/情绪/信息整理；即使 Step1 勾选了功能，**正文也不要写产品名、功能名、品牌名或操作路径**。",
+    ].join("\n");
+  }
+
   const hierarchy = formatProductHierarchyBlock(slice, embed);
   const lines = [
     hierarchy,
@@ -225,7 +239,18 @@ export function buildBriefProductRuntimeLock(
   embedLevel: EmbedLevel | string | undefined,
 ): string {
   const embed = normalizeEmbedLevel(embedLevel);
-  if (embed === "none") return "";
+  if (embed === "none") {
+    return [
+      "【纯内容成稿锁定 · 覆盖人设与场景里的默认推广】",
+      "- 正文禁止出现平台名、产品名、功能名、子功能名、操作路径、开户/申购/搜索引导。",
+      "- 标题与开头钩子围绕生活/情绪/困惑，禁止第一句就写产品或品牌。",
+      "- 禁止 CTA、interactionGuide、「微信搜 XX」类导流；insertStrength 填 none。",
+      `- 创作场景：${slice.creationSceneLabel}（${slice.creationSceneDescription}）`,
+      slice.topic ? `- 用户主题：${slice.topic}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+  }
 
   const lines = [
     embed === "high"

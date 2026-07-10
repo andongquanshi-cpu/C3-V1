@@ -688,9 +688,10 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
               workflowConfig,
               selectedAngle: angle,
               templateId: angle.recommendedTemplateId,
-              selectedFeatureIds: [
-                ...new Set([...(brief.selectedFeatureIds || []), ...(angle.recommendedFeatureIds || [])]),
-              ],
+              selectedFeatureIds:
+                normalizeEmbedLevel(brief.embedLevel) === "none"
+                  ? []
+                  : [...new Set([...(brief.selectedFeatureIds || []), ...(angle.recommendedFeatureIds || [])])],
             });
             const rawContent = await callTextModel(
               { system: contentPrompt.system, user: contentPrompt.user + retryHint },

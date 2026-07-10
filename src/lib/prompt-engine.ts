@@ -200,6 +200,7 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
       (knowledge.businessLine || data.businessLine || "weisec") as "weisec" | "licaitong",
       data.creationScene,
       data.workflowConfig,
+      data.embedLevel,
     ),
     contentType: data.contentType || "brand-seed",
     topic: data.topic || data.hotspot || "未提供",
@@ -344,6 +345,7 @@ export function buildContentGenerationPrompt(input: AnyRecord = {}) {
       (knowledge.businessLine || data.businessLine || "weisec") as "weisec" | "licaitong",
       data.creationScene,
       data.workflowConfig,
+      data.embedLevel,
     ),
     contentType: data.contentType || "brand-seed",
     generationMode,
@@ -366,6 +368,7 @@ export function buildVideoScriptGenerationPrompt(input: AnyRecord = {}) {
       (knowledge.businessLine || data.businessLine || "weisec") as "weisec" | "licaitong",
       data.creationScene,
       data.workflowConfig,
+      data.embedLevel,
     ),
   }));
   return finalizePromptWithRuntimeLock(built, { ...input, generationMode: "video-script" });
@@ -480,6 +483,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
     businessLine as "weisec" | "licaitong",
     input.creationScene,
     input.workflowConfig,
+    input.embedLevel,
   );
 
   const personaPrompt = buildPersonaContentPrompt(
