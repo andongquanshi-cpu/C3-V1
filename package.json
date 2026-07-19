@@ -1,14 +1,15 @@
 {
-  "name": "c3-v0-copilot-workbench",
-  "version": "0.1.0",
+  "name": "c3-v3",
+  "version": "3.0.0",
   "private": true,
-  "description": "C3-V0 Copilot AI workbench rebuilt from G12 with Next.js, React, TypeScript and shadcn-style components.",
+  "description": "C3-V3 · AI 内容创作工作台。",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run build",
     "build:kb": "node scripts/build-knowledge-base.mjs",
     "build:kb:v4": "node scripts/build-knowledge-base-v4.mjs"
   },

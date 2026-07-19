@@ -179,7 +179,6 @@ export function buildWorkflowConfig(
     defaultFeaturesByScene: Object.keys(defaultFeaturesByScene).length
       ? defaultFeaturesByScene
       : fallback.defaultFeaturesByScene,
-    featureLimit: Number(offerDefaults.featureLimit || fallback.featureLimit),
     featureUiSummaries: buildFeatureUiSummaries(businessLine, kb, workflowDoc, primaryOfferId, fallback),
     primaryOfferId,
     featureSource: resolveFeatureSource(workflowDoc, fallback),
@@ -207,7 +206,6 @@ export function mergeWorkflowConfig(
     defaultFeaturesByScene: Object.keys(kbConfig.defaultFeaturesByScene || {}).length
       ? (kbConfig.defaultFeaturesByScene as BusinessLineWorkflowConfig["defaultFeaturesByScene"])
       : fallback.defaultFeaturesByScene,
-    featureLimit: kbConfig.featureLimit || fallback.featureLimit,
     featureUiSummaries: Object.keys(kbConfig.featureUiSummaries || {}).length
       ? kbConfig.featureUiSummaries!
       : fallback.featureUiSummaries,

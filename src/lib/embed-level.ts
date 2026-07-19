@@ -1,5 +1,7 @@
 import type { EmbedLevel } from "@/lib/types";
 
+type NormalizedEmbedLevel = Exclude<EmbedLevel, "low">;
+
 /** 植入强度：纯内容 / 场景桥接 / 强硬植入 */
 export interface EmbedLevelOption {
   value: EmbedLevel;
@@ -25,14 +27,14 @@ export const EMBED_LEVEL_OPTIONS: EmbedLevelOption[] = [
   },
 ];
 
-const EMBED_LABELS: Record<EmbedLevel, string> = {
+const EMBED_LABELS: Record<NormalizedEmbedLevel, string> = {
   none: "纯内容",
   medium: "场景桥接",
   high: "强硬植入",
 };
 
 /** 历史 low（自然带过）映射为 medium */
-export function normalizeEmbedLevel(value: unknown): EmbedLevel {
+export function normalizeEmbedLevel(value: unknown): NormalizedEmbedLevel {
   const raw = String(value || "medium").trim().toLowerCase();
   if (raw === "low") return "medium";
   if (raw === "none" || raw === "medium" || raw === "high") return raw;
@@ -43,7 +45,7 @@ export function getEmbedLevelLabel(level: EmbedLevel | string | undefined): stri
   return EMBED_LABELS[normalizeEmbedLevel(level)];
 }
 
-function buildEmbedSharedGuide(embed: EmbedLevel, label: string): string {
+function buildEmbedSharedGuide(embed: NormalizedEmbedLevel, label: string): string {
   if (embed === "high") {
     return [
       "【high · 强硬植入】",
@@ -81,7 +83,7 @@ export function formatEmbedLevelForPrompt(level: EmbedLevel | string | undefined
   const label = getEmbedLevelLabel(embed);
   const shared = buildEmbedSharedGuide(embed, label);
 
-  const tierRules: Record<EmbedLevel, string> = {
+  const tierRules: Record<NormalizedEmbedLevel, string> = {
     none: [
       "- 价值来自经历、复盘、观点、避坑或信息整理；转化靠文末一句「想了解可自行搜索」类轻提示即可（可选）。",
       "- 标题和开头钩子围绕生活/情绪/困惑，不要围绕产品名。",
@@ -113,7 +115,7 @@ export function capSelectedFeaturesByEmbedLevel(
   embedLevel: EmbedLevel | string | undefined,
   selectedFeatureIds: string[] = [],
 ): number {
-  const limits: Record<EmbedLevel, number> = {
+  const limits: Record<NormalizedEmbedLevel, number> = {
     none: 0,
     medium: 2,
     high: 4,

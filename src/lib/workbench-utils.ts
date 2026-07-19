@@ -3,7 +3,15 @@ import { buildImagePromptFromScene } from "@/lib/image-prompt-utils";
 import { hasAdequateRiskReminder } from "@/lib/risk-reminder";
 import { isSkeletonVideoScript } from "@/lib/video-script-quality";
 import { getSelectedMaterials } from "@/lib/hotspot-workflow";
-import type { BriefInput, ComplianceReport, CreativeAngle, GeneratedContent, Material } from "@/lib/types";
+import type {
+  BriefInput,
+  ComplianceReport,
+  CreativeAngle,
+  GeneratedContent,
+  Material,
+  VideoScriptShot,
+} from "@/lib/types";
+import { buildProductAwareTags, type TagStrategyRuntimeContext } from "@/lib/tag-strategy";
 
 type LooseRecord = Record<string, unknown>;
 
@@ -71,6 +79,26 @@ function formatStoryboardAsContent(storyboard: unknown): string {
     })
     .filter(Boolean);
   return lines.join("\n");
+}
+
+function normalizeStoryboard(storyboard: unknown): VideoScriptShot[] {
+  if (!Array.isArray(storyboard)) return [];
+  return storyboard
+    .map<VideoScriptShot | null>((item, index) => {
+      const row = asRecord(item);
+      const visual = asString(row.visual);
+      const voiceover = asString(row.voiceover);
+      if (!visual && !voiceover) return null;
+      const duration = Number(row.durationSec ?? row.duration ?? 0);
+      return {
+        shotIndex: Number(row.shotIndex) || index + 1,
+        durationSec: Number.isFinite(duration) ? duration : 0,
+        visual,
+        voiceover,
+        onScreenText: asString(row.onScreenText) || undefined,
+      };
+    })
+    .filter((item): item is VideoScriptShot => Boolean(item));
 }
 
 function extractOpeningHookLine(data: LooseRecord): string {
@@ -311,7 +339,7 @@ function buildFallbackDisplayTags(angle: CreativeAngle, brief: BriefInput) {
 export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngle[] {
   const parsed = value as { angles?: CreativeAngle[] } | CreativeAngle[];
   const angles = Array.isArray(parsed) ? parsed : Array.isArray(parsed.angles) ? parsed.angles : [];
-  const limit = Math.min(5, Math.max(1, Math.round(Number(brief.generateCount) || 3)));
+  const limit = Math.min(6, Math.max(1, Math.round(Number(brief.generateCount) || 6)));
   return angles.slice(0, limit).map((angle, index) => {
     const normalized: CreativeAngle = {
       angleId: angle.angleId || `angle_${String(index + 1).padStart(3, "0")}`,
@@ -344,12 +372,13 @@ export function normalizeAngles(value: unknown, brief: BriefInput): CreativeAngl
 export function normalizeContent(
   value: unknown,
   angle: CreativeAngle,
-  options?: { generationMode?: string },
+  options?: { generationMode?: string; tagContext?: TagStrategyRuntimeContext },
 ): GeneratedContent {
   const isVideo = options?.generationMode === "video-script";
   const data = adaptPersonaContentPayload(value) as Partial<GeneratedContent>;
   const base: GeneratedContent = {
     id: uid("content"),
+    generationMode: isVideo ? "video-script" : "image-text",
     angleId: data.angleId || angle.angleId,
     angleName: data.angleName || angle.angleName,
     titleCandidates: Array.isArray(data.titleCandidates) ? data.titleCandidates : [],
@@ -358,9 +387,20 @@ export function normalizeContent(
     selectedCoverText: data.selectedCoverText || data.coverTextCandidates?.[0]?.text || (isVideo ? "" : "财经干货"),
     content: data.content || "",
     insertStrategy: data.insertStrategy || {},
-    tags: Array.isArray(data.tags) && data.tags.length ? data.tags : buildFallbackContentTags(angle),
+    tags: options?.tagContext
+      ? buildProductAwareTags(
+          Array.isArray(data.tags) && data.tags.length ? data.tags : buildFallbackContentTags(angle),
+          options.tagContext,
+        )
+      : Array.isArray(data.tags) && data.tags.length
+        ? data.tags
+        : buildFallbackContentTags(angle),
     interactionGuide: data.interactionGuide || "",
     riskReminder: data.riskReminder || (isVideo ? "" : "市场有风险，投资需谨慎。"),
+    scriptMeta: isVideo ? data.scriptMeta : undefined,
+    openingHook: isVideo ? data.openingHook : undefined,
+    storyboard: isVideo ? normalizeStoryboard(data.storyboard) : undefined,
+    bgmSuggestion: isVideo && typeof data.bgmSuggestion === "string" ? data.bgmSuggestion : undefined,
     imagePromptSuggestions: isVideo ? [] : Array.isArray(data.imagePromptSuggestions) ? data.imagePromptSuggestions : [],
     qualityScore: data.qualityScore,
     complianceReport: data.complianceReport,

@@ -373,7 +373,7 @@ function resolvePersonaUserTemplate(persona: PersonaStandard, variant: PersonaVa
 
 function appendVideoOutputRequirements(parts: string[]) {
   parts.push(
-    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- storyboard 每一镜 visual 和 voiceover **必填**，每镜口播至少 12 个汉字\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePrompt / 封面图 / 配图字段\n- tags 必填 5-8 个话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
+    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- storyboard 每一镜 visual 和 voiceover **必填**，每镜口播至少 12 个汉字\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePrompt / 封面图 / 配图字段\n- tags 必填 8-10 个强相关话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
   );
 }
 
@@ -385,7 +385,7 @@ function appendVideoJsonSchemaOverride(parts: string[]) {
 
 function appendImageTextOutputRequirements(parts: string[]) {
   parts.push(
-    `\n\n【输出要求 · 通用】\n- tags 字段必填：5-8 个小红书话题词（不带 #），与主题、标题、人设相关；不得省略或留空数组\n- emoji 按人设 emojiDensity 适量使用（多数人设全文 3-7 个）：点缀在句中、段尾或偶发段首；**禁止**每篇按固定 emoji 顺序当分段小标题（如 🎓要点1、✅方法2）\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一第二第三」「三步/四点/分成X份/先看这四个」等可见清单框架\n- interactionGuide 最多一句轻互动，不得替代正文\n- imageTextSuggestions 必填 1-3 条；每条必须有可执行的 prompt 字段（竖版 3:4 小红书封面画面描述，含主体/场景/光线/色调；若有 coverText 须写明画面内压字位置），scene/visualNotes 仅作补充`,
+    `\n\n【输出要求 · 通用】\n- tags 字段必填：8-10 个小红书强相关话题词（不带 #），按赛道/主题/读者/Offer或功能/品牌分层；不得省略或留空数组\n- emoji 按人设 emojiDensity 适量使用（多数人设全文 3-7 个）：点缀在句中、段尾或偶发段首；**禁止**每篇按固定 emoji 顺序当分段小标题（如 🎓要点1、✅方法2）\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一第二第三」「三步/四点/分成X份/先看这四个」等可见清单框架\n- interactionGuide 最多一句轻互动，不得替代正文\n- imageTextSuggestions 必填 1-3 条；每条必须有可执行的 prompt 字段（竖版 3:4 小红书封面画面描述，含主体/场景/光线/色调；若有 coverText 须写明画面内压字位置），scene/visualNotes 仅作补充`,
   );
 }
 

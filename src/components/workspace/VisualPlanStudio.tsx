@@ -21,6 +21,13 @@ import {
   buildFallbackVisualPlan,
   parseVisualPlanPayload,
 } from "@/lib/visual-plan-utils";
+import {
+  buildPromptApi,
+  generateImageApi,
+  generateTextApi,
+  persistGeneratedImageApi,
+  type MatrixWorkflowContext,
+} from "@/services/creation-api";
 import type {
   BriefInput,
   GeneratedContent,
@@ -34,7 +41,8 @@ interface VisualPlanStudioProps {
   brief: BriefInput;
   imageApiReady: boolean;
   imageModel?: string;
-  onBack: () => void;
+  workflowContext?: MatrixWorkflowContext;
+  onBack?: () => void;
   onVisualPlanChange: (contentId: string, plan: VisualPlan | undefined) => void;
   onImageGenerated: (contentId: string, image: GeneratedImage) => void;
 }
@@ -70,6 +78,7 @@ export function VisualPlanStudio({
   brief,
   imageApiReady,
   imageModel,
+  workflowContext,
   onBack,
   onVisualPlanChange,
   onImageGenerated,
@@ -118,41 +127,23 @@ export function VisualPlanStudio({
       mode === "regenerate" ? "正在让 AI 重新规划视觉方案…" : "正在让 AI 生成视觉计划…",
     );
     try {
-      const promptResp = await fetch("/api/prompt-engine", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "visualPlan",
-          input: {
-            ...brief,
-            selectedTitle: content.selectedTitle,
-            selectedCoverText: content.selectedCoverText,
-            generatedContent: content.content,
-            selectedAngle: {
-              angleName: content.angleName,
-              angleId: content.angleId,
-            },
-          },
-        }),
+      const promptData = await buildPromptApi("visualPlan", {
+        ...brief,
+        creationMode: workflowContext?.mode,
+        workflowContext,
+        selectedTitle: content.selectedTitle,
+        selectedCoverText: content.selectedCoverText,
+        generatedContent: content.content,
+        selectedAngle: {
+          angleName: content.angleName,
+          angleId: content.angleId,
+        },
       });
-      const promptData = await promptResp.json();
-      if (!promptResp.ok) throw new Error(promptData.error || "Prompt 构造失败");
 
-      const llmResp = await fetch("/api/llm-proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: [
-            { role: "system", content: promptData.system },
-            { role: "user", content: promptData.user },
-          ],
-          temperature: 0.55,
-          maxTokens: 4096,
-        }),
+      const raw = await generateTextApi(promptData, {
+        temperature: 0.55,
+        maxTokens: 4096,
       });
-      const llmData = await llmResp.json();
-      if (!llmResp.ok) throw new Error(llmData.error || "视觉计划生成失败");
-      const raw = llmData.choices?.[0]?.message?.content || "";
       const parsed = parseVisualPlanPayload(parseLLMJson(raw));
       const nextPlan = parsed || buildFallbackVisualPlan(content);
       setPlan(nextPlan);
@@ -170,20 +161,24 @@ export function VisualPlanStudio({
   }
 
   function patchItem(itemId: string, patch: Partial<VisualPlanItem>) {
-    if (!plan) return;
-    const nextPlan = {
-      ...plan,
-      items: plan.items.map((item) => (item.id === itemId ? { ...item, ...patch } : item)),
-    };
-    setPlan(nextPlan);
-    onVisualPlanChange(content.id, nextPlan);
+    setPlan((current) => {
+      if (!current) return current;
+      const nextItems = current.items.map((item) =>
+        item.id === itemId ? { ...item, ...patch } : item,
+      );
+      const nextPlan = { ...current, items: nextItems };
+      onVisualPlanChange(content.id, nextPlan);
+      return nextPlan;
+    });
   }
 
   function patchOverallStyle(nextStyle: string) {
-    if (!plan) return;
-    const nextPlan = { ...plan, overallStyle: nextStyle };
-    setPlan(nextPlan);
-    onVisualPlanChange(content.id, nextPlan);
+    setPlan((current) => {
+      if (!current) return current;
+      const nextPlan = { ...current, overallStyle: nextStyle };
+      onVisualPlanChange(content.id, nextPlan);
+      return nextPlan;
+    });
   }
 
   async function generateOne(item: VisualPlanItem, overallStyle: string) {
@@ -193,37 +188,22 @@ export function VisualPlanStudio({
     }
     setSlots((current) => ({ ...current, [item.id]: { loading: true } }));
     try {
-      const response = await fetch("/api/image-proxy", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: item.prompt,
-          overallStyle,
-          coverText: item.copy,
-          role: item.role,
-        }),
+      const url = await generateImageApi({
+        prompt: item.prompt,
+        overallStyle,
+        coverText: item.copy,
+        role: item.role,
+        workflowContext,
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "图片生成失败");
-      const url: string = data.data?.[0]?.url || data.url || "";
-      if (!url) throw new Error("API 未返回图片 URL");
 
       // 立即持久化到本地
       let localPath: string | undefined;
       try {
-        const saveResp = await fetch("/api/image-save", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            url,
-            contentId: content.id,
-            imageIndex: item.imageIndex,
-          }),
+        localPath = await persistGeneratedImageApi({
+          url,
+          contentId: content.id,
+          imageIndex: item.imageIndex,
         });
-        const saveData = await saveResp.json();
-        if (saveResp.ok && saveData.localPath) {
-          localPath = saveData.localPath as string;
-        }
       } catch {
         // 保存失败仍返回原始 URL，不阻断流程
       }
@@ -332,14 +312,16 @@ export function VisualPlanStudio({
     <div className="flex min-w-0 flex-col rounded-xl border border-border/80 bg-card/50">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
         <div className="min-w-0">
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
-          >
-            <ArrowLeft className="h-3.5 w-3.5" />
-            返回正文
-          </button>
+          {onBack ? (
+            <button
+              type="button"
+              onClick={onBack}
+              className="mb-2 inline-flex items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <ArrowLeft className="h-3.5 w-3.5" />
+              返回正文
+            </button>
+          ) : null}
           <h2 className="flex items-center gap-2 text-lg font-semibold">
             <ImageIcon className="h-5 w-5" />
             制图工作台

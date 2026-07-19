@@ -1,55 +1,39 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Archive } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useEffect, useMemo } from "react";
+import { AlertTriangle, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { BriefPanel } from "@/components/workspace/LicaitongBriefPanel";
-import { AnglesPanel } from "@/components/workspace/LicaitongAnglesPanel";
-import { ContentResultsPanel } from "@/components/workspace/ContentResultsPanel";
-import { VisualPlanStudio } from "@/components/workspace/VisualPlanStudio";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { AnglesPanel } from "@/components/workspace/AnglesPanel";
+import { BriefPanel } from "@/components/workspace/BriefPanel";
 import { BriefSummaryCard } from "@/components/workspace/BriefSummaryCard";
-import { DraftBoxPanel } from "@/components/workspace/DraftBoxPanel";
+import { ContentResultsPanel } from "@/components/workspace/ContentResultsPanel";
+import { ReviewPanel } from "@/components/workspace/ReviewPanel";
+import { VisualPlanStudio } from "@/components/workspace/VisualPlanStudio";
+import { WorkflowStageShell } from "@/components/workspace/WorkflowStageShell";
 import { WorkflowStepper } from "@/components/workspace/WorkflowStepper";
 import {
-  buildWorkflowDefaults,
   buildSuggestedTopic,
+  buildWorkflowDefaults,
   filterOfferFeatures,
   getAnglesStatusMessage,
-  getBriefStorageKey,
-  normalizeContentLength,
+  getContentLengthOptions,
+  isFeatureSelectionActive,
   resolveWorkflowForLine,
+  type BusinessLineWorkflowConfig,
 } from "@/lib/business-line-workflow";
-import { assessBriefProductIntegration, resolveBriefPromptSlice } from "@/lib/brief-prompt-context";
-import { normalizeEmbedLevel, requiresStrictProductHierarchy } from "@/lib/embed-level";
+import { getSelectedMaterials, requiresHotspotMaterials } from "@/lib/hotspot-workflow";
 import { validateGeneratedBody } from "@/lib/business-line-prompt";
-import { resolveContentPromptAction } from "@/lib/content-generation-routing";
-import { validateVideoScriptPayload } from "@/lib/video-script-quality";
-import {
-  buildHotspotSearchQueries,
-  canProceedFromBrief,
-  findStoredHotspotMaterial,
-  getSelectedMaterials,
-  isHotspotTabValidForLine,
-  mergeHotspotSearchCandidates,
-  normalizeHotspotTabForLine,
-  sceneRequiresHotspotMaterials,
-  type HotspotTabId,
-} from "@/lib/hotspot-workflow";
-import {
-  filterMaterialsForPrompt,
-  isHotspotLinkedBrief,
-  stripHotspotSearchMaterials,
-} from "@/lib/material-prompt-routing";
-import {
-  dedupeHotspotMaterials,
-  filterHotspotForBusinessLine,
-} from "@/lib/eastmoney-hotspot";
+import { ANGLE_AXES, type AngleAxis, type AngleCoordinate } from "@/lib/creative/angle-axes";
+import { sampleAngleCoordinates } from "@/lib/creative/angle-sampler";
 import {
   finalizeImagePromptSuggestions,
   shouldRequestCoverSuggestions,
 } from "@/lib/image-prompt-utils";
-import { parseLLMJson, safeJsonParse, cn } from "@/lib/utils";
+import { browserStorage, readStoredJson, writeStoredJson } from "@/lib/storage";
+import { useMatrixWorkspaceSession } from "@/hooks/useMatrixWorkspaceSession";
+import { parseLLMJson } from "@/lib/utils";
 import {
   buildAnglesConfigFingerprint,
   buildDefaultCompliance,
@@ -58,571 +42,368 @@ import {
   normalizeContent,
   uid,
 } from "@/lib/workbench-utils";
+import {
+  buildPromptApi,
+  fetchApiStatus,
+  generateTextApi,
+  type MatrixConfirmedStage,
+  type MatrixWorkflowContext,
+} from "@/services/creation-api";
 import type {
   BriefInput,
   BusinessLine,
-  CreativeAngle,
   Draft,
   GeneratedContent,
   GeneratedImage,
-  KnowledgeListView,
-  Material,
+  GenerationHistoryEntry,
   VisualPlan,
 } from "@/lib/types";
 
-const WORKFLOW_STEPS = [
-  { id: 1, label: "创作配置" },
-  { id: 2, label: "创意角度" },
-  { id: 3, label: "生成内容" },
-];
-
-type WorkbenchView = "workflow" | "drafts";
-
+const CREATION_WORKFLOW_STEPS = [
+  { id: 1, label: "要素配置", capability: "creation-brief" },
+  { id: 2, label: "创意角度", capability: "creative-angles" },
+  { id: 3, label: "生成内容", capability: "content-generation" },
+  { id: 5, label: "预览审核", capability: "content-review" },
+] as const;
 const LLM_NOT_CONFIGURED =
   "服务端未配置 LLM_API_KEY，请在项目根目录 .env 中设置后重启开发服务器";
-const ANGLE_HISTORY_STORAGE_KEY = "c3-v0-angle-history";
+const ANGLE_HISTORY_STORAGE_KEY = "lunch-angle-history";
+const LEGACY_ANGLE_COORD_HISTORY_STORAGE_KEY = "lunch-angle-coord-history-v1";
 const MAX_ANGLE_HISTORY_KEYS = 20;
-
-interface ApiStatus {
-  ready: boolean;
-  text: boolean;
-  image: boolean;
-  imageModel?: string;
-  hotspot: boolean;
-  model?: string;
-}
+const MAX_COORD_HISTORY_PER_KEY = 24;
 
 interface BusinessLineWorkbenchProps {
   businessLine: BusinessLine;
 }
 
-interface RecentAngleSummary {
-  angleName: string;
-  coreIdea: string;
-  differentiationAxis?: string;
-  userPainPoint?: string;
-  contentStructure?: string;
-  displayTags?: string[];
-}
-
-function summarizeAnglesForAvoidance(angles: CreativeAngle[]): RecentAngleSummary[] {
-  return angles.slice(0, 5).map((angle) => ({
-    angleName: angle.angleName,
-    coreIdea: angle.coreIdea,
-    differentiationAxis: angle.differentiationAxis,
-    userPainPoint: angle.userPainPoint,
-    contentStructure: angle.contentStructure,
-    displayTags: angle.displayTags?.slice(0, 5),
-  }));
-}
-
-function readAngleHistory() {
-  if (typeof window === "undefined") return {};
-  return safeJsonParse<Record<string, RecentAngleSummary[]>>(
-    localStorage.getItem(ANGLE_HISTORY_STORAGE_KEY) || "",
+function readCoordHistory(storageKey: string): Record<string, AngleCoordinate[]> {
+  browserStorage.remove(ANGLE_HISTORY_STORAGE_KEY);
+  return readStoredJson<Record<string, AngleCoordinate[]>>(
+    storageKey,
     {},
+    [LEGACY_ANGLE_COORD_HISTORY_STORAGE_KEY],
   );
 }
 
-function resolveRecentAnglesForConfig(
-  configKey: string,
-  generatedForKey: string | null,
-  currentAngles: CreativeAngle[],
-) {
-  if (generatedForKey === configKey && currentAngles.length > 0) {
-    return summarizeAnglesForAvoidance(currentAngles);
-  }
-  return readAngleHistory()[configKey] || [];
+function getRecentCoordsForConfig(storageKey: string, configKey: string) {
+  return readCoordHistory(storageKey)[configKey] || [];
 }
 
-function writeAngleHistory(configKey: string, angles: CreativeAngle[]) {
-  const history = readAngleHistory();
-  delete history[configKey];
-  history[configKey] = summarizeAnglesForAvoidance(angles);
-  const compact = Object.fromEntries(Object.entries(history).slice(-MAX_ANGLE_HISTORY_KEYS));
-  localStorage.setItem(ANGLE_HISTORY_STORAGE_KEY, JSON.stringify(compact));
+function appendCoordHistory(storageKey: string, configKey: string, coords: AngleCoordinate[]) {
+  const history = readCoordHistory(storageKey);
+  history[configKey] = [...(history[configKey] || []), ...coords].slice(-MAX_COORD_HISTORY_PER_KEY);
+  writeStoredJson(storageKey, Object.fromEntries(Object.entries(history).slice(-MAX_ANGLE_HISTORY_KEYS)));
+}
+
+function matrixAngleAxes(embedLevel: BriefInput["embedLevel"]): AngleAxis[] {
+  const cloakByLevel: Record<BriefInput["embedLevel"], string[]> = {
+    none: ["完全不提产品，只讲观点（0 植入）"],
+    low: [
+      "完全不提产品，只讲观点（0 植入）",
+      "作为顺手用到的一个工具轻描淡写带过",
+      "剧情里的自然道具：故事里角色本来就在用",
+      "以'我朋友告诉我'的转述形式出现",
+    ],
+    medium: [
+      "作为解决痛点后的最后一句：'后来我用了……'",
+      "作为对比选项之一（A/B/C 三个方式的其中一个）",
+      "剧情里的自然道具：故事里角色本来就在用",
+      "作为科普附带链接，重点在讲概念",
+    ],
+    high: [
+      "作为踩坑后才发现的方法：'早知道有这个……'",
+      "反向推荐：先讲什么样的人不适合，再讲适合谁",
+      "作为解决痛点后的最后一句：'后来我用了……'",
+      "作为对比选项之一（A/B/C 三个方式的其中一个）",
+    ],
+  };
+
+  return ANGLE_AXES.map((axis) => {
+    if (axis.key === "hook") return { ...axis, values: axis.values.filter((value) => !value.includes("热点")) };
+    if (axis.key === "format") {
+      return {
+        ...axis,
+        values: axis.values.filter((value) => !value.includes("清单") && !value.includes("SOP")),
+      };
+    }
+    if (axis.key === "offerCloak") return { ...axis, values: cloakByLevel[embedLevel] };
+    return axis;
+  });
 }
 
 function buildDefaultBrief(businessLine: BusinessLine): BriefInput {
   return {
     businessLine,
     ...buildWorkflowDefaults(businessLine),
+    topic: "",
     generationMode: "image-text",
     bloggerLevel: "middle",
     embedLevel: "medium",
     contentLength: "200-500",
-    generateCount: 2,
+    generateCount: 6,
     customRequirement: "",
     materials: [],
   };
 }
 
+function matrixWorkflowContext(
+  confirmedStage: MatrixConfirmedStage,
+  snapshotId: string,
+): MatrixWorkflowContext {
+  return { mode: "matrix", confirmed: true, confirmedStage, snapshotId };
+}
+
+function hasSelectedHotspotMaterials(brief: BriefInput) {
+  return (brief.materials || []).some((material) => material.source && material.source !== "手动输入");
+}
+
+function getMissingBriefSelections(brief: BriefInput, config: BusinessLineWorkflowConfig) {
+  const missing: string[] = [];
+  if (!config.hideOfferSelection && !brief.offerId) missing.push("Offer");
+  if (!brief.creationScene) missing.push("创作场景");
+  if (!brief.audienceTag || !brief.targetUser) missing.push("目标读者");
+  if (!brief.personaId) missing.push("创作人设");
+  if (
+    isFeatureSelectionActive(brief, config, brief.businessLine) &&
+    brief.embedLevel !== "none" &&
+    brief.selectedFeatureIds.length === 0
+  ) {
+    missing.push(config.hideOfferSelection ? "主推功能" : "主推卖点");
+  }
+  if (
+    requiresHotspotMaterials({
+      personaId: brief.personaId,
+      creationScene: brief.creationScene,
+      config,
+    }) &&
+    getSelectedMaterials(brief.materials || []).length === 0
+  ) {
+    missing.push("热点素材");
+  }
+  return [...new Set(missing)];
+}
+
 export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchProps) {
   const defaultBrief = useMemo(() => buildDefaultBrief(businessLine), [businessLine]);
-  const storageKeys = useMemo(
-    () => ({
-      drafts: "c3-v0-drafts",
-      materials: "c3-v0-materials",
-      brief: getBriefStorageKey(businessLine),
-    }),
-    [businessLine],
-  );
-
-  const [view, setView] = useState<WorkbenchView>("workflow");
-  const [step, setStep] = useState(1);
-  const [brief, setBrief] = useState<BriefInput>(defaultBrief);
-  const [knowledge, setKnowledge] = useState<KnowledgeListView | null>(null);
-  const [apiStatus, setApiStatus] = useState<ApiStatus>({ ready: false, text: false, image: false, hotspot: false });
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [materialDraft, setMaterialDraft] = useState("");
-  const [hotspotPanelOpen, setHotspotPanelOpen] = useState(false);
-  const [activeHotspotTab, setActiveHotspotTab] = useState<HotspotTabId>("trending");
-  const [customHotspotQuery, setCustomHotspotQuery] = useState("");
-  const [hotspotCandidates, setHotspotCandidates] = useState<Material[]>([]);
-  const [hotspotSearchError, setHotspotSearchError] = useState<string | null>(null);
-  const [angles, setAngles] = useState<CreativeAngle[]>([]);
-  const [selectedAngleIds, setSelectedAngleIds] = useState<string[]>([]);
-  const [results, setResults] = useState<GeneratedContent[]>([]);
-  const [drafts, setDrafts] = useState<Draft[]>([]);
-  const [activeResultId, setActiveResultId] = useState("");
-  const [contentSubView, setContentSubView] = useState<"result" | "studio">("result");
-  const [status, setStatus] = useState("");
-  const [isSearchingHotspot, setIsSearchingHotspot] = useState(false);
-  const [isGeneratingAngles, setIsGeneratingAngles] = useState(false);
-  const [isGeneratingContent, setIsGeneratingContent] = useState(false);
-  const [anglesGeneratedForKey, setAnglesGeneratedForKey] = useState<string | null>(null);
-
-  useEffect(() => {
-    const stored = safeJsonParse<Partial<BriefInput>>(localStorage.getItem(storageKeys.brief) || "", {});
-    const mode = stored.generationMode || defaultBrief.generationMode;
-    setBrief({
-      ...defaultBrief,
-      ...stored,
-      businessLine,
-      generationMode: mode,
-      contentLength: normalizeContentLength(stored.contentLength, mode),
-      embedLevel: normalizeEmbedLevel(stored.embedLevel ?? defaultBrief.embedLevel),
-    });
-    setMaterials(safeJsonParse(localStorage.getItem(storageKeys.materials) || "", []));
-    setDrafts(safeJsonParse(localStorage.getItem(storageKeys.drafts) || "", []));
-    setStep(1);
-    setView("workflow");
-    setAngles([]);
-    setSelectedAngleIds([]);
-    setResults([]);
-    setAnglesGeneratedForKey(null);
-
-    fetch("/api/knowledge-base/list")
-      .then((r) => r.json())
-      .then((data: KnowledgeListView) => setKnowledge(data))
-      .catch(() => setStatus("知识库加载失败"));
-
-    fetch("/api/config/status")
-      .then((r) => r.json())
-      .then((data: ApiStatus) => setApiStatus(data))
-      .catch(() => setApiStatus({ ready: false, text: false, image: false, hotspot: false }));
-  }, [businessLine, defaultBrief, storageKeys.brief, storageKeys.drafts, storageKeys.materials]);
-
-  useEffect(() => {
-    setActiveHotspotTab((current) => {
-      const normalized = normalizeHotspotTabForLine(current, businessLine);
-      return isHotspotTabValidForLine(normalized, businessLine) ? normalized : "trending";
-    });
-  }, [businessLine]);
-
-  useEffect(() => {
-    localStorage.setItem(storageKeys.brief, JSON.stringify(brief));
-  }, [brief, storageKeys.brief]);
-
-  useEffect(() => {
-    localStorage.setItem(storageKeys.materials, JSON.stringify(materials));
-    setBrief((current) => ({ ...current, materials }));
-  }, [materials, storageKeys.materials]);
-
-  useEffect(() => {
-    localStorage.setItem(storageKeys.drafts, JSON.stringify(drafts));
-  }, [drafts, storageKeys.drafts]);
+  const session = useMatrixWorkspaceSession({ businessLine, defaultBrief });
+  const {
+    storageKeys,
+    step,
+    setStep,
+    brief,
+    setBrief,
+    confirmedBrief,
+    setConfirmedBrief,
+    angles,
+    setAngles,
+    selectedAngleIds,
+    setSelectedAngleIds,
+    confirmedAngles,
+    setConfirmedAngles,
+    results,
+    setResults,
+    activeResultId,
+    setActiveResultId,
+    confirmedContentId,
+    setConfirmedContentId,
+    confirmedImageContentId,
+    setConfirmedImageContentId,
+    reviewConfirmed,
+    setReviewConfirmed,
+    setHistory,
+    setDrafts,
+    knowledge,
+    apiStatus,
+    apiStatusResolved,
+    setApiStatus,
+    status,
+    setStatus,
+    isGeneratingAngles,
+    setIsGeneratingAngles,
+    isGeneratingContent,
+    setIsGeneratingContent,
+    anglesGeneratedForKey,
+    setAnglesGeneratedForKey,
+  } = session;
 
   const workflowConfig = useMemo(
     () => resolveWorkflowForLine(knowledge, businessLine),
     [knowledge, businessLine],
   );
-
-  useEffect(() => {
-    if (!knowledge) return;
-    const names = brief.selectedFeatureIds
-      .map((id) => knowledge.features.find((f) => f.id === id)?.name)
-      .filter(Boolean) as string[];
-    if (names.length && names.join("|") !== brief.selectedFeatureNames.join("|")) {
-      setBrief((current) => ({ ...current, selectedFeatureNames: names }));
-    }
-  }, [brief.selectedFeatureIds, brief.selectedFeatureNames, knowledge]);
-
   const offerFeatures = useMemo(
     () => filterOfferFeatures(knowledge?.features || [], businessLine, brief.offerId, workflowConfig),
     [knowledge, businessLine, brief.offerId, workflowConfig],
   );
-
-  const selectedAngles = useMemo(
-    () => angles.filter((a) => selectedAngleIds.includes(a.angleId)),
-    [angles, selectedAngleIds],
-  );
   const activeResult = useMemo(
-    () => results.find((r) => r.id === activeResultId) || results[0],
+    () => results.find((result) => result.id === activeResultId) || results[0],
     [activeResultId, results],
   );
-  const hotspotLinked = useMemo(
-    () => isHotspotLinkedBrief(brief, workflowConfig),
-    [brief.personaId, brief.creationScene, workflowConfig],
+  const confirmedContent = useMemo(
+    () => results.find((result) => result.id === confirmedContentId),
+    [confirmedContentId, results],
   );
-  const promptMaterials = useMemo(
-    () => filterMaterialsForPrompt(materials, hotspotLinked),
-    [materials, hotspotLinked],
+  const confirmedImageContent = useMemo(
+    () => results.find((result) => result.id === confirmedImageContentId),
+    [confirmedImageContentId, results],
   );
-  const anglesConfigKey = useMemo(
-    () => buildAnglesConfigFingerprint(brief, promptMaterials),
-    [brief, promptMaterials],
+  const missingBriefSelections = getMissingBriefSelections(brief, workflowConfig);
+  const canConfirmImages = Boolean(
+    confirmedContent?.visualPlan && (confirmedContent.generatedImages?.length || 0) > 0,
   );
-  const selectedMaterials = useMemo(() => getSelectedMaterials(materials), [materials]);
-  const canContinueFromBrief = useMemo(
-    () => canProceedFromBrief(brief, materials, workflowConfig),
-    [brief, materials, workflowConfig],
-  );
-  const suggestedTopic = useMemo(
-    () => buildSuggestedTopic(brief, workflowConfig),
-    [brief, workflowConfig],
-  );
-  const anglesUpToDate = anglesGeneratedForKey === anglesConfigKey && angles.length > 0;
 
   useEffect(() => {
-    if (hotspotLinked) return;
-    setMaterials((current) => {
-      const next = stripHotspotSearchMaterials(current);
-      return next.length === current.length ? current : next;
-    });
-    setHotspotPanelOpen(false);
-    setHotspotCandidates([]);
-  }, [hotspotLinked]);
-
-  useEffect(() => {
-    if (isGeneratingAngles) return;
-    if (anglesGeneratedForKey && anglesConfigKey !== anglesGeneratedForKey) {
-      setAngles([]);
-      setSelectedAngleIds([]);
-      setAnglesGeneratedForKey(null);
-    }
-  }, [anglesConfigKey, anglesGeneratedForKey, isGeneratingAngles]);
-
-  useEffect(() => {
-    // 切换到不同结果 / 离开第 3 步时，退出制图子视图
-    setContentSubView("result");
-  }, [activeResultId, step, view]);
-
-  async function refreshApiStatus() {
-    try {
-      const response = await fetch("/api/config/status");
-      const data = (await response.json()) as ApiStatus;
-      setApiStatus(data);
-      return data;
-    } catch {
-      return apiStatus;
-    }
-  }
-
-  useEffect(() => {
-    if (step !== 1 || view !== "workflow") return;
-    void refreshApiStatus();
-  }, [step, view]);
-
-  function updateBrief(patch: Partial<BriefInput>) {
-    setBrief((current) => ({ ...current, ...patch }));
-  }
-
-  function commitMaterialDraft() {
-    const text = materialDraft.trim();
-    if (!text) return;
-    const material: Material = {
-      id: uid("material"),
-      title: text.split("\n")[0].slice(0, 48) || "手动素材",
-      body: text,
-      source: "手动输入",
-      tags: ["粘贴"],
-      selected: true,
-      isPrimary: getSelectedMaterials(materials).length === 0,
-      createdAt: new Date().toISOString(),
-    };
-    setMaterials((current) => [material, ...current].slice(0, 12));
-    setMaterialDraft("");
-    setStatus(hotspotLinked ? "素材已加入已选列表" : "背景补充已加入");
-  }
-
-  async function fetchEastMoneyNews(query: string) {
-    const response = await fetch("/api/eastmoney-proxy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.error || "东财资讯搜索失败");
-    }
-    return (data.items || []) as Array<Pick<Material, "title" | "body" | "source">>;
-  }
-
-  async function searchHotspot(tab: HotspotTabId = activeHotspotTab) {
-    setIsSearchingHotspot(true);
-    setHotspotSearchError(null);
-      setStatus("正在拉取热榜...");
-    try {
-      const queries = buildHotspotSearchQueries(tab, brief.topic, customHotspotQuery, businessLine);
-      const errors: string[] = [];
-      const batches: Awaited<ReturnType<typeof fetchEastMoneyNews>>[] = [];
-
-      for (const query of queries) {
-        try {
-          batches.push(await fetchEastMoneyNews(query));
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "东财资讯搜索失败";
-          errors.push(message);
-          batches.push([]);
-        }
-      }
-
-      let mergedItems = filterHotspotForBusinessLine(
-        dedupeHotspotMaterials(batches.flat()),
-        businessLine,
-        tab,
-      );
-      if (!mergedItems.length && errors.length === queries.length) {
-        throw new Error(errors[0] || "东财 MCP 资讯搜索失败，请检查 EASTMONEY_API_KEY");
-      }
-      if (!mergedItems.length) {
-        throw new Error("热榜结果质量过低（多为日报聚合页），请换「财经热搜」分类或手动粘贴新闻");
-      }
-
-      const normalizedResults = mergedItems.filter((item) => item.title);
-
-      const next = mergeHotspotSearchCandidates(normalizedResults, materials);
-
-      setHotspotCandidates(next);
-      setMaterials((current) =>
-        current.map((item) => {
-          const refreshed = next.find((candidate) => findStoredHotspotMaterial([item], candidate));
-          if (refreshed?.body?.trim()) {
-            return { ...item, body: refreshed.body, tags: refreshed.tags || item.tags };
-          }
-          return item;
-        }),
-      );
-      setHotspotSearchError(null);
-      setStatus(
-        next.length > 0
-          ? `热榜 ${next.length} 条，勾选即可`
-          : "暂无匹配资讯，可换分类、用主题搜索或手动粘贴",
-      );
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "东财资讯搜索失败，可手动粘贴素材";
-      setHotspotCandidates([]);
-      setHotspotSearchError(message);
-      setStatus(message);
-    } finally {
-      setIsSearchingHotspot(false);
-    }
-  }
-
-  async function openHotspotPanel() {
-    const nextStatus = await refreshApiStatus();
-    if (!nextStatus.hotspot) {
-      setStatus("未检测到 EASTMONEY_API_KEY，请到妙想平台领取后写入 .env 并重启 dev");
-      return;
-    }
-    setHotspotPanelOpen(true);
-    void searchHotspot(activeHotspotTab);
-  }
-
-  function changeHotspotTab(tab: HotspotTabId) {
-    setHotspotPanelOpen(true);
-    setActiveHotspotTab(tab);
-    if (tab === "custom") {
-      setHotspotCandidates([]);
-      return;
-    }
-    void searchHotspot(tab);
-  }
-
-  function searchCustomHotspot() {
-    const query = customHotspotQuery.trim() || brief.topic.trim();
-    if (!query) {
-      setStatus("请输入搜索问句，或先填写主题");
-      return;
-    }
-    setHotspotPanelOpen(true);
-    setActiveHotspotTab("custom");
-    void searchHotspot("custom");
-  }
-
-  function editHotspotMaterials() {
-    setHotspotPanelOpen(true);
-    setView("workflow");
-    setStep(1);
-    if (hotspotCandidates.length === 0 && !isSearchingHotspot) {
-      void searchHotspot(activeHotspotTab);
-    }
-  }
-
-  function closeHotspotPanel() {
-    setHotspotPanelOpen(false);
-  }
-
-  function toggleHotspotCandidate(candidate: Material, selected: boolean) {
-    if (selected) {
-      setMaterials((current) => {
-        const stored = findStoredHotspotMaterial(current, candidate);
-        const selectedCount = getSelectedMaterials(current).length;
-        const nextItem: Material = {
-          ...candidate,
-          id: stored?.id || candidate.id,
-          selected: true,
-          isPrimary: selectedCount === 0 ? true : stored?.isPrimary,
-          createdAt: stored?.createdAt || candidate.createdAt || new Date().toISOString(),
-        };
-        if (stored) {
-          return current.map((item) => (item.id === stored.id ? nextItem : item));
-        }
-        return [nextItem, ...current].slice(0, 12);
-      });
-      setHotspotCandidates((current) =>
-        current.map((item) => (item.id === candidate.id ? { ...item, selected: true } : item)),
-      );
-      setStatus(`已选用：${candidate.title.slice(0, 24)}…`);
-      return;
-    }
-
-    setMaterials((current) => {
-      const stored = findStoredHotspotMaterial(current, candidate);
-      if (!stored) return current;
-      const remaining = current.filter((item) => item.id !== stored.id);
-      const stillSelected = getSelectedMaterials(remaining);
-      if (stillSelected.length === 1 && !stillSelected[0]?.isPrimary) {
-        return remaining.map((item) =>
-          item.id === stillSelected[0].id ? { ...item, isPrimary: true } : item,
-        );
-      }
-      return remaining;
-    });
-    setHotspotCandidates((current) =>
-      current.map((item) => (item.id === candidate.id ? { ...item, selected: false } : item)),
+    const staleScene = Boolean(
+      brief.creationScene && !workflowConfig.creationScenes.some((item) => item.id === brief.creationScene),
     );
-    setStatus("已取消选用该热点");
-  }
-
-  function setPrimaryMaterial(id: string) {
-    setMaterials((current) =>
-      current.map((item) => ({
-        ...item,
-        isPrimary: item.id === id,
-      })),
+    const stalePersona = Boolean(
+      brief.personaId && !workflowConfig.personas.some((item) => item.id === brief.personaId),
     );
-  }
+    const staleOffer = Boolean(
+      !workflowConfig.hideOfferSelection &&
+      brief.offerId &&
+      !workflowConfig.offers.some((item) => item.id === brief.offerId && item.enabled),
+    );
+    if (!staleScene && !stalePersona && !staleOffer) return;
 
-  function removeMaterial(id: string) {
-    setMaterials((current) => current.filter((item) => item.id !== id));
-  }
+    setBrief((current) => ({
+      ...current,
+      creationScene: staleScene ? undefined : current.creationScene,
+      personaId: stalePersona ? undefined : current.personaId,
+      personaVariant: stalePersona ? undefined : current.personaVariant,
+      offerId: staleOffer ? undefined : current.offerId,
+      selectedFeatureIds: staleScene ? [] : current.selectedFeatureIds,
+      selectedFeatureNames: staleScene ? [] : current.selectedFeatureNames,
+    }));
+    setConfirmedBrief(null);
+    setAngles([]);
+    setSelectedAngleIds([]);
+    setConfirmedAngles([]);
+    setResults([]);
+    setConfirmedContentId("");
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
+    setAnglesGeneratedForKey(null);
+    setStatus("已清理不再适用的旧版场景、人设或 Offer，请重新选择要素");
+  }, [
+    brief.creationScene,
+    brief.offerId,
+    brief.personaId,
+    brief.selectedFeatureIds,
+    brief.selectedFeatureNames,
+    setAngles,
+    setAnglesGeneratedForKey,
+    setBrief,
+    setConfirmedAngles,
+    setConfirmedBrief,
+    setConfirmedContentId,
+    setConfirmedImageContentId,
+    setResults,
+    setReviewConfirmed,
+    setSelectedAngleIds,
+    setStatus,
+    workflowConfig,
+  ]);
 
-  function deselectHotspotMaterial(material: Material) {
-    if (material.source === "手动输入") {
-      removeMaterial(material.id);
-      setStatus("已移除粘贴素材");
-      return;
+  useEffect(() => {
+    if (!knowledge) return;
+    const names = brief.selectedFeatureIds
+      .map((id) => knowledge.features.find((feature) => feature.id === id)?.name)
+      .filter(Boolean) as string[];
+    if (names.join("|") !== brief.selectedFeatureNames.join("|")) {
+      setBrief((current) => ({ ...current, selectedFeatureNames: names }));
     }
+  }, [brief.selectedFeatureIds, brief.selectedFeatureNames, knowledge, setBrief]);
 
-    const candidate = hotspotCandidates.find((item) => {
-      const stored = findStoredHotspotMaterial(materials, item);
-      return stored?.id === material.id || item.id === material.id;
-    });
+  useEffect(() => {
+    if (step !== 1) return;
+    let cancelled = false;
+    void fetchApiStatus().then((data) => {
+      if (!cancelled) setApiStatus(data);
+    }).catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [setApiStatus, step]);
 
-    if (candidate) {
-      toggleHotspotCandidate(candidate, false);
-      return;
-    }
-
-    removeMaterial(material.id);
-    setStatus("已取消选用该热点");
+  function invalidateAfterBrief() {
+    setConfirmedBrief(null);
+    setAngles([]);
+    setSelectedAngleIds([]);
+    setConfirmedAngles([]);
+    setResults([]);
+    setActiveResultId("");
+    setConfirmedContentId("");
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
+    setAnglesGeneratedForKey(null);
   }
 
-  function clearHotspotSelection() {
-    const selected = getSelectedMaterials(materials);
-    if (!selected.length) return;
-
-    const selectedIds = new Set(selected.map((item) => item.id));
-    setMaterials((current) => current.filter((item) => !selectedIds.has(item.id)));
-    setHotspotCandidates((current) => current.map((item) => ({ ...item, selected: false })));
-    setStatus("已清空选用");
-  }
-
-  async function buildPrompt(action: string, input: Record<string, unknown>) {
-    const response = await fetch("/api/prompt-engine", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, input }),
+  function updateBrief(patch: Partial<BriefInput> | ((current: BriefInput) => BriefInput)) {
+    setBrief((current) => {
+      const next = typeof patch === "function" ? patch(current) : { ...current, ...patch };
+      return {
+        ...next,
+        generateCount: 6,
+      };
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Prompt Engine 失败");
-    return data as { system: string; user: string };
-  }
-
-  async function callTextModel(prompt: { system: string; user: string }, options: { temperature?: number; maxTokens?: number } = {}) {
-    const response = await fetch("/api/llm-proxy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: [
-          { role: "system", content: prompt.system },
-          { role: "user", content: prompt.user },
-        ],
-        temperature: options.temperature ?? 0.7,
-        maxTokens: options.maxTokens ?? 4096,
-      }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "文字生成失败");
-    return data.choices?.[0]?.message?.content || "";
+    invalidateAfterBrief();
   }
 
   async function generateAngles() {
-    const configKey = anglesConfigKey;
-    const avoidRecentAngles = resolveRecentAnglesForConfig(configKey, anglesGeneratedForKey, angles);
+    const missing = getMissingBriefSelections(brief, workflowConfig);
+    if (missing.length > 0) {
+      setStatus(`还没有完成选择：请补充${missing.join("、")}后再生成创意角度`);
+      return;
+    }
+    const generationBrief: BriefInput = {
+      ...brief,
+      topic: brief.topic.trim() || buildSuggestedTopic(brief, workflowConfig),
+      materials: brief.materials || [],
+      generateCount: 6,
+    };
+    const generationConfigKey = buildAnglesConfigFingerprint(generationBrief, generationBrief.materials);
+    setConfirmedBrief(generationBrief);
     setIsGeneratingAngles(true);
-    setStatus(
-      avoidRecentAngles.length > 0
-        ? "正在刷新创意角度，并避开上一批相似表达..."
-        : getAnglesStatusMessage(businessLine),
-    );
+    setStatus(angles.length > 0 ? "正在刷新 6 个创意角度…" : getAnglesStatusMessage(businessLine));
     setAngles([]);
     setSelectedAngleIds([]);
-    setAnglesGeneratedForKey(null);
+    setConfirmedAngles([]);
+    setResults([]);
+    setConfirmedContentId("");
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
     try {
       if (!apiStatus.ready) throw new Error(LLM_NOT_CONFIGURED);
-      const input = {
-        ...brief,
-        materials: promptMaterials,
-        hotspotLinked,
-        workflowConfig,
-        avoidRecentAngles,
-        diversitySeed: uid("angle_batch"),
-      };
-      const prompt = await buildPrompt("creativeAngles", input);
-      const hasHotspotMaterials = hotspotLinked && promptMaterials.some((item) => item.source !== "手动输入");
-      const raw = await callTextModel(prompt, {
-        temperature: avoidRecentAngles.length > 0 ? 0.75 : hasHotspotMaterials ? 0.58 : 0.45,
+      const recentCoords = getRecentCoordsForConfig(storageKeys.angleHistory, generationConfigKey);
+      const batchSeed = uid("angle_batch");
+      const angleCoordinates = sampleAngleCoordinates({
+        count: 6,
+        recentCoords,
+        seed: batchSeed,
+        axes: matrixAngleAxes(generationBrief.embedLevel),
+      });
+      const prompt = await buildPromptApi("creativeAngles", {
+        ...generationBrief,
+        hotspotLinked: hasSelectedHotspotMaterials(generationBrief),
+        creationMode: "matrix",
+        workflowContext: matrixWorkflowContext("elements", generationConfigKey),
+        generateCount: 6,
+        materials: generationBrief.materials || [],
+        diversitySeed: batchSeed,
+        angleCoordinates,
+      });
+      const raw = await generateTextApi(prompt, {
+        temperature: 0.95,
+        topP: 0.92,
+        frequencyPenalty: 0.6,
+        presencePenalty: 0.4,
+        seed: Math.floor(Math.random() * 2_147_483_647),
         maxTokens: 8192,
       });
-      const normalized = normalizeAngles(parseLLMJson(raw), brief);
+      const normalized = normalizeAngles(parseLLMJson(raw), generationBrief);
+      if (normalized.length !== 6) throw new Error(`模型返回 ${normalized.length} 个角度，未达到固定数量 6，请刷新重试`);
       setAngles(normalized);
-      setSelectedAngleIds([]);
-      setAnglesGeneratedForKey(configKey);
-      writeAngleHistory(configKey, normalized);
-      setStatus(`已生成 ${normalized.length} 个创意角度，请勾选要写成正文的角度（可点全选）`);
+      setAnglesGeneratedForKey(generationConfigKey);
+      appendCoordHistory(storageKeys.angleHistory, generationConfigKey, angleCoordinates);
+      setStatus("已生成 6 个创意角度，请勾选需要用于内容生成的角度");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "创意角度生成失败");
     } finally {
@@ -630,431 +411,373 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     }
   }
 
+  function changeSelectedAngles(ids: string[]) {
+    const selected = angles.filter((angle) => ids.includes(angle.angleId));
+    setSelectedAngleIds(ids);
+    setConfirmedAngles(selected);
+    setResults([]);
+    setActiveResultId("");
+    setConfirmedContentId("");
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
+    setStatus(selected.length > 0 ? `已选择 ${selected.length} 个创意角度，选择已自动生效` : "请选择至少一个创意角度");
+  }
+
   async function generateContent() {
+    if (!confirmedBrief || !confirmedAngles.length) {
+      setStatus("请先选择至少一个创意角度");
+      return;
+    }
     if (!apiStatus.ready) {
       setStatus(LLM_NOT_CONFIGURED);
       return;
     }
-    if (angles.length === 0) {
-      setStatus("请先在上方生成创意角度");
-      return;
-    }
-    if (!selectedAngles.length) {
-      setStatus("请至少勾选一个创意角度（点击下方角度卡片左侧复选框）");
-      return;
-    }
     setIsGeneratingContent(true);
-    setStatus("正在生成正文并完成合规审查...");
+    setStatus("正在生成正文并完成合规审查…");
     try {
       const nextResults: GeneratedContent[] = [];
-      const failedAngles: string[] = [];
-      const isVideo = (brief.generationMode || "image-text") === "video-script";
-      const needsProductEmbed = requiresStrictProductHierarchy(brief.embedLevel);
-      const maxAttempts = isVideo ? 3 : needsProductEmbed ? 3 : 2;
-
-      for (let angleIndex = 0; angleIndex < selectedAngles.length; angleIndex++) {
-        const angle = selectedAngles[angleIndex];
-        const ordinal = angleIndex + 1;
-        const total = selectedAngles.length;
-
-        try {
-          setStatus(`正在生成第 ${ordinal}/${total} 条：「${angle.angleName}」…`);
-
-          const contentAction = resolveContentPromptAction(brief);
-          let content: GeneratedContent | null = null;
-          let lastError = "";
-          let lastMissingFeatures: string[] = [];
-          const briefSlice = resolveBriefPromptSlice({ ...brief }, workflowConfig);
-
-          for (let attempt = 0; attempt < maxAttempts; attempt++) {
-            const retryHint =
-              attempt > 0
-                ? isVideo
-                  ? "\n\n【重试 · 上次只有镜头时长占位、没有口播原文】本次 storyboard 每镜 voiceover 和 visual 必填，每镜口播≥12字，content 写完整分镜稿。"
-                  : needsProductEmbed
-                    ? `\n\n【重试 · high 强硬植入不合规】层级：${briefSlice.brandName}(平台) → ${briefSlice.offerLabel}(主推产品) → 子功能。${
-                        lastMissingFeatures.length
-                          ? `须补充子功能：${lastMissingFeatures.join("、")}，且必须写在${briefSlice.offerLabel}的语境里。`
-                          : ""
-                      }正文须同时体现平台、主推产品「${briefSlice.offerLabel}」，禁止只写子功能。`
-                    : lastError === "模型返回的 JSON 格式有误"
-                      ? "\n\n【重试 · 上次 JSON 非法】只输出合法 JSON：不要用 Markdown 代码块；字符串里的换行写成 \\n，双引号写成 \\\"；确保括号配对完整。"
-                      : ""
-                : "";
-            const contentPrompt = await buildPrompt(contentAction, {
-              ...brief,
-              materials: promptMaterials,
-              hotspotLinked,
-              workflowConfig,
-              selectedAngle: angle,
-              templateId: angle.recommendedTemplateId,
-              selectedFeatureIds:
-                normalizeEmbedLevel(brief.embedLevel) === "none"
-                  ? []
-                  : [...new Set([...(brief.selectedFeatureIds || []), ...(angle.recommendedFeatureIds || [])])],
-            });
-            const rawContent = await callTextModel(
-              { system: contentPrompt.system, user: contentPrompt.user + retryHint },
-              {
-                maxTokens: isVideo ? 12288 : 8192,
-                temperature: isVideo ? (attempt > 0 ? 0.72 : 0.62) : attempt > 0 ? 0.78 : 0.72,
-              },
-            );
-            let parsed: Record<string, unknown>;
-            try {
-              parsed = parseLLMJson<Record<string, unknown>>(rawContent);
-            } catch {
-              lastError = "模型返回的 JSON 格式有误（可能输出被截断）";
-              if (attempt < maxAttempts - 1) {
-                setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」JSON 解析失败，正在重试…`);
-              }
-              continue;
-            }
-            const candidate = normalizeContent(parsed, angle, { generationMode: brief.generationMode });
-            if (isVideo) {
-              const videoCheck = validateVideoScriptPayload(candidate.content, parsed);
-              if (!videoCheck.ok) {
-                lastError = videoCheck.reason || "视频脚本不完整";
-                if (attempt < maxAttempts - 1) {
-                  setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」${lastError}，正在重试…`);
-                }
-                continue;
-              }
-            }
-            const bodyCheck = validateGeneratedBody(candidate.content, brief.businessLine, brief.generationMode);
-            if (!bodyCheck.ok) {
-              lastError = bodyCheck.reason || "质检未通过";
-              if (isVideo && attempt < maxAttempts - 1) {
-                setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」${lastError}，正在重试…`);
-              }
-              continue;
-            }
-            const embedCheck = assessBriefProductIntegration(candidate.content, brief.embedLevel, briefSlice);
-            if (!embedCheck.ok) {
-              lastError = embedCheck.reason || "植入质检未通过";
-              lastMissingFeatures = embedCheck.missingFeatures;
-              if (needsProductEmbed) {
-                setStatus(`第 ${ordinal}/${total} 条「${angle.angleName}」${lastError}，正在重试…`);
-              }
-              continue;
-            }
-            if (!candidate.content.trim()) {
-              lastError = "正文为空";
-              continue;
-            }
-            content = candidate;
-            break;
-          }
-
-          if (!content) {
-            failedAngles.push(`「${angle.angleName}」${lastError || "生成失败"}`);
-            continue;
-          }
-
-          const isImageText = !isVideo;
-          if (isImageText && shouldRequestCoverSuggestions(content.imagePromptSuggestions)) {
-            setStatus(`第 ${ordinal}/${total} 条：正在为「${angle.angleName}」生成封面 Prompt…`);
-            const coverPrompt = await buildPrompt("coverSuggestions", {
-              ...brief,
-              materials: promptMaterials,
-              hotspotLinked,
-              selectedAngle: angle,
-              generatedContent: content,
-              templateId: angle.recommendedTemplateId,
-              selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
-            });
-            const rawCover = await callTextModel(coverPrompt, { temperature: 0.45, maxTokens: 4096 });
-            let coverPayload: unknown;
-            try {
-              coverPayload = parseLLMJson(rawCover);
-            } catch {
-              coverPayload = undefined;
-            }
-            content = {
-              ...content,
-              imagePromptSuggestions: finalizeImagePromptSuggestions(content, angle, coverPayload),
-            };
-          }
-
-          setStatus(`第 ${ordinal}/${total} 条：正在为「${angle.angleName}」完成合规审查…`);
-          const defaultCompliance = buildDefaultCompliance(content, { generationMode: brief.generationMode });
-          try {
-            const compliancePrompt = await buildPrompt("complianceReview", {
-              ...brief,
-              generatedContent: content,
-              selectedFeatureIds: [...new Set([...brief.selectedFeatureIds, ...angle.recommendedFeatureIds])],
-            });
-            const rawCompliance = await callTextModel(compliancePrompt, { temperature: 0.2, maxTokens: 4096 });
-            content.complianceReport = normalizeCompliance(parseLLMJson(rawCompliance), defaultCompliance);
-          } catch {
-            content.complianceReport = defaultCompliance;
-          }
-
-          nextResults.push(content);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : "未知错误";
-          failedAngles.push(`「${angle.angleName}」${message}`);
-          console.error(`[generateContent] angle ${angle.angleId}`, error);
+      const contentBrief: BriefInput = {
+        ...confirmedBrief,
+        generationMode: brief.generationMode,
+        contentLength: brief.contentLength,
+        materials: confirmedBrief.materials || [],
+      };
+      for (const angle of confirmedAngles) {
+        const selectedFeatureIds = contentBrief.embedLevel === "none"
+          ? []
+          : [...new Set([...contentBrief.selectedFeatureIds, ...angle.recommendedFeatureIds])];
+        const contentAction = contentBrief.personaId ? "personaContent" : "contentGeneration";
+        const contentPrompt = await buildPromptApi(contentAction, {
+          ...contentBrief,
+          hotspotLinked: hasSelectedHotspotMaterials(contentBrief),
+          creationMode: "matrix",
+          workflowContext: matrixWorkflowContext("angles", confirmedAngles.map((item) => item.angleId).join("|")),
+          selectedAngle: angle,
+          templateId: angle.recommendedTemplateId,
+          selectedFeatureIds,
+        });
+        const rawContent = await generateTextApi(contentPrompt, { maxTokens: 8192 });
+        const parsedContent = parseLLMJson<unknown>(rawContent);
+        let content = normalizeContent(parsedContent, angle, {
+          generationMode: contentBrief.generationMode,
+          tagContext: {
+            businessLine: contentBrief.businessLine,
+            offerId: contentBrief.offerId,
+            selectedFeatureIds,
+            audienceTag: contentBrief.audienceTag,
+            targetUser: contentBrief.targetUser,
+            embedLevel: contentBrief.embedLevel,
+          },
+        });
+        if (!content.content.trim()) {
+          const payloadKeys = parsedContent && typeof parsedContent === "object" && !Array.isArray(parsedContent)
+            ? Object.keys(parsedContent as Record<string, unknown>).slice(0, 12).join("、")
+            : "非对象响应";
+          throw new Error(`模型返回内容未包含可识别正文（顶层字段：${payloadKeys || "无"}），请重试`);
         }
+        const bodyCheck = validateGeneratedBody(content.content, contentBrief.businessLine, contentBrief.generationMode);
+        if (!bodyCheck.ok) throw new Error(`正文质检未通过：${bodyCheck.reason}`);
+
+        if (contentBrief.generationMode !== "video-script" && shouldRequestCoverSuggestions(content.imagePromptSuggestions)) {
+          const coverPrompt = await buildPromptApi("coverSuggestions", {
+            ...contentBrief,
+            hotspotLinked: hasSelectedHotspotMaterials(contentBrief),
+            creationMode: "matrix",
+            workflowContext: matrixWorkflowContext("angles", confirmedAngles.map((item) => item.angleId).join("|")),
+            selectedAngle: angle,
+            generatedContent: content,
+            templateId: angle.recommendedTemplateId,
+            selectedFeatureIds,
+          });
+          const rawCover = await generateTextApi(coverPrompt, { temperature: 0.45, maxTokens: 4096 });
+          content = {
+            ...content,
+            imagePromptSuggestions: finalizeImagePromptSuggestions(content, angle, parseLLMJson(rawCover)),
+          };
+        }
+
+        const compliancePrompt = await buildPromptApi("complianceReview", {
+          ...contentBrief,
+          hotspotLinked: hasSelectedHotspotMaterials(contentBrief),
+          creationMode: "matrix",
+          workflowContext: matrixWorkflowContext("angles", confirmedAngles.map((item) => item.angleId).join("|")),
+          generatedContent: content,
+          selectedFeatureIds,
+        });
+        const rawCompliance = await generateTextApi(compliancePrompt, { temperature: 0.2, maxTokens: 4096 });
+        content.complianceReport = normalizeCompliance(parseLLMJson(rawCompliance), buildDefaultCompliance(content));
+        nextResults.push(content);
       }
 
       setResults(nextResults);
-      setActiveResultId(nextResults[0]?.id || "");
-      setView("workflow");
-      setStep(3);
-
-      if (nextResults.length === selectedAngles.length) {
-        setStatus(`已生成 ${nextResults.length} 条${isVideo ? "视频脚本" : "内容"}`);
-      } else if (nextResults.length > 0) {
-        setStatus(
-          `已生成 ${nextResults.length}/${selectedAngles.length} 条；未成功 ${failedAngles.length} 条：${failedAngles.join("；")}`,
-        );
-      } else {
-        setStatus(
-          failedAngles.length
-            ? `全部角度生成失败：${failedAngles.join("；")}`
-            : "全部角度生成失败，请检查植入档位或换角度后重试",
-        );
-      }
+      const firstResultId = nextResults[0]?.id || "";
+      setActiveResultId(firstResultId);
+      setConfirmedContentId(firstResultId);
+      setConfirmedImageContentId(contentBrief.generationMode === "video-script" ? firstResultId : "");
+      setReviewConfirmed(false);
+      const entry: GenerationHistoryEntry = {
+        historyEntryId: uid("history"),
+        generatedAt: new Date().toISOString(),
+        businessLine,
+        generationSnapshot: contentBrief,
+        results: nextResults,
+      };
+      setHistory((current) => [entry, ...current].slice(0, 3));
+      setStatus(`已生成 ${nextResults.length} 篇正文，并自动保存到历史记录`);
     } catch (error) {
-      const message = error instanceof Error ? error.message : "内容生成失败";
-      setStatus(`内容生成失败：${message}`);
-      console.error("[generateContent]", error);
+      setStatus(error instanceof Error ? error.message : "正文生成失败");
     } finally {
       setIsGeneratingContent(false);
     }
   }
 
-  function saveActiveDraft() {
-    if (!activeResult) return;
-    const draft: Draft = {
-      ...activeResult,
-      savedAt: new Date().toISOString(),
-      draftEntryId: uid("draft"),
-      generationSnapshot: { ...brief, materials: promptMaterials },
-    };
-    setDrafts((current) => [draft, ...current].slice(0, 30));
-    setView("drafts");
-    setStatus("已保存到草稿箱");
+  function changeContentLength(contentLength: BriefInput["contentLength"]) {
+    setBrief((current) => ({ ...current, contentLength }));
+    setResults([]);
+    setActiveResultId("");
+    setConfirmedContentId("");
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
+  }
+
+  function changeGenerationMode(generationMode: BriefInput["generationMode"]) {
+    setBrief((current) => ({
+      ...current,
+      generationMode,
+      contentLength: generationMode === "video-script" ? "30s" : "200-500",
+    }));
+    setResults([]);
+    setActiveResultId("");
+    setConfirmedContentId("");
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
+  }
+
+  function changeActiveResult(id: string) {
+    setActiveResultId(id);
+    setConfirmedContentId(id);
+    setConfirmedImageContentId(brief.generationMode === "video-script" ? id : "");
+    setReviewConfirmed(false);
   }
 
   function updateResultImage(contentId: string, image: GeneratedImage) {
-    setResults((current) =>
-      current.map((item) => {
-        if (item.id !== contentId) return item;
-        const targetIndex = image.imageIndex ?? image.promptIndex;
-        const rest = (item.generatedImages || []).filter((entry) => {
-          const entryIndex = entry.imageIndex ?? entry.promptIndex;
-          return entryIndex !== targetIndex;
-        });
-        return { ...item, generatedImages: [...rest, image] };
-      }),
-    );
+    setResults((current) => current.map((item) => {
+      if (item.id !== contentId) return item;
+      const targetIndex = image.imageIndex ?? image.promptIndex;
+      const rest = (item.generatedImages || []).filter(
+        (entry) => (entry.imageIndex ?? entry.promptIndex) !== targetIndex,
+      );
+      return { ...item, generatedImages: [...rest, image] };
+    }));
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
   }
 
   function updateResultVisualPlan(contentId: string, plan: VisualPlan | undefined) {
-    setResults((current) =>
-      current.map((item) => (item.id === contentId ? { ...item, visualPlan: plan } : item)),
-    );
+    setResults((current) => current.map((item) => item.id === contentId ? { ...item, visualPlan: plan } : item));
+    setConfirmedImageContentId("");
+    setReviewConfirmed(false);
   }
 
-  function deleteDraft(draftEntryId: string) {
-    setDrafts((current) => current.filter((item) => (item.draftEntryId || `${item.id}_${item.savedAt}`) !== draftEntryId));
-    setStatus("草稿已删除");
+  function confirmImages() {
+    if (!confirmedContent || !canConfirmImages) return;
+    setConfirmedImageContentId(confirmedContent.id);
+    setReviewConfirmed(false);
+    setStatus(`已确认 ${confirmedContent.generatedImages?.length || 0} 张图片`);
   }
 
-  function goToWorkflowStep(nextStep: number) {
-    setView("workflow");
-    if (nextStep === 1 || nextStep <= step || (nextStep === 2 && angles.length > 0) || (nextStep === 3 && results.length > 0)) {
-      setStep(nextStep);
-      if (nextStep === 1 && getSelectedMaterials(materials).length > 0) {
-        setHotspotPanelOpen(true);
-      }
-    }
+  function saveActiveDraft() {
+    const draftContent = confirmedImageContent || activeResult;
+    if (!draftContent || !confirmedBrief) return;
+    const draft: Draft = {
+      ...draftContent,
+      savedAt: new Date().toISOString(),
+      draftEntryId: uid("draft"),
+      generationSnapshot: { ...confirmedBrief, contentLength: brief.contentLength },
+    };
+    setDrafts((current) => [draft, ...current].slice(0, 30));
+    setStatus("已保存到左侧工具栏的草稿箱");
+  }
+
+  function goToStep(target: number) {
+    setStep(target);
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 flex-1">
-          <WorkflowStepper
-            steps={WORKFLOW_STEPS}
-            current={step}
-            onStepClick={goToWorkflowStep}
-            canClickStep={(targetStep) =>
-              targetStep === 1 || (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
-            }
-            isStepComplete={(targetStep) =>
-              (targetStep === 2 && angles.length > 0) || (targetStep === 3 && results.length > 0)
-            }
-          />
-        </div>
-        <button
-          type="button"
-          onClick={() => setView((current) => (current === "drafts" ? "workflow" : "drafts"))}
-          className={cn(
-            "inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
-            view === "drafts"
-              ? "border-primary/50 bg-primary/10 text-primary"
-              : "border-border/80 bg-card/40 text-muted-foreground hover:border-primary/30 hover:text-foreground",
-          )}
-        >
-          <Archive className="h-4 w-4" />
-          <span>草稿箱</span>
-          {drafts.length > 0 ? (
-            <Badge variant={view === "drafts" ? "default" : "secondary"} className="h-5 min-w-5 justify-center px-1.5 text-[10px]">
-              {drafts.length}
-            </Badge>
-          ) : null}
-        </button>
-      </div>
+      <WorkflowStepper
+        steps={CREATION_WORKFLOW_STEPS}
+        current={step === 4 ? 3 : step}
+        onStepClick={goToStep}
+        canClickStep={() => true}
+        isStepComplete={(target) => {
+          if (target === 1) return missingBriefSelections.length === 0;
+          if (target === 2) return confirmedAngles.length > 0;
+          if (target === 3) return Boolean(confirmedContentId);
+          if (target === 5) return reviewConfirmed;
+          return false;
+        }}
+      />
 
-      {!apiStatus.ready ? (
+      {apiStatusResolved && !apiStatus.ready ? (
         <div className="flex items-start gap-3 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
           <div>
             <p className="font-medium text-destructive">LLM API 未配置</p>
-            <p className="mt-1 leading-6 text-muted-foreground">
-              请在项目根目录创建 <code className="text-foreground">.env</code>，填入{" "}
-              <code className="text-foreground">LLM_API_KEY</code> 后重启开发服务器。可参考{" "}
-              <code className="text-foreground">.env.example</code>。
-            </p>
+            <p className="mt-1 leading-6 text-muted-foreground">请在项目根目录的 .env 中配置 LLM_API_KEY 后重启服务。</p>
           </div>
         </div>
       ) : null}
 
-      {status ? (
-        <div className="rounded-lg border border-border/70 bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">
-          {status}
-        </div>
+      {status ? <div className="rounded-lg border border-border/70 bg-muted/30 px-4 py-2.5 text-sm text-muted-foreground">{status}</div> : null}
+
+      {step === 1 ? (
+        <WorkflowStageShell
+          title="要素配置"
+          description="选定产品、功能、场景、读者、人设与产品出现方式。系统会自动整理创作任务。"
+          showConfirm={false}
+          nextRequiresConfirmation={false}
+          onNext={() => setStep(2)}
+        >
+          <BriefPanel brief={brief} offerFeatures={offerFeatures} workflowConfig={workflowConfig} onBriefChange={updateBrief} />
+        </WorkflowStageShell>
       ) : null}
 
-      <div className="min-w-0 space-y-6">
-        {view === "drafts" ? (
-          <DraftBoxPanel drafts={drafts} onDeleteDraft={deleteDraft} onBackToWorkflow={() => setView("workflow")} />
-        ) : null}
-
-        {view === "workflow" && step === 1 && (
-          <BriefPanel
-            brief={brief}
-            materials={materials}
-            materialDraft={materialDraft}
-            offerFeatures={offerFeatures}
-            workflowConfig={workflowConfig}
-            hotspotPanelOpen={hotspotPanelOpen}
-            activeHotspotTab={activeHotspotTab}
-            customHotspotQuery={customHotspotQuery}
-            hotspotCandidates={hotspotCandidates}
-            isSearchingHotspot={isSearchingHotspot}
-            hotspotSearchError={hotspotSearchError}
-            canContinue={canContinueFromBrief}
-            topicExample={suggestedTopic}
-            onBriefChange={(patch) => {
-              if (typeof patch === "function") setBrief((c) => patch(c));
-              else updateBrief(patch);
-            }}
-            onMaterialDraftChange={setMaterialDraft}
-            onMaterialDraftCommit={commitMaterialDraft}
-            onCustomHotspotQueryChange={setCustomHotspotQuery}
-            onCustomHotspotSearch={searchCustomHotspot}
-            onSearchHotspot={openHotspotPanel}
-            onHotspotTabChange={changeHotspotTab}
-            onToggleCandidate={toggleHotspotCandidate}
-            onSetPrimaryMaterial={setPrimaryMaterial}
-            onRemoveMaterial={removeMaterial}
-            onDeselectHotspot={deselectHotspotMaterial}
-            onClearHotspotSelection={clearHotspotSelection}
-            onEditHotspotMaterials={editHotspotMaterials}
-            onCloseHotspotPanel={closeHotspotPanel}
-            onContinue={() => {
-              if (!canContinueFromBrief) {
-                const needsSceneHotspot = sceneRequiresHotspotMaterials(brief.creationScene, workflowConfig);
-                setStatus(
-                  needsSceneHotspot
-                    ? "市场热点解读需先选择至少 1 条热点素材"
-                    : brief.personaId === "hotspot_observer"
-                      ? "市场观察员需先选择至少 1 条热点素材"
-                      : "请先选择至少 1 条热点素材",
-                );
-                return;
-              }
-              setView("workflow");
-              setStep(2);
-            }}
-          />
-        )}
-
-        {view === "workflow" && step === 2 && (
+      {step === 2 ? (
+        <WorkflowStageShell
+          title="创意角度"
+          description="默认生成 6 个角度。勾选一个或多个后立即生效，可直接进入正文生成。"
+          confirmed={confirmedAngles.length > 0}
+          showConfirm={false}
+          onPrevious={() => setStep(1)}
+          onNext={() => setStep(3)}
+        >
           <div className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-            <aside className="xl:sticky xl:top-4 xl:self-start">
-              <BriefSummaryCard
-                brief={brief}
-                materials={materials}
-                anglesSelected={selectedAngleIds.length}
-                anglesTotal={angles.length}
-                kbVersion={knowledge?.knowledgeBaseVersion}
-                workflowConfig={workflowConfig}
-              />
-            </aside>
+            <BriefSummaryCard
+              brief={confirmedBrief || brief}
+              anglesSelected={selectedAngleIds.length}
+              anglesTotal={angles.length}
+              kbVersion={knowledge?.knowledgeBaseVersion}
+              workflowConfig={workflowConfig}
+            />
             <AnglesPanel
-              brief={brief}
               angles={angles}
               selectedAngleIds={selectedAngleIds}
-              isGeneratingAngles={isGeneratingAngles}
-              isGeneratingContent={isGeneratingContent}
-              anglesUpToDate={anglesUpToDate}
-              hasGeneratedContent={results.length > 0}
-              apiReady={apiStatus.ready}
-              onBriefChange={updateBrief}
-              onBriefReplace={(updater) => setBrief(updater)}
-              onSelectedAngleIdsChange={setSelectedAngleIds}
-              onGenerateAngles={generateAngles}
-              onGenerateContent={generateContent}
-              onBackToConfig={editHotspotMaterials}
+              isGenerating={isGeneratingAngles}
+              onSelectedAngleIdsChange={changeSelectedAngles}
+              onGenerate={generateAngles}
             />
           </div>
-        )}
+        </WorkflowStageShell>
+      ) : null}
 
-        {view === "workflow" && step === 3 && (
-          <div className="space-y-5">
-            {results.length === 0 ? (
-              <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                暂无生成结果
-                <div className="mt-4">
-                  <Button variant="secondary" onClick={() => setStep(2)}>
-                    返回角度
-                  </Button>
-                </div>
-              </div>
-            ) : contentSubView === "studio" && activeResult && (brief.generationMode || "image-text") !== "video-script" ? (
-              <VisualPlanStudio
-                content={activeResult}
-                brief={brief}
-                imageApiReady={apiStatus.image}
-                imageModel={apiStatus.imageModel}
-                onBack={() => setContentSubView("result")}
-                onVisualPlanChange={updateResultVisualPlan}
-                onImageGenerated={updateResultImage}
-              />
-            ) : (
-              <ContentResultsPanel
-                results={results}
-                activeResultId={activeResult?.id || results[0]?.id || ""}
-                isVideoScript={(brief.generationMode || "image-text") === "video-script"}
-                imageApiReady={apiStatus.image}
-                imageModel={apiStatus.imageModel}
-                onActiveResultChange={setActiveResultId}
-                onEnterVisualStudio={(contentId) => {
-                  setActiveResultId(contentId);
-                  setContentSubView("studio");
-                }}
-                onSaveDraft={saveActiveDraft}
-                onBackToAngles={() => setStep(2)}
-              />
-            )}
+      {step === 3 ? (
+        <WorkflowStageShell
+          title="生成内容"
+          description="选择图文或视频脚本并生成内容。当前结果会自动生效，每次生成会保留到最近 3 次历史记录。"
+          confirmed={Boolean(confirmedContentId)}
+          showConfirm={false}
+          onPrevious={() => setStep(2)}
+          onNext={() => setStep(brief.generationMode === "video-script" ? 5 : 4)}
+        >
+          <div className="mb-5 flex flex-wrap items-end justify-between gap-4 rounded-xl border border-border/70 bg-muted/15 p-4">
+            <div className="w-full max-w-xs space-y-2">
+              <Label>内容形式</Label>
+              <Select value={brief.generationMode} onChange={(event) => changeGenerationMode(event.target.value as BriefInput["generationMode"])}>
+                <option value="image-text">图文内容</option>
+                <option value="video-script">视频脚本</option>
+              </Select>
+            </div>
+            <div className="w-full max-w-xs space-y-2">
+              <Label>{brief.generationMode === "video-script" ? "视频时长" : "图文篇幅"}</Label>
+              <Select value={brief.contentLength} onChange={(event) => changeContentLength(event.target.value as BriefInput["contentLength"])}>
+                {getContentLengthOptions(brief.generationMode).map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+              </Select>
+            </div>
+            <Button onClick={generateContent} disabled={isGeneratingContent || !apiStatus.ready || !confirmedAngles.length}>
+              {isGeneratingContent ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+              {isGeneratingContent ? "生成中…" : results.length ? "重新生成正文" : `生成正文（${confirmedAngles.length}）`}
+            </Button>
           </div>
-        )}
-      </div>
+          {results.length ? (
+            <ContentResultsPanel
+              results={results}
+              activeResultId={activeResult?.id || ""}
+              isVideoScript={brief.generationMode === "video-script"}
+              imageApiReady={apiStatus.image}
+              imageModel={apiStatus.imageModel}
+              onActiveResultChange={changeActiveResult}
+              onEnterVisualStudio={(contentId) => {
+                setActiveResultId(contentId);
+                setConfirmedContentId(contentId);
+                setStep(4);
+              }}
+              onSaveDraft={saveActiveDraft}
+              onBackToAngles={() => setStep(2)}
+            />
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/80 py-16 text-center text-sm text-muted-foreground">尚未生成正文</div>
+          )}
+        </WorkflowStageShell>
+      ) : null}
+
+      {step === 4 && brief.generationMode !== "video-script" ? (
+        <WorkflowStageShell
+          title="生成图片"
+          description="根据已确认的正文规划封面与内容图，完成生图后再确认。"
+          confirmed={Boolean(confirmedImageContentId)}
+          canConfirm={canConfirmImages}
+          onConfirm={confirmImages}
+          showConfirm={Boolean(confirmedContent)}
+          onPrevious={() => setStep(3)}
+          onNext={() => setStep(5)}
+        >
+          {confirmedContent ? (
+            <VisualPlanStudio
+              content={confirmedContent}
+              brief={{ ...(confirmedBrief || brief), contentLength: brief.contentLength }}
+              imageApiReady={apiStatus.image}
+              imageModel={apiStatus.imageModel}
+              workflowContext={matrixWorkflowContext("content", confirmedContent.id)}
+              onVisualPlanChange={updateResultVisualPlan}
+              onImageGenerated={updateResultImage}
+            />
+          ) : (
+            <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 px-5 text-center">
+              <p className="text-sm font-medium">尚未确认可用于制图的正文</p>
+              <p className="text-xs leading-5 text-muted-foreground">请返回“生成内容”选择正文后，再进入图片制作。</p>
+              <Button type="button" variant="outline" onClick={() => setStep(3)}>返回生成内容</Button>
+            </div>
+          )}
+        </WorkflowStageShell>
+      ) : null}
+
+      {step === 5 ? (
+        <WorkflowStageShell
+          title="预览审核"
+          description="统一预览正文、图片与合规结果。用户手动保存的版本会进入草稿箱。"
+          confirmed={reviewConfirmed}
+          canConfirm={Boolean(confirmedImageContent)}
+          confirmLabel="确认审核"
+          showConfirm={Boolean(confirmedImageContent)}
+          onConfirm={() => {
+            if (!confirmedImageContent) return;
+            setReviewConfirmed(true);
+            setStatus("预览审核已确认");
+          }}
+          onPrevious={() => setStep(brief.generationMode === "video-script" || !confirmedContent ? 3 : 4)}
+        >
+          {confirmedImageContent ? (
+            <ReviewPanel content={confirmedImageContent} onSaveDraft={saveActiveDraft} />
+          ) : (
+            <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 px-5 text-center">
+              <p className="text-sm font-medium">还没有可预览的内容</p>
+              <p className="text-xs leading-5 text-muted-foreground">你可以先浏览本页；完成创意角度和内容生成后，预览结果会显示在这里。</p>
+              <Button type="button" variant="outline" onClick={() => setStep(3)}>返回生成内容</Button>
+            </div>
+          )}
+        </WorkflowStageShell>
+      ) : null}
     </div>
   );
 }

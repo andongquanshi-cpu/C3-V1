@@ -69,7 +69,7 @@ export function collectAngleGenerationRetrievalTerms(materials: MaterialInput[] 
  */
 export function buildHotspotCoveragePlan(materials: MaterialInput[] | undefined, generateCount: number): string {
   const selected = resolvePromptMaterials({ materials });
-  const count = Math.min(5, Math.max(1, Math.round(generateCount) || 3));
+  const count = Math.min(6, Math.max(1, Math.round(generateCount) || 6));
   if (!selected.length) {
     return "无热点素材：各角度围绕「用户主题 + 人设 + 场景」展开。";
   }
@@ -161,7 +161,7 @@ export function formatBackgroundMaterialsForPrompt(materials: MaterialInput[] | 
 
 /** 场景创作模式：角度生成时不做热点槽位分配，强制围绕场景+主题 */
 export function buildSceneModeCoveragePlan(generateCount: number, hasBackground: boolean): string {
-  const count = Math.min(5, Math.max(1, Math.round(generateCount) || 3));
+  const count = Math.min(6, Math.max(1, Math.round(generateCount) || 6));
   const lines = [
     `当前为场景创作模式（非热点解读）：本次需生成 ${count} 个角度。`,
     "",

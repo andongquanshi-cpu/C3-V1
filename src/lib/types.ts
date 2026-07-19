@@ -12,12 +12,12 @@ export type TextContentLength = "under-200" | "200-500" | "500-1000" | "long-for
 export type VideoScriptDuration = "15s" | "30s" | "60s";
 export type ContentLength = TextContentLength | VideoScriptDuration;
 export type BloggerLevel = "tail" | "middle" | "head";
-export type EmbedLevel = "none" | "medium" | "high";
+export type EmbedLevel = "none" | "low" | "medium" | "high";
 export type RiskLevel = "low" | "medium" | "high";
 export type BusinessLine = "weisec" | "licaitong";
 
 /** 理财通 Offer（本期深化 fixed-income-plus） */
-export type LicaitongOfferId = "fixed-income-plus" | "lingqiantong" | "weizhitou";
+export type LicaitongOfferId = "fixed-income-plus";
 
 /** 理财通创作场景 */
 export type LicaitongCreationScene =
@@ -162,8 +162,25 @@ export interface VisualPlan {
   items: VisualPlanItem[];
 }
 
+export interface VideoScriptShot {
+  shotIndex: number;
+  durationSec: number;
+  visual: string;
+  voiceover: string;
+  onScreenText?: string;
+}
+
+export interface VideoScriptMeta {
+  titleType?: string;
+  hookType?: string;
+  bodyStructure?: string;
+  targetDuration?: string;
+  estimatedSpeechSeconds?: number;
+}
+
 export interface GeneratedContent {
   id: string;
+  generationMode?: GenerationMode;
   angleId: string;
   angleName: string;
   titleCandidates: Array<{ text: string; type?: string; riskLevel?: RiskLevel }>;
@@ -175,6 +192,14 @@ export interface GeneratedContent {
   tags: string[];
   interactionGuide: string;
   riskReminder: string;
+  scriptMeta?: VideoScriptMeta;
+  openingHook?: {
+    type?: string;
+    spokenLine?: string;
+    visualNote?: string;
+  };
+  storyboard?: VideoScriptShot[];
+  bgmSuggestion?: string;
   imagePromptSuggestions: Array<{
     style: string;
     prompt: string;
@@ -212,6 +237,15 @@ export interface Draft extends GeneratedContent {
   savedAt: string;
   draftEntryId?: string;
   generationSnapshot: BriefInput;
+}
+
+/** 矩阵创作一次正文生成的自动历史快照；草稿箱仅保留最近 3 次。 */
+export interface GenerationHistoryEntry {
+  historyEntryId: string;
+  generatedAt: string;
+  businessLine: BusinessLine;
+  generationSnapshot: BriefInput;
+  results: GeneratedContent[];
 }
 
 export interface ProductFeatureView {

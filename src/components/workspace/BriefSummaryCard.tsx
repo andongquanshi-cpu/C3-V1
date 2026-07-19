@@ -3,21 +3,18 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  getContentLengthOptions,
   getOffer,
   getScene,
   getWorkflowFallback,
   type BusinessLineWorkflowConfig,
 } from "@/lib/business-line-workflow";
 import { getBusinessLinePreset } from "@/lib/business-line";
-import { filterMaterialsForPrompt } from "@/lib/material-prompt-routing";
-import { getPrimaryMaterial, requiresHotspotMaterials } from "@/lib/hotspot-workflow";
+import { getEmbedLevelLabel } from "@/lib/embed-level";
 import { getWeisecPersonaDisplayLabel } from "@/lib/weisec-persona-ui";
-import type { BriefInput, Material } from "@/lib/types";
+import type { BriefInput } from "@/lib/types";
 
 interface BriefSummaryCardProps {
   brief: BriefInput;
-  materials: Material[];
   anglesSelected: number;
   anglesTotal: number;
   kbVersion?: string;
@@ -26,7 +23,6 @@ interface BriefSummaryCardProps {
 
 export function BriefSummaryCard({
   brief,
-  materials,
   anglesSelected,
   anglesTotal,
   kbVersion,
@@ -47,20 +43,11 @@ export function BriefSummaryCard({
           brief.audienceTag || cfg.defaultBrief.audienceTag,
         ) || persona?.label
       : persona?.label;
-  const lengthLabel =
-    getContentLengthOptions(brief.generationMode).find((item) => item.value === brief.contentLength)?.label || "-";
-  const hotspotLinked = requiresHotspotMaterials({
-    personaId: brief.personaId,
-    creationScene: brief.creationScene,
-    config: workflowConfig,
-  });
-  const selectedMaterials = filterMaterialsForPrompt(materials, hotspotLinked);
-  const primaryMaterial = hotspotLinked ? getPrimaryMaterial(materials) : selectedMaterials[0];
 
   return (
     <Card className="border-border/80 bg-card/80 backdrop-blur-sm">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base">当前 Brief</CardTitle>
+        <CardTitle className="text-base">当前创作要素</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="flex flex-wrap gap-1.5">
@@ -70,62 +57,35 @@ export function BriefSummaryCard({
         </div>
 
         <dl className="space-y-2.5">
-          {!cfg.hideOfferSelection && offer ? (
-            <div className="flex justify-between gap-3">
-              <dt className="shrink-0 text-muted-foreground">主推 Offer</dt>
-              <dd className="text-right font-medium">{offer.label}</dd>
-            </div>
-          ) : null}
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">创作场景</dt>
-            <dd className="text-right font-medium">{scene.label}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">目标读者</dt>
-            <dd className="font-medium">{brief.targetUser}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">博主人设</dt>
-            <dd className="text-right font-medium">{personaLabel || "-"}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">主推功能</dt>
-            <dd className="text-right font-medium">
-              {brief.selectedFeatureNames.join("、") || `${brief.selectedFeatureIds.length} 项`}
-            </dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">内容形式</dt>
-            <dd className="font-medium">{brief.generationMode === "video-script" ? "视频脚本" : "图文内容"}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">
-              {brief.generationMode === "video-script" ? "视频时长" : "文字篇幅"}
-            </dt>
-            <dd className="font-medium">{lengthLabel}</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">{hotspotLinked ? "已选素材" : "背景补充"}</dt>
-            <dd className="text-right font-medium">{selectedMaterials.length} 条</dd>
-          </div>
-          <div className="flex justify-between gap-3">
-            <dt className="shrink-0 text-muted-foreground">创意角度</dt>
-            <dd className="font-medium">{anglesTotal > 0 ? `${anglesSelected}/${anglesTotal}` : "待生成"}</dd>
-          </div>
+          {!cfg.hideOfferSelection && offer ? <SummaryRow label="主推 Offer" value={offer.label} /> : null}
+          <SummaryRow label="创作场景" value={brief.creationScene ? scene.label : "-"} />
+          <SummaryRow label="目标读者" value={brief.targetUser || "-"} />
+          <SummaryRow label="博主人设" value={personaLabel || "-"} />
+          <SummaryRow
+            label="主推功能"
+            value={brief.selectedFeatureNames.join("、") || `${brief.selectedFeatureIds.length} 项`}
+          />
+          <SummaryRow label="产品出现" value={getEmbedLevelLabel(brief.embedLevel)} />
+          <SummaryRow
+            label="创意角度"
+            value={anglesTotal > 0 ? `${anglesSelected}/${anglesTotal}` : "待生成"}
+          />
         </dl>
 
-        {primaryMaterial ? (
-          <div className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
-            <p className="mb-1 font-medium text-foreground/80">{hotspotLinked ? "主热点" : "背景补充"}</p>
-            {primaryMaterial.title}
-          </div>
-        ) : null}
-
         <div className="rounded-lg bg-muted/60 p-3 text-xs leading-5 text-muted-foreground">
-          <p className="mb-1 font-medium text-foreground/80">主题</p>
-          {brief.topic || "尚未填写主题"}
+          <p className="mb-1 font-medium text-foreground/80">系统创作任务</p>
+          {brief.topic || "将在点击生成时根据当前选择自动整理"}
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="text-right font-medium">{value}</dd>
+    </div>
   );
 }

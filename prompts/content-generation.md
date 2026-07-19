@@ -21,6 +21,12 @@
 选中内容模板：
 {{selectedTemplate}}
 
+小红书结构方法论（外部只补方法，不引用未核验数据）：
+{{xhsMethodology}}
+
+话题策略：
+{{tagStrategy}}
+
 Brief 已勾选的产品功能（仅写这些，勿额外编造；可为空则按 embed 档位决定是否提及）：
 {{selectedFeatures}}
 
@@ -54,7 +60,7 @@ Brief 已勾选的产品功能（仅写这些，勿额外编造；可为空则�
 6. 不得使用 forbiddenClaims、avoidExpressions、forbiddenPatterns 中的表达。
 7. 不得推荐具体股票、基金、代码、买卖点位、收益率或「机会」确定性表达。
 8. 必须包含风险提示。
-9. tags 必填 5-8 个小红书话题词（不带 #），与主题、标题、读者相关；不得省略或留空。
+9. tags 必填 8-10 个小红书话题词（不带 #），严格按上方“话题策略”分层；核心词必须与正文真实主线对应。非 none 植入必须包含 Offer/功能词和 2-3 个品牌直连词；不得省略、留空或堆砌无关热词。
 10. insertStrategy.whyNatural 必须解释「为什么在这个场景里提产品不突兀」（none/medium 若未提产品可写「本篇以纯内容价值为主」）；**high** insertStrength 填 high 且须覆盖全部 Brief 功能；**medium** 不强制命中功能，insertStrength 与 embed 档位一致。
 11. qualityScore：**high** 档位 productIntegration 低于 60 视为不达标；**none/medium** 以内容可读性为主，未写产品不应因此低分。
 12. 如果批量生成，每条内容必须绑定不同 angleId，且不得复用相同开头句、正文结构或互动引导。
@@ -97,7 +103,7 @@ Brief 已勾选的产品功能（仅写这些，勿额外编造；可为空则�
     "insertStrength": "none/medium/high",
     "whyNatural": ""
   },
-  "tags": ["必填，5-8个话题词，不带#"],
+  "tags": ["必填，8-10个强相关话题词，不带#"],
   "interactionGuide": "",
   "riskReminder": "市场有风险，投资需谨慎。",
   "imagePromptSuggestions": [

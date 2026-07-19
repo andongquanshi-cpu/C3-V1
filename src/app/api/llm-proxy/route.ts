@@ -17,6 +17,10 @@ export async function POST(request: Request) {
       temperature: body.temperature,
       maxTokens: body.maxTokens,
       responseFormat: body.responseFormat,
+      topP: body.topP,
+      frequencyPenalty: body.frequencyPenalty,
+      presencePenalty: body.presencePenalty,
+      seed: body.seed,
     });
     return NextResponse.json(data);
   } catch (error) {

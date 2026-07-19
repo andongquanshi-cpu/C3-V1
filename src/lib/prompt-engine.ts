@@ -39,6 +39,15 @@ import {
   resolveVideoScriptModules,
 } from "@/lib/video-script-routing";
 import { formatVideoRiskReminderGuide } from "@/lib/risk-reminder";
+import {
+  formatTagStrategyForPrompt,
+  formatXhsContentMethodologyForPrompt,
+} from "@/lib/viral-methodology";
+import {
+  ANGLE_AXES,
+  formatCoordinateForPrompt,
+  type AngleCoordinate,
+} from "@/lib/creative/angle-axes";
 
 type AnyRecord = Record<string, any>;
 
@@ -173,12 +182,21 @@ function buildPrompt(templateName: string, input: AnyRecord, taskName: string, v
 
 function clampGenerateCount(value: unknown) {
   const count = Number(value);
-  if (!Number.isFinite(count)) return 3;
-  return Math.min(5, Math.max(1, Math.round(count)));
+  if (!Number.isFinite(count)) return 6;
+  return Math.min(6, Math.max(1, Math.round(count)));
+}
+
+function buildDiversityAxisPlan(coords: AngleCoordinate[] | undefined, count: number): string {
+  if (!coords?.length) return "本次未提供结构化坐标，须自行保证角度间至少两个维度不同。";
+  return coords
+    .slice(0, count)
+    .map((coord, index) => `【角度 ${index + 1} 的创意坐标】\n${formatCoordinateForPrompt(coord, ANGLE_AXES)}`)
+    .join("\n\n");
 }
 
 export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
   const generateCount = clampGenerateCount(input.generateCount);
+  const diversityAxisPlan = buildDiversityAxisPlan(input.angleCoordinates, generateCount);
   const hotspotLinked =
     input.hotspotLinked !== undefined
       ? Boolean(input.hotspotLinked)
@@ -217,6 +235,7 @@ export function buildCreativeAnglesPrompt(input: AnyRecord = {}) {
     hotspotCoveragePlan,
     personaContext: buildCreativeAngleL4Context(data, knowledge.businessLine || data.businessLine || "weisec"),
     avoidRecentAngles: data.avoidRecentAngles || [],
+    diversityAxisPlan,
     diversitySeed: data.diversitySeed || "default",
     generateCount,
   }));
@@ -250,6 +269,12 @@ function buildVideoScriptVariables(data: AnyRecord, knowledge: AnyRecord) {
     selectedAngle: selectedAngle || "未提供，请基于主题生成一个保守安全的单一角度",
     selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
     viralMethodology: formatVideoScriptModulesForPrompt(modules, selectedAngle),
+    tagStrategy: formatTagStrategyForPrompt({
+      businessLine: knowledge.businessLine || data.businessLine,
+      offerId: data.offerId,
+      selectedFeatureIds: data.selectedFeatureIds,
+      embedLevel: data.embedLevel,
+    }),
     videoRiskReminderGuide: formatVideoRiskReminderGuide(
       knowledge.riskDisclaimers,
       String(
@@ -356,6 +381,13 @@ export function buildContentGenerationPrompt(input: AnyRecord = {}) {
     customRequirement: data.customRequirement || data.customPrompt || "无",
     selectedAngle: data.selectedAngle || data.angle || "未提供，请基于主题生成一个保守安全的单一角度",
     selectedTemplate: data.selectedTemplate || knowledge.selectedTemplates[0] || null,
+    xhsMethodology: formatXhsContentMethodologyForPrompt(),
+    tagStrategy: formatTagStrategyForPrompt({
+      businessLine: knowledge.businessLine || data.businessLine,
+      offerId: data.offerId,
+      selectedFeatureIds: data.selectedFeatureIds,
+      embedLevel: data.embedLevel,
+    }),
   }));
   return finalizePromptWithRuntimeLock(built, input);
 }
@@ -519,7 +551,12 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
   const personaUser = appendBriefLocks(
     `${personaPrompt.user}\n\n【Brief 业务配置 · 必须服从】\n${briefFields.briefBusinessContext}${
       sceneRules ? `\n\n${sceneRules}` : ""
-    }\n\n${runtimeLock}`,
+    }\n\n${formatXhsContentMethodologyForPrompt()}\n\n${formatTagStrategyForPrompt({
+      businessLine,
+      offerId: input.offerId,
+      selectedFeatureIds: input.selectedFeatureIds,
+      embedLevel: input.embedLevel,
+    })}\n\n${runtimeLock}`,
     input,
   );
   return {

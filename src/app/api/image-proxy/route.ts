@@ -57,6 +57,21 @@ export async function POST(request: Request) {
       role?: string;
     } = body || {};
 
+    const workflowContext = body?.workflowContext as {
+      mode?: string;
+      confirmed?: boolean;
+      confirmedStage?: string;
+      snapshotId?: string;
+    } | undefined;
+    if (
+      workflowContext?.mode === "matrix" &&
+      (workflowContext.confirmed !== true ||
+        workflowContext.confirmedStage !== "content" ||
+        !workflowContext.snapshotId?.trim())
+    ) {
+      return NextResponse.json({ error: "生图需要已确认的正文快照" }, { status: 400 });
+    }
+
     if (!prompt || !prompt.trim()) {
       return NextResponse.json({ error: "缺少 prompt 参数" }, { status: 400 });
     }

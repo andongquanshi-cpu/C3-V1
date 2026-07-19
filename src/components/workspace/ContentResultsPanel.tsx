@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { buildContentCopyText, copyTextToClipboard } from "@/lib/clipboard-utils";
 import { cn } from "@/lib/utils";
 import type { GeneratedContent } from "@/lib/types";
+import { VideoScriptTable } from "@/components/workspace/VideoScriptTable";
 
 interface ContentResultsPanelProps {
   results: GeneratedContent[];
@@ -186,7 +187,11 @@ export function ContentResultsPanel({
               </div>
 
               <div className="p-5 sm:p-6">
-                <pre className="whitespace-pre-wrap font-sans text-sm leading-7">{activeResult.content}</pre>
+                {isVideoScript ? (
+                  <VideoScriptTable content={activeResult} />
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans text-sm leading-7">{activeResult.content}</pre>
+                )}
                 {activeResult.riskReminder ? (
                   <p className="mt-5 border-t border-border/60 pt-4 text-xs leading-5 text-muted-foreground">
                     {activeResult.riskReminder}

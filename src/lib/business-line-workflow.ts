@@ -58,7 +58,6 @@ export interface BusinessLineWorkflowConfig {
   audiences: AudienceOption[];
   personas: PersonaOption[];
   defaultFeaturesByScene: Record<string, string[]>;
-  featureLimit: number;
   featureUiSummaries: Record<string, string>;
   primaryOfferId: string;
   featureSource: FeatureSource;
@@ -82,20 +81,6 @@ export const FALLBACK_LICAITONG_WORKFLOW: BusinessLineWorkflowConfig = {
       description: "本期主推。严选专区、体验金、长期专区、灵活申赎、AI 辅助等卖点。",
       enabled: true,
       badge: "本期主推",
-    },
-    {
-      id: "lingqiantong",
-      label: "零钱通",
-      description: "入口预留，知识库建设中。",
-      enabled: false,
-      badge: "敬请期待",
-    },
-    {
-      id: "weizhitou",
-      label: "微智投",
-      description: "入口预留，知识库建设中。",
-      enabled: false,
-      badge: "敬请期待",
     },
   ],
   creationScenes: [
@@ -171,7 +156,6 @@ export const FALLBACK_LICAITONG_WORKFLOW: BusinessLineWorkflowConfig = {
     "pain-story": ["fplus_curated_zone", "fplus_flexible_redeem"],
     "dry-goods-list": ["fplus_long_term_zone", "fplus_ai_assist"],
   },
-  featureLimit: 2,
   featureUiSummaries: {
     fplus_curated_zone: "严选专区，缩小固收+比较范围，不构成荐基。",
     fplus_virtual_trial: "虚拟理财金体验，熟悉流程；规则以活动页为准。",
@@ -278,7 +262,6 @@ export const FALLBACK_WEISEC_WORKFLOW: BusinessLineWorkflowConfig = {
     "life-story-seed": ["wzq_wechat_trading", "wzq_news_digest"],
     "market-hotspot": ["wzq_hot_rankings", "wzq_yuanbao_ai"],
   },
-  featureLimit: 2,
   featureUiSummaries: {
     wzq_wechat_alerts: "目标价/公告提醒直达微信，信息辅助，非买卖信号。",
     wzq_yuanbao_ai: "大白话解答术语与行情，整理公开信息，不构成投资建议。",
@@ -428,7 +411,7 @@ export function getDefaultFeatureIdsForScene(
   businessLine: BusinessLine = "licaitong",
 ): string[] {
   const cfg = resolveConfig(config, businessLine);
-  return (cfg.defaultFeaturesByScene[scene] || []).slice(0, cfg.featureLimit);
+  return [...(cfg.defaultFeaturesByScene[scene] || [])];
 }
 
 export function getPersonasForScene(

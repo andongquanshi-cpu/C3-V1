@@ -1,33 +1,40 @@
 "use client";
 
+import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export interface WorkflowStep {
-  id: number;
+export interface WorkflowStep<StepId extends string | number = number> {
+  id: StepId;
   label: string;
 }
 
-interface WorkflowStepperProps {
-  steps: WorkflowStep[];
-  current: number;
-  onStepClick?: (step: number) => void;
-  canClickStep?: (step: number) => boolean;
-  isStepComplete?: (step: number) => boolean;
+interface WorkflowStepperProps<StepId extends string | number> {
+  steps: readonly WorkflowStep<StepId>[];
+  current: StepId;
+  onStepClick?: (step: StepId) => void;
+  canClickStep?: (step: StepId) => boolean;
+  isStepComplete?: (step: StepId) => boolean;
 }
 
-export function WorkflowStepper({ steps, current, onStepClick, canClickStep, isStepComplete }: WorkflowStepperProps) {
+export function WorkflowStepper<StepId extends string | number>({
+  steps,
+  current,
+  onStepClick,
+  canClickStep,
+  isStepComplete,
+}: WorkflowStepperProps<StepId>) {
   return (
     <nav aria-label="创作流程" className="w-full">
       <ol className="flex items-start justify-center gap-0">
         {steps.map((step, index) => {
-          const done = current > step.id || Boolean(isStepComplete?.(step.id));
+          const done = Boolean(isStepComplete?.(step.id));
           const active = current === step.id;
-          const clickable = onStepClick && (done || active || canClickStep?.(step.id));
+          const clickable = Boolean(onStepClick && (canClickStep ? canClickStep(step.id) : true));
           const isLast = index === steps.length - 1;
 
           return (
-            <li key={step.id} className="flex flex-1 flex-col items-center last:flex-none">
-              <div className="flex w-full items-center">
+            <li key={step.id} className="flex min-w-0 flex-1 flex-col items-center">
+              <div className="workflow-step-track flex w-full items-center">
                 {index > 0 ? (
                   <div
                     aria-hidden
@@ -42,19 +49,21 @@ export function WorkflowStepper({ steps, current, onStepClick, canClickStep, isS
                   onClick={() => clickable && onStepClick?.(step.id)}
                   aria-current={active ? "step" : undefined}
                   className={cn(
-                    "relative shrink-0 rounded-full transition-all",
-                    clickable && "cursor-pointer hover:scale-110",
+                    "workflow-step-button relative shrink-0 rounded-full transition-all",
+                    clickable && "cursor-pointer hover:-translate-y-0.5",
                     !clickable && "cursor-default",
                   )}
                 >
                   <span
                     className={cn(
-                      "block rounded-full border-2 transition-all",
-                      active && "h-3 w-3 border-primary bg-primary shadow-[0_0_8px] shadow-primary/40",
-                      done && !active && "h-2.5 w-2.5 border-primary bg-primary/30",
-                      !active && !done && "h-2.5 w-2.5 border-muted-foreground/40 bg-transparent",
+                      "flex h-8 w-8 items-center justify-center rounded-full border text-[11px] font-bold transition-all",
+                      active && "border-primary bg-primary text-primary-foreground shadow-[0_8px_20px] shadow-primary/25",
+                      done && !active && "border-primary/30 bg-primary/10 text-primary",
+                      !active && !done && "border-border bg-background/45 text-muted-foreground/60",
                     )}
-                  />
+                  >
+                    {done && !active ? <Check className="h-3.5 w-3.5" /> : index + 1}
+                  </span>
                 </button>
                 {!isLast ? (
                   <div
