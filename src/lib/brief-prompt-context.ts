@@ -42,28 +42,42 @@ function formatProductHierarchyBlock(slice: BriefPromptSlice, embed: EmbedLevel)
   if (embed === "none") return "";
   if (!hasProductHierarchy(slice)) return "";
 
-  const subFeatures = slice.briefFeatureNames.map((name) => `        ├── ${name}（${slice.offerLabel} 的子功能）`).join("\n");
+  const subFeatures = slice.briefFeatureNames
+    .map((name) => `        ├── ${name}（${slice.offerLabel} 下的子功能/入口，不是独立产品）`)
+    .join("\n");
+
+  const isFixedIncomePlus =
+    slice.offerLabel.includes("固收") ||
+    slice.briefFeatureNames.some((name) => /严选|体验金|长期专区|灵活申赎|AI/.test(name));
 
   const base = [
-    "【产品层级 · 背景认知（写作时心里要有，不必每档都写满）】",
+    "【产品层级 · 硬性从属关系（写作禁止写反）】",
     `${slice.brandName}（平台）`,
-    `  └── ${slice.offerLabel}（主推产品）`,
+    `  └── ${slice.offerLabel}（主推产品 / Offer）`,
     subFeatures,
-    `- 子功能从属于${slice.offerLabel}，禁止写成与${slice.offerLabel}平级的第二个产品。`,
+    `- 正确语感：先落到「${slice.brandName}」里的「${slice.offerLabel}」，再提子功能（如严选专区）。`,
+    `- 子功能从属于${slice.offerLabel}：禁止把子功能写成与${slice.offerLabel}平级，更禁止写成「子功能里归拢/包含${slice.offerLabel}」。`,
   ];
+
+  if (isFixedIncomePlus) {
+    base.push(
+      "- 【理财通示例 · 禁止写反】正确：理财通 → 固收+ → 严选专区；错误：「理财通有严选专区，把固收+产品归到一起」。",
+      "- 可写：「在理财通看固收+时，先点严选专区缩小比较范围」；勿写：「严选专区整理了固收+」。",
+    );
+  }
 
   if (embed === "high") {
     base.push(
       "",
-      "【high 硬性要求】正文后段须按上述层级写全：平台 → 主推产品 → 各子功能分工。",
+      "【high 硬性要求】正文后段须按上述层级写全：平台 → 主推产品 → 各子功能分工（勿颠倒）。",
     );
   } else if (embed === "medium") {
     base.push(
       "",
-      "【medium 写法】理解上述层级即可；正文像真人聊天，痛点故事里顺口带出，不强制写全各层。",
+      "【medium 写法】若提到子功能，须让读者感到它挂在主推产品下（可同句或邻句点到 Offer）；平台全文至少点一次；禁止层级写反。",
     );
   } else {
-    base.push("", "【当前档位】产品信息轻点即可，不必展开层级。");
+    base.push("", "【当前档位】产品信息轻点即可，但仍不得写反层级。");
   }
 
   return base.join("\n");
@@ -83,8 +97,23 @@ export function assessBriefProductIntegration(
     return { ok: true, hitFeatures, missingFeatures: [] };
   }
 
-  // low / medium：不做强硬质检，靠 Prompt 引导自然写法
+  // medium：不强制写全功能，但若已提功能则须至少点一次平台（不必每个功能重复）
   if (!requiresStrictProductHierarchy(embed)) {
+    if (hitFeatures.length > 0) {
+      const brandToken = slice.brandName.includes("理财通")
+        ? "理财通"
+        : slice.brandName.includes("微证券")
+          ? "微证券"
+          : slice.brandName;
+      if (!body.includes(brandToken) && !body.includes(slice.brandName)) {
+        return {
+          ok: false,
+          reason: `提到了功能但未点平台「${slice.brandName}」（全文点一次即可，不必每个功能重复）`,
+          hitFeatures,
+          missingFeatures,
+        };
+      }
+    }
     return { ok: true, hitFeatures, missingFeatures };
   }
 
@@ -222,7 +251,7 @@ export function buildEmbedAngleProductRules(
       ? `- high：角度须覆盖${slice.offerLabel} + 全部子功能（${slice.briefFeatureNames.join("、")}）的分工路径。`
       : "",
     embed === "medium"
-      ? "- medium：角度像真人选题，productBridge 选填；有产品处须口语自然，禁止教程口吻。"
+      ? `- medium：角度像真人选题；若桥接产品，productBridge 须能落到平台「${slice.brandName}」（点一次即可），禁止只绑孤立功能名。`
       : "",
     embed === "high" && minFeatures > 0
       ? `- recommendedFeatureIds 须绑定全部 ${minFeatures} 个子功能。`
@@ -268,9 +297,9 @@ export function buildBriefProductRuntimeLock(
   } else if (embed === "medium") {
     lines.push(
       "- medium：像小红书真人帖，故事/情绪先行；产品信息顺口带出即可，禁止为植入而植入。",
-      hasProductHierarchy(slice)
-        ? `- 若提到子功能，读者应能感到是在聊${slice.offerLabel}，但不要求写全平台/产品/功能各层。`
-        : "",
+      `- 若提到功能或 Offer：全文至少点一次平台「${slice.brandName}」锚定；后续功能可顺着写，不必每个功能重复平台名。`,
+      `- 提到子功能时，须挂在「${slice.offerLabel}」下（可同句/邻句点到${slice.offerLabel}），禁止写成子功能包含/归拢${slice.offerLabel}。`,
+      "- 禁止：全文只提功能完全不提平台；禁止「功能+平台」句式复读；禁止产品层级写反。",
     );
   }
 
@@ -280,7 +309,10 @@ export function buildBriefProductRuntimeLock(
   );
 
   if (embed === "high") {
-    lines.push("- 禁止：只写子功能不写主推产品；禁止平台/产品/子功能写成三个平级推广点。");
+    lines.push(
+      "- 禁止：只写子功能不写主推产品；禁止平台/产品/子功能写成三个平级推广点；禁止「子功能归拢主推产品」的反向表述。",
+      "- 平台点清即可，不必每个子功能句都重复平台名。",
+    );
   }
 
   lines.push("- 合规结尾：了解公开信息，不构成投资建议。");

@@ -128,12 +128,6 @@ export function ContentResultsPanel({
                   <div className="min-w-0 flex-1 space-y-2">
                     <h3 className="text-xl font-semibold leading-snug">{activeResult.selectedTitle}</h3>
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                      {!isVideoScript && activeResult.selectedCoverText ? (
-                        <>
-                          <span>封面：{activeResult.selectedCoverText}</span>
-                          <span className="text-border">|</span>
-                        </>
-                      ) : null}
                       <Badge
                         variant={activeResult.complianceReport?.publishReadiness === "ready" ? "success" : "warning"}
                         className="text-[10px]"
@@ -167,10 +161,8 @@ export function ContentResultsPanel({
                             "全文",
                             buildContentCopyText({
                               selectedTitle: activeResult.selectedTitle,
-                              selectedCoverText: activeResult.selectedCoverText,
                               content: activeResult.content,
                               tags: activeResult.tags,
-                              riskReminder: activeResult.riskReminder,
                               interactionGuide: activeResult.interactionGuide,
                             }),
                           )
@@ -192,11 +184,6 @@ export function ContentResultsPanel({
                 ) : (
                   <pre className="whitespace-pre-wrap font-sans text-sm leading-7">{activeResult.content}</pre>
                 )}
-                {activeResult.riskReminder ? (
-                  <p className="mt-5 border-t border-border/60 pt-4 text-xs leading-5 text-muted-foreground">
-                    {activeResult.riskReminder}
-                  </p>
-                ) : null}
               </div>
             </article>
 

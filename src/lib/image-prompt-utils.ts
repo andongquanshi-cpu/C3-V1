@@ -41,7 +41,7 @@ export function isWeakImagePrompt(prompt: string): boolean {
   const text = prompt.trim();
   if (!text) return true;
   if (text.length < 90) return true;
-  const hasLayout = /3:4|竖版|封面|构图|光线|色调|景深|实拍|插画|小红书/.test(text);
+  const hasLayout = /3:4|竖版|封面|构图|光线|色调|景深|实拍|插画|生活化/.test(text);
   return !hasLayout;
 }
 
@@ -58,28 +58,71 @@ export function stripHexColorCodes(text: string): string {
     .trim();
 }
 
-/** 清理画面上应出现的中文文案，去掉色号、长英文串等技术残留 */
+/**
+ * 清洗可能被模型画进图里的指令/平台字样。
+ * 解决：小红书 Logo、「coverText:」、风格说明角标、参数原文泄露。
+ */
+export function stripPromptLeakage(text: string): string {
+  return stripHexColorCodes(text)
+    .replace(/小\s*红\s*书/g, "")
+    .replace(/红书财经笔记|财经笔记封面|竖活版|竖版封面风/g, "")
+    .replace(/coverText\s*[:：]\s*[“"']?[^”"'\n]{0,40}[”"']?/gi, "")
+    .replace(/overallStyle\s*[:：]/gi, "")
+    .replace(/imagePrompt\s*[:：]/gi, "")
+    .replace(/prompt\s*[:：]/gi, "")
+    .replace(/【[^】]{0,12}硬约束】/g, "")
+    .replace(/【本张画面】|【整体视觉规范[^】]*】|【合规约束】/g, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/[，,]{2,}/g, "，")
+    .trim();
+}
+
+/** 清理画面上应出现的中文文案：去技术残留、指令泄露、平台名 */
 export function sanitizeOnImageCopy(copy: string): string {
-  return stripHexColorCodes(copy)
-    .replace(/\b[A-Za-z]{4,}\b/g, "")
+  let text = stripPromptLeakage(copy)
+    .replace(/\b[A-Za-z]{3,}\b/g, "")
+    .replace(/[:：]\s*$/g, "")
+    .replace(/^[「『"']|[」』"']$/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
+
+  // 角标/栏目类短词不当作封面大字（易被画成 Logo 条）
+  if (/^(财经干货|财务笔记|财经笔记|干货|封面|小红书|笔记)$/.test(text)) {
+    return "";
+  }
+  // 过长或像 JSON/指令
+  if (text.length > 18 || /[{}\[\]"=]/.test(text) || /coverText|prompt|style/i.test(text)) {
+    return text.length > 18 ? text.slice(0, 14) : "";
+  }
+  return text;
 }
 
 export function buildImageTextRenderLock(onImageCopy?: string, role?: string): string {
   const label = role === "cover" ? "封面大字" : "画面内文案";
   const lines = [
-    "【画面文字硬约束】",
-    "- 风格描述、色号、英文、技术参数仅用于配色与构图，严禁渲染为画面内可见文字、便签、标签、色卡、调色板",
+    "【画面文字硬约束 · 以下条目本身禁止出现在画面上】",
+    "- 风格描述、色号、英文、技术参数、字段名仅用于配色与构图，严禁渲染为可见文字/便签/标签/色卡",
+    "- 禁止出现任何平台 Logo、角标、水印字（含近似「小红书」「红书」「竖活版」「财经笔记」栏目条）",
+    "- 禁止把 prompt 参数原文印上画面（如 coverText:、风格：、小红书封面风）",
   ];
   const copy = sanitizeOnImageCopy(onImageCopy || "");
   if (copy) {
-    lines.push(`- 本张图上只允许出现${label}：「${copy}」，字体清晰、位置醒目、不得错别字`);
-    lines.push("- 除上述文案外，禁止出现任何其他可读文字（含英文、数字串、色号、#号）");
+    lines.push(`- 本张图上只允许出现这一句${label}：${copy}`);
+    lines.push("- 该句只出现一次，禁止顶部和底部重复同一标题");
+    lines.push("- 除上述一句外，禁止任何其他可读文字（含英文、数字串、色号、#号）");
   } else {
-    lines.push("- 本张图尽量避免可读文字；装饰元素不得形成可辨认的色号或英文");
+    lines.push("- 本张图避免可读文字；装饰元素不得形成可辨认文字或角标");
   }
   return lines.join("\n");
+}
+
+function buildComplianceLock(): string {
+  return [
+    "【合规与画面禁令 · 禁止印在画面上】",
+    "- 不出现真实人物清晰正脸/半脸特写；人物若出现须背影、侧影、手部或完全虚化，不得成为画面主体脸部",
+    "- 禁止：股票代码、具体收益数字、承诺性文案、暴富金币、满屏红绿 K 线、二维码、水印、明星肖像",
+    "- 禁止：社交平台 Logo、品牌徽章、栏目角标条、参数说明小字",
+  ].join("\n");
 }
 
 /** 视觉计划 / 制图工作台：合成发给 Seedream 的最终 prompt */
@@ -89,16 +132,16 @@ export function assembleSeedreamImagePrompt(input: {
   coverText?: string;
   role?: string;
 }): string {
-  const style = stripHexColorCodes(input.overallStyle || "");
-  const scene = stripHexColorCodes(input.prompt.trim());
+  const style = stripPromptLeakage(input.overallStyle || "");
+  const scene = stripPromptLeakage(input.prompt.trim());
   const copy = sanitizeOnImageCopy(input.coverText || "");
 
   return [
-    "小红书竖版 3:4 卡片",
-    style ? `【整体视觉规范 · 仅配色构图，禁止渲染为文字】\n${style}` : "",
-    scene ? `【本张画面】\n${scene}` : "",
+    "竖版 3:4 生活化财经配图，清爽真实摄影感，信息流缩略图也要能看清主体",
+    style ? `整体视觉规范（仅配色构图，禁止渲染为文字）：\n${style}` : "",
+    scene ? `本张画面描述：\n${scene}` : "",
     buildImageTextRenderLock(copy, input.role),
-    "【合规约束】不出现真实人物正脸特写；禁止：股票代码、具体收益数字、承诺性文案、暴富金币、满屏红绿 K 线、二维码、水印、明星肖像。",
+    buildComplianceLock(),
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -106,23 +149,32 @@ export function assembleSeedreamImagePrompt(input: {
 
 /** 组装发给 Seedream 的最终画面描述（含版式、封面字、合规约束） */
 export function formatImagePromptForSeedream(prompt: string, coverText?: string, style?: string): string {
-  const base = stripHexColorCodes(prompt.trim());
+  const base = stripPromptLeakage(prompt.trim());
   if (!base) return "";
 
   const copy = sanitizeOnImageCopy(coverText || "");
   const alreadyStructured =
-    base.includes("3:4") && base.includes("禁止") && base.includes("画面文字硬约束");
-  if (alreadyStructured) return base;
+    base.includes("3:4") && base.includes("禁止") && (base.includes("画面文字硬约束") || base.includes("合规与画面禁令"));
+  if (alreadyStructured) {
+    // 仍做一轮泄露清洗，避免上游已写入「小红书」
+    return assembleSeedreamImagePrompt({
+      prompt: stripPromptLeakage(base),
+      coverText: copy,
+      role: "cover",
+      overallStyle: style,
+    });
+  }
 
   const styleLabel =
-    style && !["default", "cover", "fallback-cover"].includes(style) ? `风格：${style}` : "";
+    style && !["default", "cover", "fallback-cover"].includes(style)
+      ? stripPromptLeakage(`风格气质：${style}`)
+      : "";
 
   const draft = [
-    "小红书财经笔记封面，竖版 3:4",
+    "竖版 3:4 生活化财经配图",
     styleLabel,
     base,
-    "生活化场景，柔和自然光，画面整洁有秩序感；不出现真实人物正脸特写",
-    "禁止：股票代码、收益数字、承诺性文案、暴富金币、满屏红绿K线、二维码、水印",
+    "柔和自然光，画面整洁有秩序感；可有生活物件，避免模板化桌面四件套堆砌",
   ]
     .filter(Boolean)
     .join("。");
@@ -154,7 +206,7 @@ function normalizeImagePromptList(items: unknown[]): ImagePromptItem[] {
     result.push({
       style: asString(row.style) || asString(row.coverType) || "cover",
       prompt,
-      coverText: asString(row.coverText) || undefined,
+      coverText: sanitizeOnImageCopy(asString(row.coverText)) || undefined,
       riskNotes: Array.isArray(row.riskNotes) ? row.riskNotes.map(String) : [],
     });
   }
@@ -208,6 +260,7 @@ export function finalizeImagePromptSuggestions(
   const merged = fromCovers.length ? mergeImagePromptSuggestions(fromContent, fromCovers) : fromContent;
 
   const usable = merged.filter((item) => asString(item.prompt));
+  const safeCover = sanitizeOnImageCopy(content.selectedCoverText || "") || undefined;
   const base =
     usable.length > 0
       ? usable
@@ -215,24 +268,24 @@ export function finalizeImagePromptSuggestions(
           {
             style: "fallback-cover",
             prompt: [
-              "小红书财经笔记封面，竖版 3:4",
-              content.selectedCoverText ? `封面大字：${content.selectedCoverText}` : "",
-              content.selectedTitle ? `主题：${content.selectedTitle}` : "",
+              "竖版 3:4 生活化财经配图",
+              content.selectedTitle ? `主题氛围：${content.selectedTitle}` : "",
               angle.coreIdea ? `画面方向：${angle.coreIdea.slice(0, 100)}` : "",
-              "风格：生活化、温暖、有秩序感",
+              "风格：生活化、温暖、有秩序感，避免桌面四件套模板堆砌",
             ]
               .filter(Boolean)
               .join("。"),
-            coverText: content.selectedCoverText || undefined,
-            riskNotes: ["由标题与封面字自动拼装"],
+            coverText: safeCover,
+            riskNotes: ["由标题自动拼装"],
           },
         ];
 
   return base.map((item) => ({
     ...item,
+    coverText: sanitizeOnImageCopy(item.coverText || safeCover || "") || undefined,
     prompt: formatImagePromptForSeedream(
       item.prompt,
-      item.coverText || content.selectedCoverText,
+      item.coverText || safeCover,
       item.style,
     ),
   }));

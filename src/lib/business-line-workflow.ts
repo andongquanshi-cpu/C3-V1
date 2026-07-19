@@ -20,6 +20,8 @@ export interface OfferOption {
   description: string;
   enabled: boolean;
   badge?: string;
+  /** false = 仅可点选入口，无主推功能知识库 */
+  hasFeatureLibrary?: boolean;
 }
 
 export interface CreationSceneOption {
@@ -157,7 +159,7 @@ export const FALLBACK_LICAITONG_WORKFLOW: BusinessLineWorkflowConfig = {
     "dry-goods-list": ["fplus_long_term_zone", "fplus_ai_assist"],
   },
   featureUiSummaries: {
-    fplus_curated_zone: "严选专区，缩小固收+比较范围，不构成荐基。",
+    fplus_curated_zone: "固收+下的严选专区，缩小比较范围；从属于固收+，不是归拢固收+的上级专区。",
     fplus_virtual_trial: "虚拟理财金体验，熟悉流程；规则以活动页为准。",
     fplus_long_term_zone: "长期理财专区，看公开运作信息，不代表未来表现。",
     fplus_flexible_redeem: "部分产品申赎更灵活，买前先看清持有期限。",
@@ -323,7 +325,10 @@ export function isFeatureSelectionActive(
 ): boolean {
   const cfg = resolveConfig(config, businessLine);
   if (cfg.hideOfferSelection) return true;
-  return Boolean(brief.offerId);
+  if (!brief.offerId) return false;
+  const offer = cfg.offers.find((item) => item.id === brief.offerId);
+  if (offer && offer.hasFeatureLibrary === false) return false;
+  return true;
 }
 
 export function getPersonaRecommendation(

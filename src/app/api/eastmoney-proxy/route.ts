@@ -17,7 +17,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const items = await searchEastMoneyNewsViaMcp(query, apiKey);
+    const businessLine = String(body.businessLine || "").trim() || undefined;
+    const items = await searchEastMoneyNewsViaMcp(query, apiKey, { businessLine });
     return NextResponse.json({ query, items });
   } catch (error) {
     return NextResponse.json(

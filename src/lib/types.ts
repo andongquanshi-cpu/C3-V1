@@ -75,7 +75,7 @@ export interface BriefInput {
   personaVariant?: string;
   campaignGoal?: string;
   bloggerLevel: BloggerLevel;
-  embedLevel: EmbedLevel;
+  embedLevel?: EmbedLevel;
   contentLength: ContentLength;
   generationMode: GenerationMode;
   generateCount: number;
@@ -168,6 +168,12 @@ export interface VideoScriptShot {
   visual: string;
   voiceover: string;
   onScreenText?: string;
+  /** 运镜：固定/推/拉/摇/移/跟 */
+  cameraMove?: string;
+  /** 本镜音效 */
+  sfx?: string;
+  /** 转场：切/淡入淡出/滑动/缩放等 */
+  transition?: string;
 }
 
 export interface VideoScriptMeta {
@@ -176,6 +182,15 @@ export interface VideoScriptMeta {
   bodyStructure?: string;
   targetDuration?: string;
   estimatedSpeechSeconds?: number;
+  /** 开头快/中间稳/结尾慢 等节奏说明 */
+  rhythmNote?: string;
+}
+
+export interface VideoCoverDesign {
+  visual: string;
+  headline: string;
+  subline?: string;
+  mood?: string;
 }
 
 export interface GeneratedContent {
@@ -198,6 +213,7 @@ export interface GeneratedContent {
     spokenLine?: string;
     visualNote?: string;
   };
+  coverDesign?: VideoCoverDesign;
   storyboard?: VideoScriptShot[];
   bgmSuggestion?: string;
   imagePromptSuggestions: Array<{
@@ -237,6 +253,8 @@ export interface Draft extends GeneratedContent {
   savedAt: string;
   draftEntryId?: string;
   generationSnapshot: BriefInput;
+  /** 保存时是否已点过「确认审核」；旧草稿无此字段视为未审核 */
+  reviewConfirmed?: boolean;
 }
 
 /** 矩阵创作一次正文生成的自动历史快照；草稿箱仅保留最近 3 次。 */

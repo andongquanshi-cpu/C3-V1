@@ -38,7 +38,8 @@ import {
   formatVideoScriptModulesForPrompt,
   resolveVideoScriptModules,
 } from "@/lib/video-script-routing";
-import { formatVideoRiskReminderGuide } from "@/lib/risk-reminder";
+import { formatVideoRiskReminderGuide, formatContentRiskReminderGuide } from "@/lib/risk-reminder";
+import { formatEmojiStyleGuide } from "@/lib/emoji-style";
 import {
   formatTagStrategyForPrompt,
   formatXhsContentMethodologyForPrompt,
@@ -388,6 +389,35 @@ export function buildContentGenerationPrompt(input: AnyRecord = {}) {
       selectedFeatureIds: data.selectedFeatureIds,
       embedLevel: data.embedLevel,
     }),
+    contentRiskReminderGuide: formatContentRiskReminderGuide(
+      knowledge.riskDisclaimers,
+      String(
+        (data.selectedAngle as { angleId?: string })?.angleId ||
+          data.diversitySeed ||
+          data.topic ||
+          "content",
+      ),
+    ),
+    emojiStyleGuide: formatEmojiStyleGuide({
+      personaId: data.personaId,
+      personaVariant: data.personaVariant,
+      businessLine: knowledge.businessLine || data.businessLine,
+      creationScene: data.creationScene || data.contentType,
+      generationMode,
+      densityHint: (() => {
+        try {
+          if (!data.personaId) return "";
+          const persona = loadPersonaStandard(
+            String(data.personaId),
+            (knowledge.businessLine || data.businessLine) === "licaitong" ? "licaitong" : "weisec",
+          );
+          const variant = persona.variants?.find((item) => item.id === data.personaVariant);
+          return variant?.style?.emojiDensity || persona.style?.emojiDensity || "";
+        } catch {
+          return "";
+        }
+      })(),
+    }),
   }));
   return finalizePromptWithRuntimeLock(built, input);
 }
@@ -411,8 +441,10 @@ const VIDEO_PERSONA_TASK_LOCK = [
   "- 当前任务：口播短视频脚本（JSON），不是小红书图文笔记",
   "- 人设 system 只约束：语气、场景、称呼、禁忌词、口播气质",
   "- 忽略人设中的：图文正文结构、emoji 分段标题、400-500 字篇幅、imageTextSuggestions、封面文案",
-  "- 创作优先级：先写满 storyboard[].voiceover 口播原文，再填 visual；禁止只输出镜头时长占位",
-  "- 忽略人设模板里固定的 ⚠️ 风险标语句式；风险提示须口语化嵌入最后一镜，禁止每条都念「市场有风险投资需谨慎」",
+  "- 创作优先级：先写满 storyboard[].voiceover 口播原文，再按「说演一致」写 visual（须含景别/动作/屏幕内容/环境/人物状态）",
+  "- 每镜必填 cameraMove、sfx、transition；整片必填 bgmSuggestion、coverDesign、openingHook（强钩子）",
+  "- 口播多信息点时 visual 须用时间轴拆画面；结尾须有软 CTA（interactionGuide）+ 口语风险",
+  "- 禁止只输出镜头时长占位；忽略人设模板里固定的 ⚠️ 风险标语，禁止每条都念「市场有风险投资需谨慎」",
 ].join("\n");
 
 /** 有人设时：user 统一走 video-script-generation.md，避免 persona video 模板的 Markdown 格式冲突 */
@@ -480,7 +512,43 @@ export function buildVisualPlanPrompt(input: AnyRecord = {}) {
     selectedCoverText: data.selectedCoverText || "未提供",
     generatedContent: data.generatedContent || data.content || "未提供",
     selectedAngle: data.selectedAngle || data.angle || "未提供",
+    personaSceneVisualContext: buildPersonaSceneVisualContext(data),
   }));
+}
+
+function buildPersonaSceneVisualContext(data: AnyRecord): string {
+  const lines: string[] = [];
+  const businessLine = String(data.businessLine || "").trim();
+  const personaId = String(data.personaId || "").trim();
+  const personaVariant = String(data.personaVariant || "").trim();
+  const scene = String(data.creationScene || "").trim();
+  const audience = String(data.audienceTag || data.targetUser || "").trim();
+  const offerId = String(data.offerId || "").trim();
+
+  if (businessLine) {
+    lines.push(`- 业务线：${businessLine === "licaitong" ? "腾讯理财通（暖、生活、秩序）" : "腾讯微证券（清爽、即时、职场碎片）"}`);
+  }
+  if (personaId) {
+    try {
+      const line = businessLine === "licaitong" ? "licaitong" : "weisec";
+      const persona = loadPersonaStandard(personaId, line);
+      const variant = persona.variants?.find((item) => item.id === personaVariant);
+      lines.push(`- 人设：${persona.label}${variant ? ` / ${variant.label}` : ""}`);
+      lines.push(`- 语气气质：${variant?.style?.tone || persona.style?.tone || "未提供"}`);
+      const emoji = variant?.identity?.emoji || persona.identity?.emoji;
+      if (emoji) lines.push(`- 人设符号气质（勿画成角标）：${emoji}`);
+    } catch {
+      lines.push(`- 人设 ID：${personaId}`);
+    }
+  }
+  if (scene) lines.push(`- 创作场景：${scene}（道具与情境优先贴合该场景，勿套万能桌面）`);
+  if (audience) lines.push(`- 目标读者：${audience}`);
+  if (offerId) lines.push(`- 主推 Offer：${offerId}（画面可轻点相关入口，禁止写反产品层级）`);
+
+  if (!lines.length) {
+    return "未提供人设/场景；请根据正文标题与全文自行推断生活化财经视觉，并保持全套风格一致。";
+  }
+  return lines.join("\n");
 }
 
 export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
@@ -530,6 +598,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       selectedAngle: input.selectedAngle || input.angle || "未提供",
       embedLevel: formatEmbedLevelForPrompt(input.embedLevel || "medium"),
       customRequirement: input.customRequirement || input.customPrompt || "无",
+      creationScene: input.creationScene || "",
       ...resolveContentMaterialFields(input),
       selectedFeatures: knowledge.selectedFeatures,
       selectedTemplate: knowledge.selectedTemplates[0] || null,
@@ -548,6 +617,15 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
 
   const globalSystem = buildSystemPrompt(knowledge);
   const personaSystem = `${personaPrompt.system}\n\n${runtimeLock}`;
+  const riskGuide = formatContentRiskReminderGuide(
+    knowledge.riskDisclaimers,
+    String(
+      (input.selectedAngle as { angleId?: string })?.angleId ||
+        input.diversitySeed ||
+        input.topic ||
+        personaId,
+    ),
+  );
   const personaUser = appendBriefLocks(
     `${personaPrompt.user}\n\n【Brief 业务配置 · 必须服从】\n${briefFields.briefBusinessContext}${
       sceneRules ? `\n\n${sceneRules}` : ""
@@ -556,7 +634,7 @@ export function buildPersonaContentGenerationPrompt(input: AnyRecord = {}) {
       offerId: input.offerId,
       selectedFeatureIds: input.selectedFeatureIds,
       embedLevel: input.embedLevel,
-    })}\n\n${runtimeLock}`,
+    })}\n\n${riskGuide}\n\n${runtimeLock}`,
     input,
   );
   return {

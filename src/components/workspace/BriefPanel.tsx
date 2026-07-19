@@ -20,7 +20,8 @@ import {
   type BusinessLineWorkflowConfig,
 } from "@/lib/business-line-workflow";
 import { EMBED_LEVEL_OPTIONS } from "@/lib/embed-level";
-import { requiresHotspotMaterials } from "@/lib/hotspot-workflow";
+import { requiresHotspotMaterials, getHotspotTopicGuides, buildHotspotGuideSearchQuery, getSelectedMaterials } from "@/lib/hotspot-workflow";
+import { buildHotspotMaterialId, isSameHotspotMaterial } from "@/lib/hotspot-display";
 import {
   expandPersonasForBriefUI,
   getPersonaUiRecommendation,
@@ -99,48 +100,67 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
   const [hotspotResults, setHotspotResults] = useState<Material[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
+  const [viewingSelectedMaterials, setViewingSelectedMaterials] = useState(false);
   const businessLine: BusinessLine = brief.businessLine;
   const cfg = workflowConfig || getWorkflowFallback(businessLine);
   const scene = brief.creationScene;
   const audienceTag = brief.audienceTag;
   const featureNameById = Object.fromEntries(offerFeatures.map((item) => [item.id, item.name]));
   const contextualExamples = getContextualExamples(brief, cfg, featureNameById);
-  const showFeatureSelection = isFeatureSelectionActive(brief, cfg, businessLine);
+  const showFeatureColumn = cfg.hideOfferSelection || Boolean(brief.offerId);
+  const requiresFeatureLibrary = isFeatureSelectionActive(brief, cfg, businessLine);
   const showHotspotSearch = requiresHotspotMaterials({
     personaId: brief.personaId,
     creationScene: brief.creationScene,
     config: cfg,
   });
+  const offerLabel = cfg.offers.find((item) => item.id === brief.offerId)?.label;
+  const hotspotTopicGuides = showHotspotSearch
+    ? getHotspotTopicGuides(businessLine, {
+        personaId: brief.personaId,
+        creationScene: brief.creationScene,
+        offerLabel,
+      })
+    : [];
   const licaitongPersonas = getPersonasForUI(scene, audienceTag, cfg, businessLine);
   const weisecPersonaGroups =
     businessLine === "weisec" ? expandPersonasForBriefUI(cfg.personas, scene, audienceTag, businessLine) : null;
+  const selectedMaterials = getSelectedMaterials(brief.materials || []);
+  const selectedMaterialCount = selectedMaterials.length;
 
-  async function searchHotspots() {
-    const query = hotspotQuery.trim() || brief.topic.trim();
-    if (!query) {
-      setSearchError("请先输入主题或搜索词");
+  async function searchHotspots(overrideQuery?: string, fromGuide = false) {
+    const rawQuery = (overrideQuery ?? hotspotQuery).trim() || brief.topic.trim();
+    if (!rawQuery) {
+      setSearchError("请先点选下方话题指引，或自行输入搜索词");
       return;
     }
+    const query = fromGuide ? buildHotspotGuideSearchQuery(rawQuery) : rawQuery;
+    if (overrideQuery !== undefined) setHotspotQuery(overrideQuery);
+    setViewingSelectedMaterials(false);
     setIsSearching(true);
     setSearchError("");
     try {
       const response = await fetch("/api/eastmoney-proxy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ query, businessLine }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "热点搜索失败");
-      const items = (Array.isArray(data.items) ? data.items : []).slice(0, 8).map((item: Partial<Material>, index: number) => ({
-        id: item.id || `hotspot_${Date.now()}_${index}`,
-        title: String(item.title || `热点 ${index + 1}`),
-        body: String(item.body || ""),
-        source: item.source || "东方财富",
-        tags: item.tags || ["热点"],
-        createdAt: item.createdAt || new Date().toISOString(),
-      }));
+      const items = (Array.isArray(data.items) ? data.items : []).slice(0, 8).map((item: Partial<Material>, index: number) => {
+        const title = String(item.title || `热点 ${index + 1}`);
+        const source = String(item.source || "东方财富");
+        return {
+          id: item.id || buildHotspotMaterialId(source, title),
+          title,
+          body: String(item.body || ""),
+          source,
+          tags: item.tags || ["热点"],
+          createdAt: item.createdAt || new Date().toISOString(),
+        };
+      });
       setHotspotResults(items);
-      if (!items.length) setSearchError("没有找到可用结果，可改用手动素材");
+      if (!items.length) setSearchError("没有找到可用结果，可改用手动素材或换个话题再试");
     } catch (error) {
       setHotspotResults([]);
       setSearchError(error instanceof Error ? error.message : "热点搜索失败");
@@ -149,12 +169,26 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
     }
   }
 
+  function applyHotspotGuide(topic: string) {
+    setSearchError("");
+    setHotspotQuery(topic);
+    void searchHotspots(topic, true);
+  }
+
   function toggleHotspot(material: Material) {
     const selected = brief.materials || [];
-    const exists = selected.some((item) => item.id === material.id);
+    const exists = selected.some((item) => isSameHotspotMaterial(item, material));
     const next = exists
-      ? selected.filter((item) => item.id !== material.id)
-      : [...selected, { ...material, selected: true, isPrimary: selected.length === 0 }].slice(-8);
+      ? selected.filter((item) => !isSameHotspotMaterial(item, material))
+      : [
+          ...selected,
+          {
+            ...material,
+            id: material.id || buildHotspotMaterialId(material.source, material.title),
+            selected: true,
+            isPrimary: getSelectedMaterials(selected).length === 0,
+          },
+        ].slice(-8);
     onBriefChange({ materials: next });
   }
 
@@ -195,6 +229,7 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
       setHotspotQuery("");
       setHotspotResults([]);
       setSearchError("");
+      setViewingSelectedMaterials(false);
     }
     onBriefChange((current) => {
       const next = applySceneChange(current, nextScene, featureNameById, cfg);
@@ -215,6 +250,7 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
       setHotspotQuery("");
       setHotspotResults([]);
       setSearchError("");
+      setViewingSelectedMaterials(false);
     }
     onBriefChange((current) => {
       const next = applyPersonaChange(current, personaId, cfg);
@@ -282,7 +318,11 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
                   <strong className="text-xs leading-tight">{offer.label}</strong>
                   {offer.badge ? (
                     <Badge variant={offer.enabled ? "secondary" : "outline"} className="px-1 py-0 text-[9px] leading-3">
-                      {offer.enabled ? "主推" : "待开"}
+                      {offer.enabled
+                        ? offer.badge === "本期主推"
+                          ? "主推"
+                          : offer.badge
+                        : "待开"}
                     </Badge>
                   ) : null}
                 </button>
@@ -290,13 +330,22 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
             </div>
           ) : null}
 
-          {showFeatureSelection ? (
+          {showFeatureColumn ? (
             <>
               <div className="flex items-center justify-between px-0.5 pt-0.5 text-xs text-muted-foreground">
                 <span>{cfg.hideOfferSelection ? "可选功能" : "主推功能"}</span>
-                <span>已选 {brief.selectedFeatureIds.length} 项 · 不限数量</span>
+                <span>已选 {brief.selectedFeatureIds.length} 项</span>
               </div>
-              {offerFeatures.map((feature) => {
+              {!requiresFeatureLibrary ? (
+                <p className="rounded-lg border border-dashed border-border/80 px-3 py-6 text-center text-xs leading-5 text-muted-foreground">
+                  该 Offer 暂无主推功能库，可先选场景与人设继续创作。
+                </p>
+              ) : offerFeatures.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border/80 px-3 py-6 text-center text-xs leading-5 text-muted-foreground">
+                  暂无可用主推功能，请稍后再试或切换其他 Offer。
+                </p>
+              ) : (
+                offerFeatures.map((feature) => {
                 const checked = brief.selectedFeatureIds.includes(feature.id);
                 return (
                   <label
@@ -325,7 +374,8 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
                     </span>
                   </label>
                 );
-              })}
+              })
+              )}
             </>
           ) : (
             <p className="px-1 py-8 text-center text-xs text-muted-foreground">请先选择 Offer</p>
@@ -425,8 +475,36 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
               <>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium">热点搜索</label>
+                  <p className="text-[11px] leading-4 text-muted-foreground">
+                    先点选话题指引发起搜索，再从结果里勾选要用的热点；默认不会预选任何素材。
+                  </p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {hotspotTopicGuides.map((topic) => {
+                      const active = hotspotQuery.trim() === topic;
+                      return (
+                        <button
+                          key={topic}
+                          type="button"
+                          onClick={() => applyHotspotGuide(topic)}
+                          disabled={isSearching}
+                          className={cn(
+                            "rounded-full border px-2.5 py-1 text-[11px] transition-colors",
+                            active
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border/80 text-muted-foreground hover:border-primary/40 hover:bg-accent/30 hover:text-foreground",
+                          )}
+                        >
+                          {topic}
+                        </button>
+                      );
+                    })}
+                  </div>
                   <div className="flex gap-2">
-                    <Input value={hotspotQuery} onChange={(event) => setHotspotQuery(event.target.value)} placeholder={contextualExamples.hotspot} />
+                    <Input
+                      value={hotspotQuery}
+                      onChange={(event) => setHotspotQuery(event.target.value)}
+                      placeholder="也可自行输入搜索词，例如：降息 资产配置"
+                    />
                     <Button type="button" variant="outline" onClick={() => void searchHotspots()} disabled={isSearching}>
                       {isSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                       搜索
@@ -434,17 +512,77 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
                   </div>
                   {searchError ? <p className="text-xs text-destructive">{searchError}</p> : null}
                 </div>
-                {hotspotResults.length ? (
+                {hotspotResults.length || selectedMaterialCount > 0 ? (
                   <div className="space-y-2 rounded-lg border border-border/70 p-2">
-                    {hotspotResults.map((item) => {
-                      const selected = brief.materials.some((material) => material.id === item.id);
-                      return (
-                        <button key={item.id} type="button" onClick={() => toggleHotspot(item)} className={cn("w-full rounded-md border px-3 py-2 text-left text-xs", selected ? "border-primary bg-primary/10" : "border-transparent hover:bg-accent/30")}>
-                          <strong className="line-clamp-1">{item.title}</strong>
-                          <span className="mt-1 block text-[11px] text-muted-foreground">{selected ? "已选用" : "点击选用"} · {item.source}</span>
+                    <div className="flex items-center justify-between gap-2 px-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        {viewingSelectedMaterials
+                          ? "已选素材 · 点击可取消选用"
+                          : "搜索结果 · 点击选用（可多选）"}
+                      </p>
+                      {selectedMaterialCount > 0 || viewingSelectedMaterials ? (
+                        <button
+                          type="button"
+                          onClick={() => setViewingSelectedMaterials((current) => !current)}
+                          className="shrink-0 text-[11px] font-medium text-primary hover:underline"
+                        >
+                          {viewingSelectedMaterials
+                            ? hotspotResults.length
+                              ? "返回搜索结果"
+                              : "收起已选"
+                            : `已选 ${selectedMaterialCount} 条 · 查看`}
                         </button>
-                      );
-                    })}
+                      ) : null}
+                    </div>
+                    {viewingSelectedMaterials ? (
+                      selectedMaterials.length ? (
+                        selectedMaterials.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              if (item.source === "手动输入") {
+                                updateManualMaterial("");
+                                return;
+                              }
+                              toggleHotspot(item);
+                            }}
+                            className="w-full rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-left text-xs"
+                          >
+                            <strong className="line-clamp-1">{item.title}</strong>
+                            <span className="mt-1 block text-[11px] text-muted-foreground">
+                              已选用 · 点击取消 · {item.source}
+                            </span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="px-1 py-4 text-center text-[11px] text-muted-foreground">暂无已选素材</p>
+                      )
+                    ) : hotspotResults.length ? (
+                      hotspotResults.map((item) => {
+                        const selected = selectedMaterials.some((material) => isSameHotspotMaterial(material, item));
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => toggleHotspot(item)}
+                            className={cn(
+                              "w-full rounded-md border px-3 py-2 text-left text-xs",
+                              selected ? "border-primary bg-primary/10" : "border-transparent hover:bg-accent/30",
+                            )}
+                          >
+                            <strong className="line-clamp-1">{item.title}</strong>
+                            <span className="mt-1 block text-[11px] text-muted-foreground">
+                              {selected ? "已选用" : "点击选用"} · {item.source}
+                            </span>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      <p className="px-1 py-4 text-center text-[11px] text-muted-foreground">
+                        暂无搜索结果，可点右上角查看已选素材
+                      </p>
+                    )}
                   </div>
                 ) : null}
               </>
@@ -459,7 +597,6 @@ export function BriefPanel({ brief, offerFeatures, workflowConfig, onBriefChange
               <label className="text-xs font-medium">额外创作要求（选填）</label>
               <Textarea rows={3} value={brief.customRequirement || ""} onChange={(event) => onBriefChange({ customRequirement: event.target.value })} placeholder={contextualExamples.custom} />
             </div>
-            {brief.materials.length ? <p className="text-xs text-primary">已选择 {brief.materials.length} 条参考素材</p> : null}
           </div>
         </div>
       </section>

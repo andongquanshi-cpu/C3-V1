@@ -48,15 +48,83 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-/** LLM 常在 JSON 字符串里输出字面量 \\n，解析后不会变成真实换行 */
-export function normalizeMultilineText(value: unknown): string {
-  if (typeof value !== "string" || !value) return "";
-  return value
-    .replace(/\r\n/g, "\n")
-    .replace(/\r/g, "\n")
-    .replace(/\\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+/** 将 LLM 各种正文形态压成可读多行文本（字符串 / 段落数组 / 嵌套对象） */
+export function normalizeMultilineText(value: unknown, depth = 0): string {
+  if (value == null || depth > 4) return "";
+
+  if (typeof value === "string") {
+    if (!value) return "";
+    return value
+      .replace(/\r\n/g, "\n")
+      .replace(/\r/g, "\n")
+      .replace(/\\n/g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeMultilineText(item, depth + 1))
+      .filter(Boolean)
+      .join("\n\n")
+      .trim();
+  }
+
+  if (typeof value === "object") {
+    const row = value as LooseRecord;
+    const preferred = [
+      row.content,
+      row.body,
+      row.text,
+      row.opening,
+      row.closing,
+      row.soWhat,
+      row.factOnly,
+      row.plainDefinition,
+      row.analogy,
+      row.commonMisunderstanding,
+      row.boundaryNote,
+      row.standpoint,
+      row.reasoning,
+      row.paragraphs,
+      row.sections,
+    ]
+      .map((item) => normalizeMultilineText(item, depth + 1))
+      .filter(Boolean);
+    if (preferred.length) return preferred.join("\n\n").trim();
+
+    return Object.values(row)
+      .map((item) => normalizeMultilineText(item, depth + 1))
+      .filter(Boolean)
+      .join("\n\n")
+      .trim();
+  }
+
+  return "";
+}
+
+/** 人设 JSON 偶发包在 data/result/payload 下 */
+function unwrapContentPayload(value: unknown): LooseRecord {
+  const root = asRecord(value);
+  if (normalizeMultilineText(root.opening) || normalizeMultilineText(root.body) || normalizeMultilineText(root.content)) {
+    return root;
+  }
+  for (const key of ["data", "result", "payload", "output", "article"]) {
+    const nested = asRecord(root[key]);
+    if (
+      normalizeMultilineText(nested.opening) ||
+      normalizeMultilineText(nested.body) ||
+      normalizeMultilineText(nested.content) ||
+      Object.keys(nested).length > 2
+    ) {
+      return { ...root, ...nested };
+    }
+  }
+  return root;
 }
 
 function formatStoryboardAsContent(storyboard: unknown): string {
@@ -69,16 +137,35 @@ function formatStoryboardAsContent(storyboard: unknown): string {
       const voiceover = asString(row.voiceover);
       const durationSec = row.durationSec ?? row.duration ?? "";
       const onScreen = asString(row.onScreenText);
+      const cameraMove = asString(row.cameraMove);
+      const sfx = asString(row.sfx);
+      const transition = asString(row.transition);
       if (!visual && !voiceover) return "";
       const parts = [`【镜头${shotIndex}】`];
       if (visual) parts.push(`画面：${visual}`);
       if (voiceover) parts.push(`口播：${voiceover}`);
       if (durationSec !== "") parts.push(`时长：${durationSec}秒`);
+      if (cameraMove) parts.push(`运镜：${cameraMove}`);
+      if (sfx) parts.push(`音效：${sfx}`);
+      if (transition) parts.push(`转场：${transition}`);
       if (onScreen) parts.push(`字幕：${onScreen}`);
       return parts.join(" | ");
     })
     .filter(Boolean);
   return lines.join("\n");
+}
+
+function normalizeCoverDesign(value: unknown): GeneratedContent["coverDesign"] | undefined {
+  const row = asRecord(value);
+  const visual = asString(row.visual);
+  const headline = asString(row.headline) || asString(row.coverText) || asString(row.text);
+  if (!visual && !headline) return undefined;
+  return {
+    visual,
+    headline,
+    subline: asString(row.subline) || asString(row.subtitle) || undefined,
+    mood: asString(row.mood) || asString(row.colorMood) || undefined,
+  };
 }
 
 function normalizeStoryboard(storyboard: unknown): VideoScriptShot[] {
@@ -96,6 +183,9 @@ function normalizeStoryboard(storyboard: unknown): VideoScriptShot[] {
         visual,
         voiceover,
         onScreenText: asString(row.onScreenText) || undefined,
+        cameraMove: asString(row.cameraMove) || undefined,
+        sfx: asString(row.sfx) || undefined,
+        transition: asString(row.transition) || undefined,
       };
     })
     .filter((item): item is VideoScriptShot => Boolean(item));
@@ -106,6 +196,29 @@ function extractOpeningHookLine(data: LooseRecord): string {
   return asString(hook.spokenLine);
 }
 
+function assemblePersonaFallbackParts(data: LooseRecord): string {
+  const teaching = asRecord(data.teachingMethod);
+  const event = asRecord(data.eventSummary);
+  const reversal = asRecord(data.reversalPerspective);
+  return [
+    normalizeMultilineText(data.soWhat),
+    normalizeMultilineText(event.factOnly),
+    normalizeMultilineText(event.what),
+    normalizeMultilineText(reversal.standpoint),
+    normalizeMultilineText(reversal.reasoning),
+    normalizeMultilineText(teaching.plainDefinition),
+    normalizeMultilineText(teaching.analogy),
+    normalizeMultilineText(teaching.commonMisunderstanding),
+    normalizeMultilineText(teaching.boundaryNote),
+    normalizeMultilineText(data.mainText),
+    normalizeMultilineText(data.article),
+    normalizeMultilineText(data.text),
+    normalizeMultilineText(data.paragraphs),
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 function assembleGeneratedContentText(data: LooseRecord): string {
   const opening = normalizeMultilineText(data.opening);
   const body = normalizeMultilineText(data.body);
@@ -113,7 +226,8 @@ function assembleGeneratedContentText(data: LooseRecord): string {
   const explicit = normalizeMultilineText(data.content);
   const hookLine = extractOpeningHookLine(data);
   const fromStoryboard = formatStoryboardAsContent(data.storyboard);
-  const fromParts = [hookLine, opening, body, closing].filter(Boolean).join("\n\n");
+  const fromCore = [hookLine, opening, body, closing].filter(Boolean).join("\n\n");
+  const fromParts = fromCore || assemblePersonaFallbackParts(data);
 
   if (fromStoryboard && !isSkeletonVideoScript(fromStoryboard)) {
     if (!explicit || isSkeletonVideoScript(explicit)) {
@@ -143,26 +257,31 @@ function assembleGeneratedContentText(data: LooseRecord): string {
 
 /** 将 personaContent 等人设专用 JSON 映射为 contentGeneration 标准字段 */
 export function adaptPersonaContentPayload(value: unknown): Partial<GeneratedContent> & LooseRecord {
-  const data = asRecord(value);
+  const data = unwrapContentPayload(value);
 
   const content = assembleGeneratedContentText(data);
 
   const titleOptions = Array.isArray(data.titleOptions) ? data.titleOptions : [];
+  const singularTitle = asString(data.title) || asString(data.selectedTitle);
   const titleCandidates =
     Array.isArray(data.titleCandidates) && data.titleCandidates.length > 0
       ? (data.titleCandidates as GeneratedContent["titleCandidates"])
-      : titleOptions
-          .map((item) => {
-            const row = asRecord(item);
-            const text = asString(row.text);
-            if (!text) return null;
-            return {
-              text,
-              type: asString(row.type) || undefined,
-              riskLevel: (row.riskLevel as GeneratedContent["titleCandidates"][number]["riskLevel"]) || "low",
-            };
-          })
-          .filter((item): item is NonNullable<typeof item> => Boolean(item));
+      : titleOptions.length > 0
+        ? titleOptions
+            .map((item) => {
+              const row = asRecord(item);
+              const text = asString(row.text);
+              if (!text) return null;
+              return {
+                text,
+                type: asString(row.type) || undefined,
+                riskLevel: (row.riskLevel as GeneratedContent["titleCandidates"][number]["riskLevel"]) || "low",
+              };
+            })
+            .filter((item): item is NonNullable<typeof item> => Boolean(item))
+        : singularTitle
+          ? [{ text: singularTitle, riskLevel: "low" as const }]
+          : [];
 
   const imageTextSuggestions = Array.isArray(data.imageTextSuggestions) ? data.imageTextSuggestions : [];
   const coverSuggestions = Array.isArray(data.coverSuggestions) ? data.coverSuggestions : [];
@@ -384,7 +503,7 @@ export function normalizeContent(
     titleCandidates: Array.isArray(data.titleCandidates) ? data.titleCandidates : [],
     selectedTitle: data.selectedTitle || data.titleCandidates?.[0]?.text || angle.titleDirections[0] || angle.angleName,
     coverTextCandidates: Array.isArray(data.coverTextCandidates) ? data.coverTextCandidates : [],
-    selectedCoverText: data.selectedCoverText || data.coverTextCandidates?.[0]?.text || (isVideo ? "" : "财经干货"),
+    selectedCoverText: data.selectedCoverText || data.coverTextCandidates?.[0]?.text || "",
     content: data.content || "",
     insertStrategy: data.insertStrategy || {},
     tags: options?.tagContext
@@ -396,9 +515,10 @@ export function normalizeContent(
         ? data.tags
         : buildFallbackContentTags(angle),
     interactionGuide: data.interactionGuide || "",
-    riskReminder: data.riskReminder || (isVideo ? "" : "市场有风险，投资需谨慎。"),
+    riskReminder: asString(data.riskReminder),
     scriptMeta: isVideo ? data.scriptMeta : undefined,
     openingHook: isVideo ? data.openingHook : undefined,
+    coverDesign: isVideo ? normalizeCoverDesign(data.coverDesign) : undefined,
     storyboard: isVideo ? normalizeStoryboard(data.storyboard) : undefined,
     bgmSuggestion: isVideo && typeof data.bgmSuggestion === "string" ? data.bgmSuggestion : undefined,
     imagePromptSuggestions: isVideo ? [] : Array.isArray(data.imagePromptSuggestions) ? data.imagePromptSuggestions : [],

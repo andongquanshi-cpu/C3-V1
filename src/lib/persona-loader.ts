@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { formatEmojiStyleGuide } from "@/lib/emoji-style";
 import { resolveKnowledgeBasePath } from "@/lib/knowledge-retriever";
 import type { BusinessLine } from "@/lib/types";
 
@@ -55,6 +56,8 @@ export interface PersonaVariant {
   system?: string;
   contentArchetype?: string;
   antiHomogeneity?: PersonaAntiHomogeneity;
+  identity?: Partial<PersonaIdentity> & { emoji?: string };
+  style?: Partial<PersonaStyle> & { emojiDensity?: string };
   prompts?: {
     system?: string;
     content?: { user?: string };
@@ -373,19 +376,19 @@ function resolvePersonaUserTemplate(persona: PersonaStandard, variant: PersonaVa
 
 function appendVideoOutputRequirements(parts: string[]) {
   parts.push(
-    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- storyboard 每一镜 visual 和 voiceover **必填**，每镜口播至少 12 个汉字\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePrompt / 封面图 / 配图字段\n- tags 必填 8-10 个强相关话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
+    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- openingHook 须有强钩子（反常识/痛点/好奇/数字），禁止流水账开场\n- storyboard 每镜 visual+voiceover 必填；visual 须含景别、主体动作、屏幕具体内容、环境、人物状态；多信息点用时间轴\n- 每镜填写 cameraMove / sfx / transition；整片填写 bgmSuggestion、coverDesign、interactionGuide（软CTA）\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePromptSuggestions / 图文封面字段（用 coverDesign）\n- tags 必填 8-10 个强相关话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
   );
 }
 
 function appendVideoJsonSchemaOverride(parts: string[]) {
   parts.push(
-    `\n\n【视频 JSON 硬性要求】\nopeningHook.spokenLine 和 storyboard[].voiceover 必须写完整口播原文，不能留空。示例结构：\n{"openingHook":{"spokenLine":"..."},"storyboard":[{"shotIndex":1,"durationSec":5,"visual":"宿舍举手机","voiceover":"室友问我实习工资咋理财，我说先从这一步开始"}],"content":"【镜头1】画面：... | 口播：... | 时长：5秒"}`,
+    `\n\n【视频 JSON 硬性要求】\nopeningHook.spokenLine、storyboard[].voiceover 必须写完整口播原文。示例：\n{"openingHook":{"type":"痛点情绪","spokenLine":"谁懂啊，每次想复盘都不知道从哪下手…","visualNote":"【近景】工位侧脸皱眉，手机屏幕满是K线"},"coverDesign":{"visual":"…","headline":"周末复盘还能这么玩？","subline":"15分钟搞定一周","mood":"暖色放松"},"storyboard":[{"shotIndex":1,"durationSec":5,"cameraMove":"推","transition":"切","visual":"【近景】…(0-2s)…→(2-5s)…","voiceover":"…","sfx":"消息叮×1"}],"bgmSuggestion":"轻快lo-fi，音量低于口播","interactionGuide":"你们周末都怎么复盘？评论区聊聊～"}`,
   );
 }
 
 function appendImageTextOutputRequirements(parts: string[]) {
   parts.push(
-    `\n\n【输出要求 · 通用】\n- tags 字段必填：8-10 个小红书强相关话题词（不带 #），按赛道/主题/读者/Offer或功能/品牌分层；不得省略或留空数组\n- emoji 按人设 emojiDensity 适量使用（多数人设全文 3-7 个）：点缀在句中、段尾或偶发段首；**禁止**每篇按固定 emoji 顺序当分段小标题（如 🎓要点1、✅方法2）\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一第二第三」「三步/四点/分成X份/先看这四个」等可见清单框架\n- interactionGuide 最多一句轻互动，不得替代正文\n- imageTextSuggestions 必填 1-3 条；每条必须有可执行的 prompt 字段（竖版 3:4 小红书封面画面描述，含主体/场景/光线/色调；若有 coverText 须写明画面内压字位置），scene/visualNotes 仅作补充`,
+    `\n\n【输出要求 · 通用】\n- opening 与 body 必须是**非空字符串**（不要用数组/对象拆段）；也可额外提供合并后的 content 字符串\n- tags 字段必填：8-10 个小红书强相关话题词（不带 #），按赛道/主题/读者/Offer或功能/品牌分层；不得省略或留空数组\n- emoji 数量与气质**服从下方【Emoji · 按人设/场景区分】**，不要自行压到过少；以句中/句尾为主，最多 1-2 段段首起势；禁止每段都以 emoji 开头，禁止 💼📝✅💡🎓📱 当分段小标题\n- 产品植入写在 naturalInsertion/insertStrategy，并在正文 opening/body/content 叙事中段自然带出；禁止文末单独 👉 硬推导流句\n- 禁止「首先/其次/第一第二第三」「三步/四点/分成X份/先看这四个」等可见清单框架\n- 禁止文末单独「市场有风险，投资需谨慎」/⚠️ 风险贴片；riskReminder 可留空\n- interactionGuide **必填**一句结尾互动钩子（提问/投票/接龙/悬念预告/收藏引导择一），不得空、不得替代正文\n- 标题与正文可自然融入平台口语（谁懂啊、听劝、救命、求教程等），禁止堆砌烂梗、禁止官方通稿腔\n- imageTextSuggestions 必填 1-3 条；每条必须有可执行的 prompt（竖版 3:4 信息流封面画面描述，含主体/场景/光线/色调；若有 coverText 写「画面内大字仅一句：xxx」，禁止写 coverText: 字段格式与「小红书」字样/Logo 引导），scene/visualNotes 仅作补充`,
   );
 }
 
@@ -420,6 +423,17 @@ export function buildPersonaContentUserPrompt(
   }
   if (!videoMode) {
     appendImageTextOutputRequirements(parts);
+    parts.push(
+      `\n\n${formatEmojiStyleGuide({
+        personaId,
+        personaVariant: variant?.id || variantId,
+        businessLine,
+        creationScene: String(variables.creationScene || variables.contentType || ""),
+        generationMode: String(variables.generationMode || ""),
+        densityHint: variant?.style?.emojiDensity || persona.style?.emojiDensity,
+        signatureEmoji: variant?.identity?.emoji || persona.identity?.emoji,
+      })}`,
+    );
   }
   const visualGuidelines = variables.visualGuidelines;
   if (

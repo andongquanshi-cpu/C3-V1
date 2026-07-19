@@ -26,13 +26,11 @@ export function buildContentCopyText(input: {
 }) {
   const parts = [
     input.selectedTitle,
-    input.selectedCoverText ? `封面：${input.selectedCoverText}` : "",
     "",
     input.content,
     "",
     input.tags?.length ? input.tags.map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)).join(" ") : "",
     input.interactionGuide || "",
-    input.riskReminder || "",
   ];
   return parts.filter((line, index, arr) => line !== "" || (index > 0 && arr[index - 1] !== "")).join("\n").trim();
 }

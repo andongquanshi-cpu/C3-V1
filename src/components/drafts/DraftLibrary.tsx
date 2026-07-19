@@ -21,6 +21,7 @@ type SelectedEntry = {
   content: GeneratedContent;
   time: string;
   source: "history" | "draft";
+  reviewConfirmed?: boolean;
 };
 
 function formatTime(value: string) {
@@ -63,6 +64,7 @@ export function DraftLibrary() {
       content: draft,
       time: draft.savedAt,
       source: "draft" as const,
+      reviewConfirmed: Boolean(draft.reviewConfirmed),
     })),
     [drafts],
   );
@@ -159,7 +161,17 @@ function DraftPreview({ entry }: { entry: SelectedEntry }) {
     <article className="rounded-xl border border-border/80 bg-card/60">
       <header className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 p-5">
         <div>
-          <div className="mb-2 flex items-center gap-2"><FileText className="h-4 w-4" /><Badge variant="outline">{entry.source === "history" ? "历史记录" : "用户草稿"}</Badge></div>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <FileText className="h-4 w-4" />
+            <Badge variant="outline">{entry.source === "history" ? "历史记录" : "用户草稿"}</Badge>
+            {entry.source === "draft" ? (
+              entry.reviewConfirmed ? (
+                <Badge variant="success">已审核</Badge>
+              ) : (
+                <Badge variant="warning">未审核</Badge>
+              )
+            ) : null}
+          </div>
           <h2 className="text-xl font-semibold leading-snug">{entry.content.selectedTitle}</h2>
           <p className="mt-1 text-xs text-muted-foreground">{formatTime(entry.time)}</p>
         </div>

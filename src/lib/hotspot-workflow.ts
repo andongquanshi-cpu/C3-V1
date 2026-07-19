@@ -99,6 +99,33 @@ export function hotspotMaterialsRequirementHint(options?: {
   return "需至少 1 条热点素材";
 }
 
+/** 热点搜索区话题指引（只引导搜索词，不预选素材） */
+export function getHotspotTopicGuides(
+  businessLine: BusinessLine,
+  options?: { personaId?: string; creationScene?: string; offerLabel?: string },
+): string[] {
+  if (businessLine === "weisec") {
+    return ["A股异动", "板块轮动", "财报季", "监管动态", "半导体", "开户入门"];
+  }
+  const offer = options?.offerLabel?.trim();
+  return [
+    "降息",
+    "宏观政策",
+    offer || "固收+",
+    "资产配置",
+    "基金热度",
+    "银行理财",
+  ];
+}
+
+/** 短词指引转成更适合东财语义搜索的 query；输入框仍显示短词 */
+export function buildHotspotGuideSearchQuery(guide: string): string {
+  const topic = guide.trim();
+  if (!topic) return "";
+  if (/最新|新闻|动态|解读|事件/.test(topic)) return topic;
+  return `${topic} 最新相关新闻`;
+}
+
 /** 默认视为已选（兼容旧数据）；仅显式 selected: false 才排除 */
 export function isMaterialSelected(material: Material) {
   return material.selected !== false;

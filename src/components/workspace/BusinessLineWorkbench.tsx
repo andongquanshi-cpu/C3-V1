@@ -96,7 +96,7 @@ function appendCoordHistory(storageKey: string, configKey: string, coords: Angle
 }
 
 function matrixAngleAxes(embedLevel: BriefInput["embedLevel"]): AngleAxis[] {
-  const cloakByLevel: Record<BriefInput["embedLevel"], string[]> = {
+  const cloakByLevel: Record<"none" | "low" | "medium" | "high", string[]> = {
     none: ["完全不提产品，只讲观点（0 植入）"],
     low: [
       "完全不提产品，只讲观点（0 植入）",
@@ -117,6 +117,7 @@ function matrixAngleAxes(embedLevel: BriefInput["embedLevel"]): AngleAxis[] {
       "作为对比选项之一（A/B/C 三个方式的其中一个）",
     ],
   };
+  const resolvedEmbed = embedLevel || "medium";
 
   return ANGLE_AXES.map((axis) => {
     if (axis.key === "hook") return { ...axis, values: axis.values.filter((value) => !value.includes("热点")) };
@@ -126,7 +127,7 @@ function matrixAngleAxes(embedLevel: BriefInput["embedLevel"]): AngleAxis[] {
         values: axis.values.filter((value) => !value.includes("清单") && !value.includes("SOP")),
       };
     }
-    if (axis.key === "offerCloak") return { ...axis, values: cloakByLevel[embedLevel] };
+    if (axis.key === "offerCloak") return { ...axis, values: cloakByLevel[resolvedEmbed] };
     return axis;
   });
 }
@@ -138,7 +139,7 @@ function buildDefaultBrief(businessLine: BusinessLine): BriefInput {
     topic: "",
     generationMode: "image-text",
     bloggerLevel: "middle",
-    embedLevel: "medium",
+    embedLevel: undefined,
     contentLength: "200-500",
     generateCount: 6,
     customRequirement: "",
@@ -163,8 +164,10 @@ function getMissingBriefSelections(brief: BriefInput, config: BusinessLineWorkfl
   if (!brief.creationScene) missing.push("创作场景");
   if (!brief.audienceTag || !brief.targetUser) missing.push("目标读者");
   if (!brief.personaId) missing.push("创作人设");
+  if (!brief.embedLevel) missing.push("产品出现方式");
   if (
     isFeatureSelectionActive(brief, config, brief.businessLine) &&
+    brief.embedLevel &&
     brief.embedLevel !== "none" &&
     brief.selectedFeatureIds.length === 0
   ) {
@@ -246,10 +249,23 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     () => results.find((result) => result.id === confirmedImageContentId),
     [confirmedImageContentId, results],
   );
+  /** 预览审核主内容：有确认配图用配图版，否则用已确认正文 */
+  const reviewContent = useMemo(
+    () => confirmedImageContent || confirmedContent,
+    [confirmedContent, confirmedImageContent],
+  );
   const missingBriefSelections = getMissingBriefSelections(brief, workflowConfig);
   const canConfirmImages = Boolean(
     confirmedContent?.visualPlan && (confirmedContent.generatedImages?.length || 0) > 0,
   );
+
+  function enterVisualStudio(contentId?: string) {
+    const id = contentId || confirmedContentId || activeResult?.id || "";
+    if (!id) return;
+    setActiveResultId(id);
+    setConfirmedContentId(id);
+    setStep(4);
+  }
 
   useEffect(() => {
     const staleScene = Boolean(
@@ -470,10 +486,23 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
           },
         });
         if (!content.content.trim()) {
-          const payloadKeys = parsedContent && typeof parsedContent === "object" && !Array.isArray(parsedContent)
-            ? Object.keys(parsedContent as Record<string, unknown>).slice(0, 12).join("、")
-            : "非对象响应";
-          throw new Error(`模型返回内容未包含可识别正文（顶层字段：${payloadKeys || "无"}），请重试`);
+          const raw = parsedContent && typeof parsedContent === "object" && !Array.isArray(parsedContent)
+            ? (parsedContent as Record<string, unknown>)
+            : null;
+          const payloadKeys = raw ? Object.keys(raw).slice(0, 12).join("、") : "非对象响应";
+          const fieldShape = raw
+            ? ["opening", "body", "closing", "content"]
+                .map((key) => {
+                  const value = raw[key];
+                  const kind = Array.isArray(value) ? "array" : value === null ? "null" : typeof value;
+                  const preview = typeof value === "string" ? `${value.trim().length}字` : kind;
+                  return `${key}:${preview}`;
+                })
+                .join("，")
+            : "";
+          throw new Error(
+            `模型返回内容未包含可识别正文（顶层字段：${payloadKeys || "无"}${fieldShape ? `；正文位：${fieldShape}` : ""}），请重试`,
+          );
         }
         const bodyCheck = validateGeneratedBody(content.content, contentBrief.businessLine, contentBrief.generationMode);
         if (!bodyCheck.ok) throw new Error(`正文质检未通过：${bodyCheck.reason}`);
@@ -584,16 +613,18 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
     setConfirmedImageContentId(confirmedContent.id);
     setReviewConfirmed(false);
     setStatus(`已确认 ${confirmedContent.generatedImages?.length || 0} 张图片`);
+    setStep(5);
   }
 
   function saveActiveDraft() {
-    const draftContent = confirmedImageContent || activeResult;
+    const draftContent = confirmedImageContent || confirmedContent || activeResult;
     if (!draftContent || !confirmedBrief) return;
     const draft: Draft = {
       ...draftContent,
       savedAt: new Date().toISOString(),
       draftEntryId: uid("draft"),
       generationSnapshot: { ...confirmedBrief, contentLength: brief.contentLength },
+      reviewConfirmed,
     };
     setDrafts((current) => [draft, ...current].slice(0, 30));
     setStatus("已保存到左侧工具栏的草稿箱");
@@ -678,7 +709,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
           confirmed={Boolean(confirmedContentId)}
           showConfirm={false}
           onPrevious={() => setStep(2)}
-          onNext={() => setStep(brief.generationMode === "video-script" ? 5 : 4)}
+          onNext={() => setStep(5)}
         >
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4 rounded-xl border border-border/70 bg-muted/15 p-4">
             <div className="w-full max-w-xs space-y-2">
@@ -707,11 +738,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
               imageApiReady={apiStatus.image}
               imageModel={apiStatus.imageModel}
               onActiveResultChange={changeActiveResult}
-              onEnterVisualStudio={(contentId) => {
-                setActiveResultId(contentId);
-                setConfirmedContentId(contentId);
-                setStep(4);
-              }}
+              onEnterVisualStudio={enterVisualStudio}
               onSaveDraft={saveActiveDraft}
               onBackToAngles={() => setStep(2)}
             />
@@ -724,7 +751,7 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       {step === 4 && brief.generationMode !== "video-script" ? (
         <WorkflowStageShell
           title="生成图片"
-          description="根据已确认的正文规划封面与内容图，完成生图后再确认。"
+          description="根据已确认的正文规划封面与内容图，完成生图后再回到预览审核。"
           confirmed={Boolean(confirmedImageContentId)}
           canConfirm={canConfirmImages}
           onConfirm={confirmImages}
@@ -755,24 +782,30 @@ export function BusinessLineWorkbench({ businessLine }: BusinessLineWorkbenchPro
       {step === 5 ? (
         <WorkflowStageShell
           title="预览审核"
-          description="统一预览正文、图片与合规结果。用户手动保存的版本会进入草稿箱。"
+          description="统一预览正文、合规结果与配图（配图可选）。用户手动保存的版本会进入草稿箱。"
           confirmed={reviewConfirmed}
-          canConfirm={Boolean(confirmedImageContent)}
+          canConfirm={Boolean(reviewContent)}
           confirmLabel="确认审核"
-          showConfirm={Boolean(confirmedImageContent)}
+          showConfirm={Boolean(reviewContent)}
           onConfirm={() => {
-            if (!confirmedImageContent) return;
+            if (!reviewContent) return;
             setReviewConfirmed(true);
             setStatus("预览审核已确认");
           }}
-          onPrevious={() => setStep(brief.generationMode === "video-script" || !confirmedContent ? 3 : 4)}
+          onPrevious={() => setStep(3)}
         >
-          {confirmedImageContent ? (
-            <ReviewPanel content={confirmedImageContent} onSaveDraft={saveActiveDraft} />
+          {reviewContent ? (
+            <ReviewPanel
+              content={reviewContent}
+              onSaveDraft={saveActiveDraft}
+              onEnterVisualStudio={
+                brief.generationMode === "video-script" ? undefined : () => enterVisualStudio(reviewContent.id)
+              }
+            />
           ) : (
             <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border/80 px-5 text-center">
               <p className="text-sm font-medium">还没有可预览的内容</p>
-              <p className="text-xs leading-5 text-muted-foreground">你可以先浏览本页；完成创意角度和内容生成后，预览结果会显示在这里。</p>
+              <p className="text-xs leading-5 text-muted-foreground">完成创意角度和内容生成后，预览结果会显示在这里。</p>
               <Button type="button" variant="outline" onClick={() => setStep(3)}>返回生成内容</Button>
             </div>
           )}

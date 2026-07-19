@@ -62,16 +62,26 @@ export function useMatrixWorkspaceSession({ businessLine, defaultBrief }: Matrix
         {},
         [getBriefStorageKey(businessLine)],
       );
+      // 进入创作页时要素选择保持空白；仅恢复篇幅/形态等非选择偏好。
       setBrief({
         ...defaultBrief,
-        ...stored,
         businessLine,
-        topic: stored.topic || "",
-        materials: Array.isArray(stored.materials) ? stored.materials : [],
+        topic: "",
+        materials: [],
         generationMode: stored.generationMode || "image-text",
         contentLength: normalizeContentLength(stored.contentLength, stored.generationMode || "image-text"),
+        bloggerLevel: stored.bloggerLevel || defaultBrief.bloggerLevel,
+        embedLevel: undefined,
         generateCount: 6,
-        customRequirement: stored.customRequirement || "",
+        customRequirement: "",
+        offerId: undefined,
+        creationScene: undefined,
+        audienceTag: undefined,
+        targetUser: "",
+        personaId: undefined,
+        personaVariant: undefined,
+        selectedFeatureIds: [],
+        selectedFeatureNames: [],
       });
       setDrafts(readStoredJson<Draft[]>(storageKeys.drafts, [], ["lunch-drafts"]));
       setHistory(readStoredJson<GenerationHistoryEntry[]>(storageKeys.history, []).slice(0, 3));

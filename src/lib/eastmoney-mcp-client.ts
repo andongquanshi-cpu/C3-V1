@@ -1,10 +1,11 @@
 import {
   dedupeHotspotMaterials,
+  filterHotspotForBusinessLine,
   normalizeHotspotFromEastMoney,
   type EastMoneyNewsItem,
 } from "@/lib/eastmoney-hotspot";
 import { expandEastMoneyNewsItems, parseEastMoneyTablePayload } from "@/lib/eastmoney-table-parser";
-import { filterHotspotQuality } from "@/lib/hotspot-display";
+import { buildHotspotMaterialId, filterHotspotQuality } from "@/lib/hotspot-display";
 
 export const EASTMONEY_MCP_URL =
   process.env.EASTMONEY_MCP_URL?.trim() || "https://mxapi.eastmoney.com/mxds/mcp";
@@ -282,9 +283,21 @@ export class EastMoneyMcpClient {
   }
 }
 
-export async function searchEastMoneyNewsViaMcp(query: string, apiKey: string) {
+export async function searchEastMoneyNewsViaMcp(
+  query: string,
+  apiKey: string,
+  options?: { businessLine?: string },
+) {
   const client = new EastMoneyMcpClient(apiKey);
   const items = expandEastMoneyNewsItems(await client.searchNews(query));
-  const normalized = dedupeHotspotMaterials(items).map((item) => normalizeHotspotFromEastMoney(item));
-  return filterHotspotQuality(normalized);
+  const normalized = dedupeHotspotMaterials(items).map((item) => {
+    const material = normalizeHotspotFromEastMoney(item);
+    return {
+      ...material,
+      id: buildHotspotMaterialId(material.source, material.title),
+      createdAt: new Date().toISOString(),
+    };
+  });
+  const qualityFiltered = filterHotspotQuality(normalized);
+  return filterHotspotForBusinessLine(qualityFiltered, options?.businessLine, "custom");
 }

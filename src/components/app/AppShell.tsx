@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Activity, Archive, ChartNoAxesCombined, PanelLeftClose, PanelLeftOpen, PenLine } from "lucide-react";
+import { Archive, ChartNoAxesCombined, PanelLeftClose, PanelLeftOpen, PenLine } from "lucide-react";
 import { ProfileMenu } from "@/components/app/ProfileMenu";
 import { cn } from "@/lib/utils";
 
@@ -39,8 +39,6 @@ export function AppShell({ children }: AppShellProps) {
     getSidebarPreference,
     getServerSidebarPreference,
   );
-  const pageTitle = pathname === "/drafts" ? "草稿箱" : pathname === "/create" ? "开始创作" : "首页";
-
   function toggleSidebar() {
     window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(!sidebarCollapsed));
     window.dispatchEvent(new Event(SIDEBAR_PREFERENCE_EVENT));
@@ -95,17 +93,6 @@ export function AppShell({ children }: AppShellProps) {
       </aside>
 
       <div className="app-main">
-        <header className="app-topbar">
-          <div className="app-topbar-heading">
-            <span className="app-topbar-kicker">C3 / Workspace</span>
-            <strong className="app-topbar-title">{pageTitle}</strong>
-          </div>
-          <div className="app-topbar-meta" aria-label="系统状态">
-            <span className="app-market-status"><Activity className="h-3 w-3" /> 系统就绪</span>
-            <span>KB 5.0</span>
-            <span className="is-primary">C3 · V3</span>
-          </div>
-        </header>
         <main className={cn("app-content", pathname === "/" && "homepage-content")}>{children}</main>
       </div>
     </div>
