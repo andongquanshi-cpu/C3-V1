@@ -376,13 +376,13 @@ function resolvePersonaUserTemplate(persona: PersonaStandard, variant: PersonaVa
 
 function appendVideoOutputRequirements(parts: string[]) {
   parts.push(
-    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- openingHook 须有强钩子（反常识/痛点/好奇/数字），禁止流水账开场\n- storyboard 每镜 visual+voiceover 必填；visual 须含景别、主体动作、屏幕具体内容、环境、人物状态；多信息点用时间轴\n- 每镜填写 cameraMove / sfx / transition；整片填写 bgmSuggestion、coverDesign、interactionGuide（软CTA）\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePromptSuggestions / 图文封面字段（用 coverDesign）\n- tags 必填 8-10 个强相关话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
+    `\n\n【输出要求 · 视频脚本 — 覆盖人设模板中的图文/Markdown 输出格式】\n- 必须输出**合法 JSON**，不要 Markdown 分镜稿\n- openingHook 必填开场口播+画面，但类型多元：强钩子 / 软开场-场景或日记 / 直接干货 / 轻问句；按人设与角度选，禁止篇篇强钩子\n- storyboard 每镜 visual+voiceover 必填；visual 须含景别、主体动作、屏幕具体内容、环境、人物状态；多信息点用时间轴\n- 每镜填写 cameraMove / sfx / transition；整片填写 bgmSuggestion、coverDesign、interactionGuide（软CTA）\n- content 须写完整分镜稿，**禁止**只写「【镜头N】| 时长：Xs」占位\n- 禁止 imagePromptSuggestions / 图文封面字段（用 coverDesign）\n- tags 必填 8-10 个强相关话题词（不带 #）\n- 口播像真人说话，禁止机构通稿腔`,
   );
 }
 
 function appendVideoJsonSchemaOverride(parts: string[]) {
   parts.push(
-    `\n\n【视频 JSON 硬性要求】\nopeningHook.spokenLine、storyboard[].voiceover 必须写完整口播原文。示例：\n{"openingHook":{"type":"痛点情绪","spokenLine":"谁懂啊，每次想复盘都不知道从哪下手…","visualNote":"【近景】工位侧脸皱眉，手机屏幕满是K线"},"coverDesign":{"visual":"…","headline":"周末复盘还能这么玩？","subline":"15分钟搞定一周","mood":"暖色放松"},"storyboard":[{"shotIndex":1,"durationSec":5,"cameraMove":"推","transition":"切","visual":"【近景】…(0-2s)…→(2-5s)…","voiceover":"…","sfx":"消息叮×1"}],"bgmSuggestion":"轻快lo-fi，音量低于口播","interactionGuide":"你们周末都怎么复盘？评论区聊聊～"}`,
+    `\n\n【视频 JSON 硬性要求】\nopeningHook.spokenLine、storyboard[].voiceover 必须写完整口播原文。软开场示例：\n{"openingHook":{"type":"软开场-场景","spokenLine":"周末上午泡了杯咖啡，我习惯先翻翻微信里的提醒记录。","visualNote":"【近景】咖啡馆桌面咖啡杯边缘，手机屏幕微信列表"},"coverDesign":{"visual":"…","headline":"周末复盘还能这么玩？","mood":"暖色放松"},"storyboard":[{"shotIndex":1,"durationSec":5,"cameraMove":"固定","transition":"切","visual":"【近景】…","voiceover":"…","sfx":"环境底噪"}],"bgmSuggestion":"轻快lo-fi，音量低于口播","interactionGuide":"你们周末都怎么复盘？评论区聊聊～"}`,
   );
 }
 

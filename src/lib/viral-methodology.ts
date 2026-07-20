@@ -105,6 +105,7 @@ export function formatViralMethodologyForVideoPrompt(
     ...(Array.isArray(titleMod?.examples) ? (titleMod.examples as string[]).slice(0, 2).map((e) => `  参考语气（须改写）：${e}`) : []),
     "",
     `▸ 本篇开篇：${modules.hookTypeLabel}`,
+    "  （开场风格按本篇路由，强钩子不是默认；软开场/直接干货同样合格）",
     hookMod?.guidance ? `  ${hookMod.guidance}` : modules.hookGuidance,
     ...(Array.isArray(hookMod?.oralExamples) ? (hookMod.oralExamples as string[]).slice(0, 2).map((e) => `  口播气质参考：${e}`) : []),
     "",

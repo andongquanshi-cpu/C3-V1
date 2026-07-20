@@ -127,7 +127,7 @@ export function VideoScriptTable({ content, showExport = true }: VideoScriptTabl
           ) : null}
           {hook?.type || content.scriptMeta?.hookType ? (
             <Badge variant="outline" className="font-normal">
-              钩子：{hook?.type || content.scriptMeta?.hookType}
+              开场：{hook?.type || content.scriptMeta?.hookType}
             </Badge>
           ) : null}
         </div>
@@ -143,7 +143,7 @@ export function VideoScriptTable({ content, showExport = true }: VideoScriptTabl
         <div className="grid gap-3 border-b border-border/60 bg-muted/5 px-4 py-3 text-xs leading-5 sm:grid-cols-2">
           {hook?.spokenLine || hook?.visualNote ? (
             <div>
-              <div className="font-medium text-foreground">黄金 3 秒钩子</div>
+              <div className="font-medium text-foreground">开场</div>
               {hook?.spokenLine ? <p className="mt-1 text-muted-foreground">口播：{hook.spokenLine}</p> : null}
               {hook?.visualNote ? <p className="mt-1 text-muted-foreground">画面：{hook.visualNote}</p> : null}
             </div>

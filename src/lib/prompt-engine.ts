@@ -442,7 +442,8 @@ const VIDEO_PERSONA_TASK_LOCK = [
   "- 人设 system 只约束：语气、场景、称呼、禁忌词、口播气质",
   "- 忽略人设中的：图文正文结构、emoji 分段标题、400-500 字篇幅、imageTextSuggestions、封面文案",
   "- 创作优先级：先写满 storyboard[].voiceover 口播原文，再按「说演一致」写 visual（须含景别/动作/屏幕内容/环境/人物状态）",
-  "- 每镜必填 cameraMove、sfx、transition；整片必填 bgmSuggestion、coverDesign、openingHook（强钩子）",
+  "- 每镜必填 cameraMove、sfx、transition；整片必填 bgmSuggestion、coverDesign、openingHook（开场风格）",
+  "- 开场按角度多元：强钩子 / 软场景 / 直接干货 / 轻问句均可，禁止篇篇强钩子",
   "- 口播多信息点时 visual 须用时间轴拆画面；结尾须有软 CTA（interactionGuide）+ 口语风险",
   "- 禁止只输出镜头时长占位；忽略人设模板里固定的 ⚠️ 风险标语，禁止每条都念「市场有风险投资需谨慎」",
 ].join("\n");

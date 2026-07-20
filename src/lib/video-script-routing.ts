@@ -43,19 +43,28 @@ const HOOK_MODULES: Record<string, { label: string; guidance: string }> = {
   contrast: {
     label: "强反差/反直觉",
     guidance:
-      "先建立一种预期或喜庆氛围，再迅速转折；或推翻大众共识。适合制造停留，但不要每篇都用同一句式。",
+      "先建立预期再转折，或推翻共识。适合流量/情绪向角度；不是默认选项，人设偏日记/冷静时勿硬套。",
   },
   "pain-scene": {
     label: "情绪共鸣/生活场景",
-    guidance: "用具体生活瞬间切入（工位、发工资、被家人问、刷到焦虑信息），让读者觉得「这说的就是我」。",
+    guidance: "用具体生活瞬间切入（工位、发工资、被家人问），可有情绪但不必喊麦；重在「这说的就是我」。",
   },
   curiosity: {
     label: "好奇/信息缺口",
-    guidance: "制造「我还不知道的事」或私密感，但不编造内幕、不暗示荐股。",
+    guidance: "制造「我还不知道的事」或轻私密感，但不编造内幕、不暗示荐股。",
   },
   "macro-to-personal": {
     label: "远到近",
-    guidance: "从大事件/宏观话题快速折算到个人钱包、时间、精力，强调与「我」的关系。",
+    guidance: "从大事件/宏观话题折算到个人钱包、时间、精力，强调与「我」的关系。",
+  },
+  "soft-scene": {
+    label: "软开场/场景铺垫",
+    guidance:
+      "允许平静进题：先给可拍的生活画面与细节，再自然接到主题。不要为了「黄金3秒」硬改成强钩子；仍须有信息走向，避免空洞流水账。",
+  },
+  "direct-value": {
+    label: "直接干货开场",
+    guidance: "开场就给方法、对比或结论，少铺垫、少情绪轰炸；适合教程/测评向。",
   },
 };
 
@@ -104,15 +113,23 @@ function pickTitleType(goal: string, axis?: string): keyof typeof TITLE_MODULES 
 function pickHookType(axis?: string, angleId?: string): keyof typeof HOOK_MODULES {
   const map: Record<string, keyof typeof HOOK_MODULES> = {
     情绪钩子: "contrast",
-    生活场景: "pain-scene",
-    叙事人称: "pain-scene",
-    信息增量: "macro-to-personal",
+    生活场景: "soft-scene",
+    叙事人称: "soft-scene",
+    信息增量: "direct-value",
     热点切入: "macro-to-personal",
-    风险意识: "contrast",
-    产品距离: "pain-scene",
+    风险意识: "pain-scene",
+    产品距离: "direct-value",
   };
   if (axis && map[axis]) return map[axis];
-  const pool: Array<keyof typeof HOOK_MODULES> = ["pain-scene", "contrast", "curiosity", "macro-to-personal"];
+  // 轮转含软开场/直接干货，避免篇篇强钩子
+  const pool: Array<keyof typeof HOOK_MODULES> = [
+    "soft-scene",
+    "pain-scene",
+    "direct-value",
+    "curiosity",
+    "contrast",
+    "macro-to-personal",
+  ];
   const seed = String(angleId || "").length;
   return pool[seed % pool.length];
 }
@@ -128,7 +145,7 @@ function pickBodyStructure(axis?: string, duration?: string): keyof typeof BODY_
 
 function shotCountForDuration(duration?: string): string {
   if (duration === "15s") return "2-3 个镜头，节奏快，一句一画面";
-  if (duration === "30s") return "4-5 个镜头，钩子+展开+收束";
+  if (duration === "30s") return "4-5 个镜头，开场+展开+收束（开场可强可软）";
   return "5-7 个镜头，允许完整叙事弧线";
 }
 
